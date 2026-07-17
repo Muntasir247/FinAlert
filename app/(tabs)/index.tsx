@@ -1,32 +1,13 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { View, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Home Screen</Text>
-      <Text style={styles.paragraph}>Placeholder for the Home Dashboard</Text>
-    </View>
+    <SafeAreaView className="flex-1 bg-green-white" edges={['top']}>
+      <View className="flex-1 items-center justify-center">
+        <Text className="text-2xl font-bold text-light-bg-text">Home</Text>
+        <Text className="text-light-bg-shade mt-2">Dashboard coming soon</Text>
+      </View>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6', // Light gray background
-  },
-  title: {
-    fontSize: 20,
-    lineHeight: 22,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  paragraph: {
-    fontSize: 13,
-    lineHeight: 15,
-    fontWeight: 'normal',
-    color: '#6B7280',
-  },
-});

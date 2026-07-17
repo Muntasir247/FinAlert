@@ -1,164 +1,244 @@
-import React from 'react';
-import { StyleSheet, Text, View, Image, TouchableOpacity, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import React, { useEffect } from 'react';
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  Dimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  Easing,
+} from 'react-native-reanimated';
+import * as SplashScreen from 'expo-splash-screen';
 
-// Color definitions from DESIGN.md
-const COLORS = {
-  bgLight: '#F2FAF7',       // Background Green White and Letters (light greenish-white)
-  textPrimary: '#002844',   // Text color for Light BG / Dark variant color
-  textSecondary: '#5C6B73', // Shade of Text in Light bg (secondary text)
-  lightGreen: '#D1FAE5',    // Light Green brand accent token
-  signUpText: '#0A3B29',    // Dark contrast typography for Sign Up button
-  loginGradStart: '#0CDA9E',// Button grad start (mint)
-  loginGradEnd: '#00A76F',  // Button grad end (emerald)
-};
+// Keep the native splash visible until our animation is ready to start
+SplashScreen.preventAutoHideAsync();
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const handlePress = () => {
-    // Navigate to the main tab screen
-    router.replace('/(tabs)');
-  };
+  // --- Reanimated shared values ---
+  // Logo fades + slides up from below
+  const logoOpacity = useSharedValue(0);
+  const logoTranslateY = useSharedValue(24);
+  // Title fades in slightly after logo
+  const titleOpacity = useSharedValue(0);
+  const titleTranslateY = useSharedValue(16);
+  // Subtitle/paragraph fades in after title
+  const subtextOpacity = useSharedValue(0);
+  // Buttons slide in from bottom last
+  const buttonsOpacity = useSharedValue(0);
+  const buttonsTranslateY = useSharedValue(32);
+
+  useEffect(() => {
+    const easing = Easing.out(Easing.cubic);
+
+    // Hold the native splash (1-A green screen) for 2500ms so it is
+    // clearly visible, then hide it and immediately begin the 1-B entry.
+    const splashTimer = setTimeout(async () => {
+      await SplashScreen.hideAsync();
+
+      // Staggered orchestration: logo → title → subtext → buttons
+      logoOpacity.value = withDelay(60, withTiming(1, { duration: 520, easing }));
+      logoTranslateY.value = withDelay(60, withTiming(0, { duration: 480, easing }));
+
+      titleOpacity.value = withDelay(220, withTiming(1, { duration: 420, easing }));
+      titleTranslateY.value = withDelay(220, withTiming(0, { duration: 380, easing }));
+
+      subtextOpacity.value = withDelay(360, withTiming(1, { duration: 380, easing }));
+
+      buttonsOpacity.value = withDelay(480, withTiming(1, { duration: 480, easing }));
+      buttonsTranslateY.value = withDelay(480, withTiming(0, { duration: 440, easing }));
+    }, 2500);
+
+    return () => clearTimeout(splashTimer);
+  }, []);
+
+  // --- Animated styles ---
+  const logoStyle = useAnimatedStyle(() => ({
+    opacity: logoOpacity.value,
+    transform: [{ translateY: logoTranslateY.value }],
+  }));
+
+  const titleStyle = useAnimatedStyle(() => ({
+    opacity: titleOpacity.value,
+    transform: [{ translateY: titleTranslateY.value }],
+  }));
+
+  const subtextStyle = useAnimatedStyle(() => ({
+    opacity: subtextOpacity.value,
+  }));
+
+  const buttonsStyle = useAnimatedStyle(() => ({
+    opacity: buttonsOpacity.value,
+    transform: [{ translateY: buttonsTranslateY.value }],
+  }));
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <StatusBar style="dark" />
-      
-      {/* Animated Fade-in Container for smooth entrance transition */}
-      <Animated.View 
-        entering={FadeIn.duration(1000)} 
-        style={styles.contentContainer}
-      >
-        {/* Branding Content */}
-        <View style={styles.brandSection}>
+    <View
+      style={[
+        styles.root,
+        { paddingTop: insets.top, paddingBottom: insets.bottom },
+      ]}
+    >
+      {/* ── Branding block — vertically centered ── */}
+      <View style={styles.brandBlock}>
+
+        {/* Logo — dark variant (navy circular mark on light bg) */}
+        <Animated.View style={[styles.logoWrapper, logoStyle]}>
           <Image
             source={require('../assets/images/logo.png')}
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={styles.title}>FinAlert</Text>
-          <Text style={styles.subtext}>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod.
-          </Text>
-        </View>
+        </Animated.View>
 
-        {/* Interactive Actions */}
-        <View style={styles.actionSection}>
-          {/* Log In Button - Primary with Gradient */}
-          <TouchableOpacity 
-            activeOpacity={0.8} 
-            onPress={handlePress}
-            style={styles.buttonWrapper}
-            accessibilityLabel="Log In Button"
-            accessibilityRole="button"
-          >
-            <LinearGradient
-              colors={[COLORS.loginGradStart, COLORS.loginGradEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.loginButton}
-            >
-              <Text style={styles.loginButtonText}>Log In</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+        {/* App name — Title token: text-[20px] leading-[22px] font-bold / light-bg-text */}
+        <Animated.Text style={[styles.title, titleStyle]}>
+          FinAlert
+        </Animated.Text>
 
-          {/* Sign Up Button - Low emphasis with Light Green container */}
-          <TouchableOpacity 
-            activeOpacity={0.8} 
-            onPress={handlePress}
-            style={[styles.buttonWrapper, styles.signUpContainer]}
-            accessibilityLabel="Sign Up Button"
+        {/* Subtext — Paragraph token: text-[13px] leading-[15px] font-normal / light-bg-shade */}
+        <Animated.Text style={[styles.paragraph, subtextStyle]}>
+          Smart Finance for Smart Families
+        </Animated.Text>
+
+      </View>
+
+      {/* ── CTA buttons — pinned to bottom ── */}
+      <Animated.View
+        style={[
+          styles.buttonsContainer,
+          { paddingBottom: insets.bottom > 0 ? 0 : 16 },
+          buttonsStyle,
+        ]}
+      >
+        {/* Log In — Button grad: mint gradient, white subtitle-weight label */}
+        <LinearGradient
+          colors={['#02C78E', '#0FB384']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.loginGradient}
+        >
+          <TouchableOpacity
+            style={styles.buttonInner}
+            activeOpacity={0.82}
             accessibilityRole="button"
+            accessibilityLabel="Log In"
           >
-            <Text style={styles.signUpText}>Sign Up</Text>
+            {/* Subtitle token weight for button labels */}
+            <Text style={styles.loginLabel}>Log In</Text>
           </TouchableOpacity>
-        </View>
+        </LinearGradient>
+
+        {/* Sign Up — Light Green accent bg, main-theme tint, subtitle-weight label */}
+        <TouchableOpacity
+          style={styles.signupButton}
+          activeOpacity={0.82}
+          accessibilityRole="button"
+          accessibilityLabel="Sign Up"
+        >
+          <Text style={styles.signupLabel}>Sign Up</Text>
+        </TouchableOpacity>
+
       </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  // ── Root ──────────────────────────────────────────────
+  root: {
     flex: 1,
-    backgroundColor: COLORS.bgLight,
-  },
-  contentContainer: {
-    flex: 1,
-    justifyContent: 'space-between',
+    // Token: Background Green White and Letters (#F4FBF7)
+    backgroundColor: '#F4FBF7',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 24,
   },
-  brandSection: {
+
+  // ── Brand block ───────────────────────────────────────
+  brandBlock: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    width: '100%',
+    justifyContent: 'center',
+    gap: 14,
+  },
+  logoWrapper: {
+    marginBottom: 4,
   },
   logo: {
-    width: 140,
-    height: 140,
-    marginBottom: 24,
+    width: 120,
+    height: 120,
   },
+
+  // Typography — must match DESIGN.md exactly
+  // Title token: text-[20px] leading-[22px] font-bold, light-bg-text (#091E15)
   title: {
-    // Title typography token: 20px leading 22px bold
     fontSize: 20,
     lineHeight: 22,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
+    fontWeight: '700',
+    color: '#091E15',
     textAlign: 'center',
-    marginBottom: 8,
+    letterSpacing: 0.2,
   },
-  subtext: {
-    // Paragraph typography token: 13px leading 15px normal
+  // Paragraph token: text-[13px] leading-[15px] font-normal, light-bg-shade (#6B7280)
+  paragraph: {
     fontSize: 13,
     lineHeight: 15,
-    fontWeight: 'normal',
-    color: COLORS.textSecondary,
+    fontWeight: '400',
+    color: '#6B7280',
     textAlign: 'center',
-    paddingHorizontal: 32,
+    marginTop: 2,
   },
-  actionSection: {
+
+  // ── Buttons ───────────────────────────────────────────
+  buttonsContainer: {
     width: '100%',
-    paddingBottom: 40, // Additional padding from bottom
+    gap: 12,
+    marginBottom: 20,
   },
-  buttonWrapper: {
+  loginGradient: {
     width: '100%',
-    height: 52, // Respects tap target (min 48x48dp)
+    height: 52,
     borderRadius: 26,
     overflow: 'hidden',
-    marginBottom: 12,
   },
-  loginButton: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
+  buttonInner: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  loginButtonText: {
-    // Subtitle typography token: 16px weight 500 (medium)
+  // Subtitle token: text-[16px] font-medium, Letters and Icons (#FFFFFF)
+  loginLabel: {
     fontSize: 16,
     fontWeight: '500',
     color: '#FFFFFF',
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
+    letterSpacing: 0.1,
   },
-  signUpContainer: {
-    backgroundColor: COLORS.lightGreen,
-    justifyContent: 'center',
+  signupButton: {
+    width: '100%',
+    height: 52,
+    borderRadius: 26,
+    // Token: Light Green (#E8F7F1)
+    backgroundColor: '#E8F7F1',
     alignItems: 'center',
-    marginBottom: 0,
+    justifyContent: 'center',
   },
-  signUpText: {
-    // Subtitle typography token: 16px weight 500 (medium)
+  // Subtitle token: text-[16px] font-medium, main-theme (#0FB384)
+  signupLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: COLORS.signUpText,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
+    color: '#0FB384',
+    letterSpacing: 0.1,
   },
 });
