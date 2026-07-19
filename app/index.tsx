@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -37,6 +38,28 @@ export default function WelcomeScreen() {
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
+
+  // --- Forgot Password modal state ---
+  const [forgotModalVisible, setForgotModalVisible] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
+
+  const openForgotModal = () => {
+    setResetEmail('');
+    setResetSent(false);
+    setForgotModalVisible(true);
+  };
+
+  const closeForgotModal = () => {
+    setForgotModalVisible(false);
+    setResetEmail('');
+    setResetSent(false);
+  };
+
+  const handleSendReset = () => {
+    if (resetEmail.trim().length === 0) return;
+    setResetSent(true);
+  };
 
   // --- Reanimated shared values ---
   // Logo fades + slides up from below
@@ -105,7 +128,7 @@ export default function WelcomeScreen() {
   if (screen === 'login') {
     return (
       <KeyboardAvoidingView
-        style={[styles.root, { paddingTop: insets.top }]}
+        style={[styles.root, { paddingTop: insets.top, paddingHorizontal: 0, alignItems: 'stretch' }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
@@ -224,6 +247,7 @@ export default function WelcomeScreen() {
               activeOpacity={0.7}
               accessibilityRole="link"
               accessibilityLabel="Forgot password"
+              onPress={openForgotModal}
             >
               {/* Subtext token: text-[14px] font-normal */}
               <Text style={styles.forgotText}>Forgot Password?</Text>
@@ -258,6 +282,115 @@ export default function WelcomeScreen() {
 
           </View>
         </ScrollView>
+
+        {/* ── Forgot Password Modal ── */}
+        <Modal
+          visible={forgotModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={closeForgotModal}
+          statusBarTranslucent
+        >
+          {/* Semi-transparent dark backdrop */}
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+
+              {/* Header row: title + close button */}
+              <View style={styles.modalHeader}>
+                {/* Title token: text-[20px] leading-[22px] font-bold */}
+                <Text style={styles.modalTitle}>Reset Password</Text>
+                <TouchableOpacity
+                  style={styles.modalCloseBtn}
+                  onPress={closeForgotModal}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close modal"
+                >
+                  <Ionicons name="close" size={18} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+
+              {resetSent ? (
+                /* ── State 3: Success Confirmation ── */
+                <View style={styles.modalBody}>
+                  {/* Checkmark icon in light-green circle */}
+                  <View style={styles.modalIconCircle}>
+                    <Ionicons name="checkmark-circle-outline" size={36} color="#0FB384" />
+                  </View>
+
+                  {/* Title token: text-[20px] font-bold */}
+                  <Text style={styles.successTitle}>Check your email!</Text>
+
+                  {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
+                  <Text style={styles.successBody}>
+                    We've sent a password reset link to {resetEmail}
+                  </Text>
+
+                  {/* Back to Login — full-width primary green button */}
+                  <TouchableOpacity
+                    style={styles.resetBtn}
+                    onPress={closeForgotModal}
+                    activeOpacity={0.82}
+                    accessibilityRole="button"
+                    accessibilityLabel="Back to login"
+                  >
+                    {/* Subtitle token elevated to bold white */}
+                    <Text style={styles.resetBtnLabel}>Back to Login</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                /* ── State 1 & 2: Input form ── */
+                <View style={styles.modalBody}>
+                  {/* Envelope icon in light-green rounded box */}
+                  <View style={styles.modalIconCircle}>
+                    <Ionicons name="mail-outline" size={32} color="#0FB384" />
+                  </View>
+
+                  {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
+                  <Text style={styles.modalInstructions}>
+                    Enter your registered email address. We'll send you a link to reset your password.
+                  </Text>
+
+                  {/* Email Address label + input */}
+                  <View style={styles.inputGroup}>
+                    {/* Subtext token: text-[14px] font-normal */}
+                    <Text style={styles.inputLabel}>Email Address</Text>
+                    <View style={styles.inputWrapper}>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="Enter your email"
+                        placeholderTextColor="#A0ADB6"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        value={resetEmail}
+                        onChangeText={setResetEmail}
+                        accessibilityLabel="Reset email input"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Send Reset Link button — inactive (gray) when empty, green when has text */}
+                  <TouchableOpacity
+                    style={[
+                      styles.resetBtn,
+                      resetEmail.trim().length === 0 && styles.resetBtnDisabled,
+                    ]}
+                    onPress={handleSendReset}
+                    activeOpacity={resetEmail.trim().length === 0 ? 1 : 0.82}
+                    accessibilityRole="button"
+                    accessibilityLabel="Send reset link"
+                  >
+                    {/* Subtitle token elevated to bold white */}
+                    <Text style={styles.resetBtnLabel}>Send Reset Link</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+            </View>
+          </View>
+        </Modal>
+
       </KeyboardAvoidingView>
     );
   }
@@ -344,7 +477,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F4FBF7',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
   },
 
   // ── Welcome — Brand block ─────────────────────────────
@@ -426,7 +559,7 @@ const styles = StyleSheet.create({
   // ── Login Screen ──────────────────────────────────────
   loginScrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingBottom: 32,
   },
 
@@ -542,6 +675,7 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     marginBottom: 14,
+    width: '100%',
   },
   // Subtext token: text-[14px] font-normal
   inputLabel: {
@@ -629,5 +763,122 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#091E15',
+  },
+
+  // ── Forgot Password Modal ──────────────────────────────
+  // Semi-transparent dark backdrop (Token: Dark Mode Green Black overlay)
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(9, 30, 21, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  // White modal card
+  modalCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  // Header row: title left, X button right
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  // Title token: text-[20px] leading-[22px] font-bold
+  modalTitle: {
+    fontSize: 20,
+    lineHeight: 22,
+    fontWeight: '700',
+    color: '#091E15',
+    letterSpacing: 0.2,
+  },
+  // Circle close button
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Modal body — stacked content
+  modalBody: {
+    alignItems: 'center',
+    gap: 14,
+    width: '100%',
+  },
+  // Light-green rounded icon container
+  modalIconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 18,
+    // Token: Light Green (#E8F7F1)
+    backgroundColor: '#E8F7F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  // Paragraph token: text-[13px] leading-[15px] font-normal — instruction copy
+  modalInstructions: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400',
+    // Token: Alternative Accent / main theme green for link-style instruction text
+    color: '#0FB384',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  // Send Reset Link / Back to Login full-width primary button
+  resetBtn: {
+    width: '100%',
+    height: 52,
+    borderRadius: 26,
+    // Token: Button grad primary green
+    backgroundColor: '#0FB384',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  // Disabled state — light gray when input is empty
+  resetBtnDisabled: {
+    backgroundColor: '#D1D5DB',
+  },
+  // Subtitle token elevated to bold white
+  resetBtnLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.1,
+  },
+  // Success state — "Check your email!" Title token
+  successTitle: {
+    fontSize: 20,
+    lineHeight: 22,
+    fontWeight: '700',
+    color: '#091E15',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  // Success sub-copy — Paragraph token
+  successBody: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400',
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 4,
   },
 });
