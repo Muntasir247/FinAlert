@@ -5,10 +5,9 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SymbolView } from 'expo-symbols';
+import { Ionicons, Feather } from '@expo/vector-icons';
 
 // ── Circular Progress Ring ──────────────────────────────────────────────
 
@@ -80,26 +79,14 @@ export default function HomeScreen() {
           </View>
           <View style={styles.iconRow}>
             <View style={styles.iconButton}>
-              <SymbolView
-                name={Platform.select({ ios: 'mic.fill', default: 'mic' }) as any}
-                size={20}
-                tintColor="#091E15"
-              />
+              <Feather name="mic" size={20} color="#091E15" />
             </View>
             <View style={styles.iconButton}>
-              <SymbolView
-                name={Platform.select({ ios: 'qrcode.viewfinder', default: 'center_focus_strong' }) as any}
-                size={20}
-                tintColor="#091E15"
-              />
+              <Feather name="aperture" size={20} color="#091E15" />
             </View>
             <View>
               <View style={styles.iconButton}>
-                <SymbolView
-                  name={Platform.select({ ios: 'bell.fill', default: 'notifications' }) as any}
-                  size={20}
-                  tintColor="#091E15"
-                />
+                <Ionicons name="notifications-outline" size={20} color="#091E15" />
               </View>
               <View style={styles.badgeContainer}>
                 <Text style={styles.badgeText}>3</Text>
@@ -120,11 +107,7 @@ export default function HomeScreen() {
               </Text>
             </View>
             <TouchableOpacity style={styles.fab}>
-              <SymbolView
-                name={Platform.select({ ios: 'plus', default: 'add' }) as any}
-                size={22}
-                tintColor="#FFFFFF"
-              />
+              <Ionicons name="add" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </View>
@@ -137,11 +120,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.dashedBox}>
-          <SymbolView
-            name={Platform.select({ ios: 'chart.pie.fill', default: 'pie_chart' }) as any}
-            size={32}
-            tintColor="#9CA3AF"
-          />
+          <Ionicons name="pie-chart-outline" size={32} color="#9CA3AF" />
           <TouchableOpacity>
             <Text style={styles.dashedLink}>Set up budget limits →</Text>
           </TouchableOpacity>
@@ -150,11 +129,7 @@ export default function HomeScreen() {
         {/* ── AI Financial Insight Banner ── */}
         <View style={styles.aiBanner}>
           <View style={styles.aiHeaderRow}>
-            <SymbolView
-              name={Platform.select({ ios: 'sparkles', default: 'auto_awesome' }) as any}
-              size={18}
-              tintColor="#7C3AED"
-            />
+            <Ionicons name="sparkles" size={18} color="#7C3AED" />
             <Text style={styles.aiHeaderText}>AI financial insight</Text>
           </View>
           <Text style={styles.aiBodyText}>
@@ -176,31 +151,19 @@ export default function HomeScreen() {
           style={styles.carousel}
         >
           <View style={styles.savingsCard}>
-            <SymbolView
-              name={Platform.select({ ios: 'shield.fill', default: 'shield' }) as any}
-              size={28}
-              tintColor="#3B82F6"
-            />
+            <Ionicons name="shield-checkmark-outline" size={28} color="#3B82F6" />
             <Text style={styles.savingsTitle}>Emergency Fund</Text>
             <ProgressBar pct={0.3} color="#3B82F6" />
             <Text style={styles.savingsAmount}>৳15,000 of ৳50,000</Text>
           </View>
           <View style={styles.savingsCard}>
-            <SymbolView
-              name={Platform.select({ ios: 'airplane', default: 'flight' }) as any}
-              size={28}
-              tintColor="#0FB384"
-            />
+            <Ionicons name="airplane-outline" size={28} color="#0FB384" />
             <Text style={styles.savingsTitle}>Trip Fund</Text>
             <ProgressBar pct={0.34} color="#0FB384" />
             <Text style={styles.savingsAmount}>৳8,500 of ৳25,000</Text>
           </View>
           <View style={styles.savingsCard}>
-            <SymbolView
-              name={Platform.select({ ios: 'iphone', default: 'devices' }) as any}
-              size={28}
-              tintColor="#8B5CF6"
-            />
+            <Ionicons name="phone-portrait-outline" size={28} color="#8B5CF6" />
             <Text style={styles.savingsTitle}>New Phone</Text>
             <ProgressBar pct={0.6} color="#8B5CF6" />
             <Text style={styles.savingsAmount}>৳12,000 of ৳20,000</Text>
@@ -219,11 +182,7 @@ export default function HomeScreen() {
           {/* Monthly Salary */}
           <View style={styles.transactionRow}>
             <View style={[styles.txIconBase, styles.txIconGreen]}>
-              <SymbolView
-                name={Platform.select({ ios: 'suitcase.fill', default: 'work' }) as any}
-                size={18}
-                tintColor="#0FB384"
-              />
+              <Feather name="briefcase" size={18} color="#0FB384" />
             </View>
             <View style={styles.txTextArea}>
               <Text style={styles.txName}>Monthly Salary</Text>
@@ -235,11 +194,7 @@ export default function HomeScreen() {
           {/* Lunch at restaurant */}
           <View style={styles.transactionRow}>
             <View style={[styles.txIconBase, styles.txIconRed]}>
-              <SymbolView
-                name={Platform.select({ ios: 'fork.knife', default: 'restaurant' }) as any}
-                size={18}
-                tintColor="#EF4444"
-              />
+              <Ionicons name="restaurant-outline" size={18} color="#EF4444" />
             </View>
             <View style={styles.txTextArea}>
               <Text style={styles.txName}>Lunch at restaurant</Text>
@@ -251,11 +206,7 @@ export default function HomeScreen() {
           {/* House Rent */}
           <View style={styles.transactionRowLast}>
             <View style={[styles.txIconBase, styles.txIconBlue]}>
-              <SymbolView
-                name={Platform.select({ ios: 'building.fill', default: 'business' }) as any}
-                size={18}
-                tintColor="#3B82F6"
-              />
+              <Ionicons name="home-outline" size={18} color="#3B82F6" />
             </View>
             <View style={styles.txTextArea}>
               <Text style={styles.txName}>House Rent</Text>

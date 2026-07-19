@@ -1,18 +1,17 @@
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
-import { SymbolView } from 'expo-symbols';
-import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Added for dynamic padding
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Colors from DESIGN.md (Main Theme & Text colors)
 const COLORS = {
-  mainTheme: '#0FB384', // Solid mint/green active state
-  inactive: '#9CA3AF',  // Gray inactive state
-  tabBarBg: '#FFFFFF',  // White background
-  border: '#E5E7EB',    // Light gray border
+  mainTheme: '#0FB384',
+  inactive: '#94A3B8',
+  tabBarBg: '#FFFFFF',
+  border: '#E5E7EB',
 };
 
 export default function TabLayout() {
-  const insets = useSafeAreaInsets(); // Calculates the device's exact bottom chin inset
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -23,13 +22,12 @@ export default function TabLayout() {
           backgroundColor: COLORS.tabBarBg,
           borderTopWidth: 1,
           borderTopColor: COLORS.border,
-          // Calculate height and padding dynamically based on device safe area
           height: Platform.OS === 'ios' ? 64 + insets.bottom : 72 + insets.bottom,
           paddingBottom: insets.bottom > 0 ? insets.bottom : 12,
           paddingTop: 12,
         },
         tabBarLabelStyle: {
-          fontSize: 13, // Standardized to 13px to perfectly match DESIGN.md Paragraph token
+          fontSize: 13,
           fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
           marginTop: 4,
         },
@@ -40,15 +38,8 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <SymbolView
-              name={Platform.select({
-                ios: 'house.fill',
-                default: 'home',
-              }) as any}
-              size={size}
-              tintColor={color}
-            />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="home-outline" size={24} color={color} />
           ),
         }}
       />
@@ -56,15 +47,8 @@ export default function TabLayout() {
         name="transactions"
         options={{
           title: 'Transactions',
-          tabBarIcon: ({ color, size }) => (
-            <SymbolView
-              name={Platform.select({
-                ios: 'arrow.left.and.right',
-                default: 'swap_horiz',
-              }) as any}
-              size={size}
-              tintColor={color}
-            />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="swap-horizontal-outline" size={24} color={color} />
           ),
         }}
       />
@@ -72,15 +56,8 @@ export default function TabLayout() {
         name="family"
         options={{
           title: 'Family',
-          tabBarIcon: ({ color, size }) => (
-            <SymbolView
-              name={Platform.select({
-                ios: 'person.2.fill',
-                default: 'group',
-              }) as any}
-              size={size}
-              tintColor={color}
-            />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="people-outline" size={24} color={color} />
           ),
         }}
       />
@@ -88,15 +65,8 @@ export default function TabLayout() {
         name="reports"
         options={{
           title: 'Reports',
-          tabBarIcon: ({ color, size }) => (
-            <SymbolView
-              name={Platform.select({
-                ios: 'chart.bar.fill',
-                default: 'bar_chart',
-              }) as any}
-              size={size}
-              tintColor={color}
-            />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="bar-chart-outline" size={24} color={color} />
           ),
         }}
       />
@@ -104,15 +74,8 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <SymbolView
-              name={Platform.select({
-                ios: 'person.fill',
-                default: 'person',
-              }) as any}
-              size={size}
-              tintColor={color}
-            />
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="person-outline" size={24} color={color} />
           ),
         }}
       />
