@@ -31,13 +31,19 @@ export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  // --- Screen state: 'welcome' | 'login' ---
-  const [screen, setScreen] = useState<'welcome' | 'login'>('welcome');
+  // --- Screen state: 'welcome' | 'login' | 'signup' ---
+  const [screen, setScreen] = useState<'welcome' | 'login' | 'signup'>('welcome');
 
   // --- Login form state ---
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
+
+  // --- Sign Up form state ---
+  const [fullName, setFullName] = useState('');
+  const [signupEmailOrPhone, setSignupEmailOrPhone] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupPasswordVisible, setSignupPasswordVisible] = useState(false);
 
   // --- Forgot Password modal state ---
   const [forgotModalVisible, setForgotModalVisible] = useState(false);
@@ -124,6 +130,11 @@ export default function WelcomeScreen() {
     router.replace('/(tabs)');
   };
 
+  const handleRegister = () => {
+    // Bypass backend checks: accept any data and navigate to main tabs
+    router.replace('/(tabs)');
+  };
+
   // ── Login Screen ──────────────────────────────────────────────────────────
   if (screen === 'login') {
     return (
@@ -181,6 +192,7 @@ export default function WelcomeScreen() {
               activeOpacity={0.7}
               accessibilityRole="tab"
               accessibilityLabel="Sign Up tab"
+              onPress={() => setScreen('signup')}
             >
               {/* Subtitle token: text-[16px] font-medium */}
               <Text style={styles.tabLabelInactive}>Sign Up</Text>
@@ -277,7 +289,7 @@ export default function WelcomeScreen() {
               {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
               <Text style={styles.footerText}>Don't have an account? </Text>
               {/* Subtitle token: text-[16px] font-medium */}
-              <Text style={styles.footerLink}>Create Account</Text>
+              <Text style={styles.footerLink} onPress={() => setScreen('signup')}>Create Account</Text>
             </View>
 
           </View>
@@ -395,6 +407,164 @@ export default function WelcomeScreen() {
     );
   }
 
+  // ── Sign Up Screen ────────────────────────────────────────────────────────
+  if (screen === 'signup') {
+    return (
+      <KeyboardAvoidingView
+        style={[styles.root, { paddingTop: insets.top, paddingHorizontal: 0, alignItems: 'stretch' }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView
+          contentContainerStyle={styles.loginScrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ── Language Selector (top-right floating button) ── */}
+          <View style={styles.loginTopRow}>
+            <View style={styles.spacer} />
+            <TouchableOpacity
+              style={styles.langButton}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel="Select language"
+            >
+              <Ionicons name="globe-outline" size={16} color="#091E15" style={{ marginRight: 5 }} />
+              <Text style={styles.langText}>English</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ── Branding ── */}
+          <View style={styles.loginBrandBlock}>
+            <View style={styles.loginLogoWrapper}>
+              <Image
+                source={require('../assets/images/logo.png')}
+                style={styles.loginLogo}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={styles.loginBrandTitle}>FinAlert</Text>
+            <Text style={styles.loginBrandSubtext}>Smart Finance for Smart Families</Text>
+          </View>
+
+          {/* ── Tab Segment Control ── */}
+          <View style={styles.tabBar}>
+            {/* Inactive: Login */}
+            <TouchableOpacity
+              style={styles.tabItemInactive}
+              activeOpacity={0.7}
+              accessibilityRole="tab"
+              accessibilityLabel="Login tab"
+              onPress={() => setScreen('login')}
+            >
+              <Text style={styles.tabLabelInactive}>Login</Text>
+            </TouchableOpacity>
+            {/* Active: Sign Up — underlined with mainTheme green */}
+            <View style={styles.tabItemActive}>
+              <Text style={styles.tabLabelActive}>Sign Up</Text>
+              <View style={styles.tabUnderline} />
+            </View>
+          </View>
+
+          {/* ── Form ── */}
+          <View style={styles.formContainer}>
+
+            {/* Full Name Field */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Full Name</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Enter your full name"
+                  placeholderTextColor="#A0ADB6"
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  value={fullName}
+                  onChangeText={setFullName}
+                  accessibilityLabel="Full name input"
+                />
+              </View>
+            </View>
+
+            {/* Email / Phone Field */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Email / Phone</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Email or phone"
+                  placeholderTextColor="#A0ADB6"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={signupEmailOrPhone}
+                  onChangeText={setSignupEmailOrPhone}
+                  accessibilityLabel="Email or phone input"
+                />
+              </View>
+            </View>
+
+            {/* Password Field */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Password</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={[styles.textInput, styles.textInputPassword]}
+                  placeholder="Password"
+                  placeholderTextColor="#A0ADB6"
+                  secureTextEntry={!signupPasswordVisible}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={signupPassword}
+                  onChangeText={setSignupPassword}
+                  accessibilityLabel="Password input"
+                />
+                <TouchableOpacity
+                  style={styles.visibilityToggle}
+                  onPress={() => setSignupPasswordVisible(prev => !prev)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={signupPasswordVisible ? 'Hide password' : 'Show password'}
+                >
+                  <Ionicons
+                    name={signupPasswordVisible ? 'eye-outline' : 'eye-off-outline'}
+                    size={20}
+                    color="#6B7280"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Sign Up Button — Button grad token (#0FB384), bold white label */}
+            <LinearGradient
+              colors={['#02C78E', '#0FB384']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.loginButtonGradient}
+            >
+              <TouchableOpacity
+                style={styles.loginButtonInner}
+                onPress={handleRegister}
+                activeOpacity={0.82}
+                accessibilityRole="button"
+                accessibilityLabel="Sign Up"
+              >
+                <Text style={styles.loginButtonLabel}>Sign Up</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+
+            {/* Footer text — centered */}
+            <View style={styles.footerRow}>
+              <Text style={styles.footerText}>Already have an account? </Text>
+              <Text style={styles.footerLink} onPress={() => setScreen('login')}>Login</Text>
+            </View>
+
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
   // ── Welcome Screen ────────────────────────────────────────────────────────
   return (
     <View
@@ -460,6 +630,7 @@ export default function WelcomeScreen() {
           activeOpacity={0.82}
           accessibilityRole="button"
           accessibilityLabel="Sign Up"
+          onPress={() => setScreen('signup')}
         >
           <Text style={styles.signupLabel}>Sign Up</Text>
         </TouchableOpacity>
