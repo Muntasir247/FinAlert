@@ -1,14 +1,18 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   Image,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -17,14 +21,22 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import * as SplashScreen from 'expo-splash-screen';
+import { useRouter } from 'expo-router';
 
 // Keep the native splash visible until our animation is ready to start
 SplashScreen.preventAutoHideAsync();
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  // --- Screen state: 'welcome' | 'login' ---
+  const [screen, setScreen] = useState<'welcome' | 'login'>('welcome');
+
+  // --- Login form state ---
+  const [emailOrPhone, setEmailOrPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   // --- Reanimated shared values ---
   // Logo fades + slides up from below
@@ -83,6 +95,174 @@ export default function WelcomeScreen() {
     transform: [{ translateY: buttonsTranslateY.value }],
   }));
 
+  // --- Handlers ---
+  const handleLogin = () => {
+    // Bypass authentication: navigate directly to main tabs
+    router.replace('/(tabs)');
+  };
+
+  // ── Login Screen ──────────────────────────────────────────────────────────
+  if (screen === 'login') {
+    return (
+      <KeyboardAvoidingView
+        style={[styles.root, { paddingTop: insets.top }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView
+          contentContainerStyle={styles.loginScrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ── Language Selector (top-right floating button) ── */}
+          <View style={styles.loginTopRow}>
+            <View style={styles.spacer} />
+            <TouchableOpacity
+              style={styles.langButton}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel="Select language"
+            >
+              <Ionicons name="globe-outline" size={16} color="#091E15" style={{ marginRight: 5 }} />
+              {/* Subtext token: text-[14px] font-normal */}
+              <Text style={styles.langText}>English</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ── Branding ── */}
+          <View style={styles.loginBrandBlock}>
+            <View style={styles.loginLogoWrapper}>
+              <Image
+                source={require('../assets/images/logo.png')}
+                style={styles.loginLogo}
+                resizeMode="contain"
+              />
+            </View>
+            {/* Title token: text-[20px] leading-[22px] font-bold */}
+            <Text style={styles.loginBrandTitle}>FinAlert</Text>
+            {/* Subtext token: text-[14px] font-normal */}
+            <Text style={styles.loginBrandSubtext}>Smart Finance for Smart Families</Text>
+          </View>
+
+          {/* ── Tab Segment Control ── */}
+          <View style={styles.tabBar}>
+            {/* Active: Login — underlined with mainTheme green */}
+            <View style={styles.tabItemActive}>
+              {/* Subtitle token: text-[16px] font-medium */}
+              <Text style={styles.tabLabelActive}>Login</Text>
+              <View style={styles.tabUnderline} />
+            </View>
+            {/* Inactive: Sign Up */}
+            <TouchableOpacity
+              style={styles.tabItemInactive}
+              activeOpacity={0.7}
+              accessibilityRole="tab"
+              accessibilityLabel="Sign Up tab"
+            >
+              {/* Subtitle token: text-[16px] font-medium */}
+              <Text style={styles.tabLabelInactive}>Sign Up</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ── Form ── */}
+          <View style={styles.formContainer}>
+
+            {/* Email / Phone Field */}
+            <View style={styles.inputGroup}>
+              {/* Subtext token: text-[14px] font-normal */}
+              <Text style={styles.inputLabel}>Email / Phone</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Email or phone"
+                  placeholderTextColor="#A0ADB6"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={emailOrPhone}
+                  onChangeText={setEmailOrPhone}
+                  accessibilityLabel="Email or phone input"
+                />
+              </View>
+            </View>
+
+            {/* Password Field */}
+            <View style={styles.inputGroup}>
+              {/* Subtext token: text-[14px] font-normal */}
+              <Text style={styles.inputLabel}>Password</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={[styles.textInput, styles.textInputPassword]}
+                  placeholder="Password"
+                  placeholderTextColor="#A0ADB6"
+                  secureTextEntry={!passwordVisible}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={password}
+                  onChangeText={setPassword}
+                  accessibilityLabel="Password input"
+                />
+                <TouchableOpacity
+                  style={styles.visibilityToggle}
+                  onPress={() => setPasswordVisible(prev => !prev)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
+                >
+                  <Ionicons
+                    name={passwordVisible ? 'eye-outline' : 'eye-off-outline'}
+                    size={20}
+                    color="#6B7280"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Forgot Password? — right-aligned, primary green token */}
+            <TouchableOpacity
+              style={styles.forgotRow}
+              activeOpacity={0.7}
+              accessibilityRole="link"
+              accessibilityLabel="Forgot password"
+            >
+              {/* Subtext token: text-[14px] font-normal */}
+              <Text style={styles.forgotText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
+            {/* Login Button — Button grad token (#0FB384), bold white label */}
+            <LinearGradient
+              colors={['#02C78E', '#0FB384']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.loginButtonGradient}
+            >
+              <TouchableOpacity
+                style={styles.loginButtonInner}
+                onPress={handleLogin}
+                activeOpacity={0.82}
+                accessibilityRole="button"
+                accessibilityLabel="Login"
+              >
+                {/* Subtitle token elevated to bold per spec */}
+                <Text style={styles.loginButtonLabel}>Login</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+
+            {/* Footer text — centered */}
+            <View style={styles.footerRow}>
+              {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
+              <Text style={styles.footerText}>Don't have an account? </Text>
+              {/* Subtitle token: text-[16px] font-medium */}
+              <Text style={styles.footerLink}>Create Account</Text>
+            </View>
+
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // ── Welcome Screen ────────────────────────────────────────────────────────
   return (
     <View
       style={[
@@ -134,6 +314,7 @@ export default function WelcomeScreen() {
             activeOpacity={0.82}
             accessibilityRole="button"
             accessibilityLabel="Log In"
+            onPress={() => setScreen('login')}
           >
             {/* Subtitle token weight for button labels */}
             <Text style={styles.loginLabel}>Log In</Text>
@@ -166,7 +347,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
 
-  // ── Brand block ───────────────────────────────────────
+  // ── Welcome — Brand block ─────────────────────────────
   brandBlock: {
     flex: 1,
     alignItems: 'center',
@@ -201,7 +382,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // ── Buttons ───────────────────────────────────────────
+  // ── Welcome — Buttons ─────────────────────────────────
   buttonsContainer: {
     width: '100%',
     gap: 12,
@@ -240,5 +421,213 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#0FB384',
     letterSpacing: 0.1,
+  },
+
+  // ── Login Screen ──────────────────────────────────────
+  loginScrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+  },
+
+  // Top row: spacer + language button
+  loginTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  spacer: {
+    flex: 1,
+  },
+  // Token: system border — light bg border (#D1D5DB)
+  langButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#FFFFFF',
+  },
+  // Subtext token: text-[14px] font-normal
+  langText: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#091E15',
+  },
+
+  // Login Branding
+  loginBrandBlock: {
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 24,
+    gap: 6,
+  },
+  loginLogoWrapper: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  loginLogo: {
+    width: 72,
+    height: 72,
+  },
+  // Title token: text-[20px] leading-[22px] font-bold
+  loginBrandTitle: {
+    fontSize: 20,
+    lineHeight: 22,
+    fontWeight: '700',
+    color: '#091E15',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  // Subtext token: text-[14px] font-normal
+  loginBrandSubtext: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+
+  // Tab Segment Control
+  tabBar: {
+    flexDirection: 'row',
+    width: '100%',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    marginBottom: 24,
+  },
+  tabItemActive: {
+    flex: 1,
+    alignItems: 'center',
+    paddingBottom: 10,
+    position: 'relative',
+  },
+  tabItemInactive: {
+    flex: 1,
+    alignItems: 'center',
+    paddingBottom: 10,
+  },
+  // Subtitle token: text-[16px] font-medium — active green
+  tabLabelActive: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#0FB384',
+  },
+  // Subtitle token: text-[16px] font-medium — inactive shade
+  tabLabelInactive: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  // Active tab underline — mainTheme green token (#0FB384)
+  tabUnderline: {
+    position: 'absolute',
+    bottom: -1,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#0FB384',
+    borderRadius: 1,
+  },
+
+  // Form inputs
+  formContainer: {
+    width: '100%',
+  },
+  inputGroup: {
+    marginBottom: 14,
+  },
+  // Subtext token: text-[14px] font-normal
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#091E15',
+    marginBottom: 6,
+  },
+  // Token: system border (#D1D5DB), corner radius 10, white bg
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 52,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+  },
+  // Subtext token: text-[14px] font-normal
+  textInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#091E15',
+  },
+  textInputPassword: {
+    paddingRight: 8,
+  },
+  visibilityToggle: {
+    padding: 4,
+  },
+
+  // Forgot Password? — right-aligned, primary green token
+  forgotRow: {
+    alignSelf: 'flex-end',
+    marginBottom: 20,
+    marginTop: 2,
+  },
+  // Subtext token: text-[14px] font-normal, main-theme green (#0FB384)
+  forgotText: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#0FB384',
+  },
+
+  // Login action button — Button grad token
+  loginButtonGradient: {
+    width: '100%',
+    height: 52,
+    borderRadius: 26,
+    overflow: 'hidden',
+    marginBottom: 24,
+  },
+  loginButtonInner: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Subtitle token elevated to bold white per spec
+  loginButtonLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.1,
+  },
+
+  // Footer
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  // Paragraph token: text-[13px] leading-[15px] font-normal
+  footerText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#6B7280',
+  },
+  // Subtitle token: text-[16px] font-medium — "Create Account" prominent
+  footerLink: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#091E15',
   },
 });
