@@ -1,13 +1,630 @@
-import { View, Text } from 'react-native';
+import React from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { SymbolView } from 'expo-symbols';
+
+// ── Circular Progress Ring ──────────────────────────────────────────────
+
+function CircularProgress({ pct, label = 'used' }: { pct: number; label?: string }) {
+  const angle = pct * 360;
+  const rightAngle = Math.min(angle, 180);
+
+  return (
+    <View style={styles.cpContainer}>
+      <View style={styles.cpBgRing} />
+      <View style={styles.cpRightHalf}>
+        <View
+          style={[
+            styles.cpRightArc,
+            {
+              borderLeftColor: 'transparent',
+              borderBottomColor: 'transparent',
+              transform: [{ rotate: `${rightAngle - 90}deg` }],
+            },
+          ]}
+        />
+      </View>
+      {angle > 180 && (
+        <View style={styles.cpLeftHalf}>
+          <View
+            style={[
+              styles.cpLeftArc,
+              {
+                borderRightColor: 'transparent',
+                borderTopColor: 'transparent',
+                transform: [{ rotate: `${angle - 270}deg` }],
+              },
+            ]}
+          />
+        </View>
+      )}
+      <View style={styles.cpCenter}>
+        <Text style={styles.cpPctText}>{Math.round(pct * 100)}%</Text>
+        <Text style={styles.cpLabelText}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ── Horizontal Progress Bar ─────────────────────────────────────────────
+
+function ProgressBar({ pct, color = '#0FB384' }: { pct: number; color?: string }) {
+  return (
+    <View style={styles.pbBg}>
+      <View style={[styles.pbFill, { width: `${pct * 100}%`, backgroundColor: color }]} />
+    </View>
+  );
+}
+
+// ── Home Screen ─────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   return (
-    <SafeAreaView className="flex-1 bg-green-white" edges={['top']}>
-      <View className="flex-1 items-center justify-center">
-        <Text className="text-2xl font-bold text-light-bg-text">Home</Text>
-        <Text className="text-light-bg-shade mt-2">Dashboard coming soon</Text>
-      </View>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* ── Header Row ── */}
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.greetingText}>Good morning,</Text>
+            <Text style={styles.nameText}>Name 👋</Text>
+          </View>
+          <View style={styles.iconRow}>
+            <View style={styles.iconButton}>
+              <SymbolView
+                name={Platform.select({ ios: 'mic.fill', default: 'mic' }) as any}
+                size={20}
+                tintColor="#091E15"
+              />
+            </View>
+            <View style={styles.iconButton}>
+              <SymbolView
+                name={Platform.select({ ios: 'qrcode.viewfinder', default: 'center_focus_strong' }) as any}
+                size={20}
+                tintColor="#091E15"
+              />
+            </View>
+            <View>
+              <View style={styles.iconButton}>
+                <SymbolView
+                  name={Platform.select({ ios: 'bell.fill', default: 'notifications' }) as any}
+                  size={20}
+                  tintColor="#091E15"
+                />
+              </View>
+              <View style={styles.badgeContainer}>
+                <Text style={styles.badgeText}>3</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Available Balance Card ── */}
+        <View style={styles.card}>
+          <View style={styles.cardRow}>
+            <CircularProgress pct={0.32} />
+            <View style={styles.cardTextStack}>
+              <Text style={styles.availableLabel}>Available this month</Text>
+              <Text style={styles.balanceAmount}>৳36,000</Text>
+              <Text style={styles.balanceDetail}>
+                of ৳53,000 · <Text style={styles.spentText}>৳17,000 spent</Text>
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.fab}>
+              <SymbolView
+                name={Platform.select({ ios: 'plus', default: 'add' }) as any}
+                size={22}
+                tintColor="#FFFFFF"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── Budgets Section ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Budgets</Text>
+          <TouchableOpacity>
+            <Text style={styles.seeAllText}>See all</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.dashedBox}>
+          <SymbolView
+            name={Platform.select({ ios: 'chart.pie.fill', default: 'pie_chart' }) as any}
+            size={32}
+            tintColor="#9CA3AF"
+          />
+          <TouchableOpacity>
+            <Text style={styles.dashedLink}>Set up budget limits →</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── AI Financial Insight Banner ── */}
+        <View style={styles.aiBanner}>
+          <View style={styles.aiHeaderRow}>
+            <SymbolView
+              name={Platform.select({ ios: 'sparkles', default: 'auto_awesome' }) as any}
+              size={18}
+              tintColor="#7C3AED"
+            />
+            <Text style={styles.aiHeaderText}>AI financial insight</Text>
+          </View>
+          <Text style={styles.aiBodyText}>
+            Spending up 23% on food this week. Tap for advice.
+          </Text>
+        </View>
+
+        {/* ── Savings Goals Section ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Savings Goal</Text>
+          <TouchableOpacity>
+            <Text style={styles.seeAllText}>See all</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.carouselContent}
+          style={styles.carousel}
+        >
+          <View style={styles.savingsCard}>
+            <SymbolView
+              name={Platform.select({ ios: 'shield.fill', default: 'shield' }) as any}
+              size={28}
+              tintColor="#3B82F6"
+            />
+            <Text style={styles.savingsTitle}>Emergency Fund</Text>
+            <ProgressBar pct={0.3} color="#3B82F6" />
+            <Text style={styles.savingsAmount}>৳15,000 of ৳50,000</Text>
+          </View>
+          <View style={styles.savingsCard}>
+            <SymbolView
+              name={Platform.select({ ios: 'airplane', default: 'flight' }) as any}
+              size={28}
+              tintColor="#0FB384"
+            />
+            <Text style={styles.savingsTitle}>Trip Fund</Text>
+            <ProgressBar pct={0.34} color="#0FB384" />
+            <Text style={styles.savingsAmount}>৳8,500 of ৳25,000</Text>
+          </View>
+          <View style={styles.savingsCard}>
+            <SymbolView
+              name={Platform.select({ ios: 'iphone', default: 'devices' }) as any}
+              size={28}
+              tintColor="#8B5CF6"
+            />
+            <Text style={styles.savingsTitle}>New Phone</Text>
+            <ProgressBar pct={0.6} color="#8B5CF6" />
+            <Text style={styles.savingsAmount}>৳12,000 of ৳20,000</Text>
+          </View>
+        </ScrollView>
+
+        {/* ── Recent Transactions Feed ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent Transactions</Text>
+          <TouchableOpacity>
+            <Text style={styles.seeAllText}>See all &gt;</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.transactionSection}>
+          {/* Monthly Salary */}
+          <View style={styles.transactionRow}>
+            <View style={[styles.txIconBase, styles.txIconGreen]}>
+              <SymbolView
+                name={Platform.select({ ios: 'suitcase.fill', default: 'work' }) as any}
+                size={18}
+                tintColor="#0FB384"
+              />
+            </View>
+            <View style={styles.txTextArea}>
+              <Text style={styles.txName}>Monthly Salary</Text>
+              <Text style={styles.txMeta}>salary · 2026-06-01</Text>
+            </View>
+            <Text style={styles.amountGreen}>+৳45,000</Text>
+          </View>
+
+          {/* Lunch at restaurant */}
+          <View style={styles.transactionRow}>
+            <View style={[styles.txIconBase, styles.txIconRed]}>
+              <SymbolView
+                name={Platform.select({ ios: 'fork.knife', default: 'restaurant' }) as any}
+                size={18}
+                tintColor="#EF4444"
+              />
+            </View>
+            <View style={styles.txTextArea}>
+              <Text style={styles.txName}>Lunch at restaurant</Text>
+              <Text style={styles.txMeta}>food · 2026-06-10</Text>
+            </View>
+            <Text style={styles.amountRed}>-৳1,200</Text>
+          </View>
+
+          {/* House Rent */}
+          <View style={styles.transactionRowLast}>
+            <View style={[styles.txIconBase, styles.txIconBlue]}>
+              <SymbolView
+                name={Platform.select({ ios: 'building.fill', default: 'business' }) as any}
+                size={18}
+                tintColor="#3B82F6"
+              />
+            </View>
+            <View style={styles.txTextArea}>
+              <Text style={styles.txName}>House Rent</Text>
+              <Text style={styles.txMeta}>rent · 2026-06-05</Text>
+            </View>
+            <Text style={styles.amountRed}>-৳25,000</Text>
+          </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
+
+// ── Styles ─────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  // Layout Shell
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  scrollContent: {
+    paddingBottom: 40,
+    paddingHorizontal: 16,
+  },
+
+  // Header Row
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  greetingText: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#6B7280',
+  },
+  nameText: {
+    fontSize: 20,
+    lineHeight: 22,
+    fontWeight: '700',
+    color: '#091E15',
+  },
+  iconRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  badgeContainer: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  // Balance Card
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  cardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  cardTextStack: {
+    flex: 1,
+  },
+  availableLabel: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#6B7280',
+  },
+  balanceAmount: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#091E15',
+    lineHeight: 32,
+    marginTop: 4,
+  },
+  balanceDetail: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  spentText: {
+    color: '#DC2626',
+    fontWeight: '500',
+  },
+  fab: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#0FB384',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0FB384',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+
+  // Circular Progress
+  cpContainer: {
+    width: 72,
+    height: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cpBgRing: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 36,
+    borderWidth: 5,
+    borderColor: '#E5E7EB',
+  },
+  cpRightHalf: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 36,
+    height: 72,
+    overflow: 'hidden',
+  },
+  cpRightArc: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 5,
+    borderColor: '#0FB384',
+  },
+  cpLeftHalf: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 36,
+    height: 72,
+    overflow: 'hidden',
+  },
+  cpLeftArc: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 5,
+    borderColor: '#0FB384',
+  },
+  cpCenter: {
+    backgroundColor: '#F4FBF7',
+    borderRadius: 26,
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cpPctText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#091E15',
+  },
+  cpLabelText: {
+    fontSize: 9,
+    color: '#6B7280',
+    marginTop: -2,
+  },
+
+  // Progress Bar
+  pbBg: {
+    width: '100%',
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E5E7EB',
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  pbFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+
+  // Section Headers
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#091E15',
+  },
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#0FB384',
+  },
+
+  // Budgets Dashed Box
+  dashedBox: {
+    width: '100%',
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    paddingVertical: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  dashedLink: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#0FB384',
+    marginTop: 8,
+  },
+
+  // AI Banner
+  aiBanner: {
+    width: '100%',
+    backgroundColor: '#EDE9FE',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  aiHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  aiHeaderText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#7C3AED',
+  },
+  aiBodyText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#7C3AED',
+    marginLeft: 28,
+  },
+
+  // Savings Carousel
+  carousel: {
+    marginBottom: 24,
+  },
+  carouselContent: {
+    paddingHorizontal: 16,
+    gap: 16,
+  },
+  savingsCard: {
+    width: 140,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  savingsTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#091E15',
+    marginTop: 8,
+  },
+  savingsAmount: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 6,
+  },
+
+  // Transaction Feed
+  transactionSection: {
+    paddingBottom: 12,
+  },
+  transactionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  transactionRowLast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  txIconBase: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  txIconGreen: {
+    backgroundColor: '#E8F7F1',
+  },
+  txIconRed: {
+    backgroundColor: '#FEE2E2',
+  },
+  txIconBlue: {
+    backgroundColor: '#DBEAFE',
+  },
+  txTextArea: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  txName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#091E15',
+  },
+  txMeta: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  amountGreen: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0FB384',
+  },
+  amountRed: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
+});
