@@ -9,7 +9,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 
-const SUB_TABS = ['Overview', 'Members', 'Expenses', 'Family Goals'] as const;
+const SUB_TABS: { label: string; key: 'overview' | 'members' | 'expenses' | 'goals' }[] = [
+  { label: 'Overview', key: 'overview' },
+  { label: 'Members', key: 'members' },
+  { label: 'Expenses', key: 'expenses' },
+  { label: 'Family Goals', key: 'goals' },
+];
 
 const MEMBERS = [
   {
@@ -93,13 +98,12 @@ export default function FamilyScreen() {
         {/* ── Sub-Tab Bar ── */}
         <View style={styles.subTabBar}>
           {SUB_TABS.map((tab) => {
-            const key = tab.toLowerCase().replace(' ', '') as 'overview' | 'members' | 'expenses' | 'goals';
-            const isActive = activeSubTab === key;
+            const isActive = activeSubTab === tab.key;
             return (
               <TouchableOpacity
-                key={tab}
+                key={tab.key}
                 style={styles.subTabItem}
-                onPress={() => setActiveSubTab(key)}
+                onPress={() => setActiveSubTab(tab.key)}
               >
                 <Text
                   style={[
@@ -107,7 +111,7 @@ export default function FamilyScreen() {
                     isActive ? styles.subTabLabelActive : styles.subTabLabelInactive,
                   ]}
                 >
-                  {tab}
+                  {tab.label}
                 </Text>
                 {isActive && <View style={styles.subTabUnderline} />}
               </TouchableOpacity>
