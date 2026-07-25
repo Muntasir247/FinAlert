@@ -22,7 +22,8 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.adormuntasir.finalert"
     },
     "web": {
       "bundler": "metro",
@@ -30,6 +31,12 @@
     },
     "plugins": [
       "expo-router"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1083735b-aafd-4b61-9e1d-0eef6345b2bb"
+      }
+    }
   }
 }
