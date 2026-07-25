@@ -9,18 +9,18 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useNavigation } from 'expo-router';
 
 export default function ProfileScreen() {
-  const router = useRouter();
+  const rootNav = useNavigation('/');
 
   // Local state for preferences toggles
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
 
   const handleLogout = () => {
-    // Redirection via router.replace to login/signup root
-    router.replace('/');
+    // Replace the tab layout in the root stack with the login/signup screen
+    (rootNav as any).replace('index');
   };
 
   return (
