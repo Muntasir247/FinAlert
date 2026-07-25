@@ -1,32 +1,328 @@
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  Switch,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons, Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
+  const router = useRouter();
+
+  // Local state for preferences toggles
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+
+  const handleLogout = () => {
+    // Redirection via router.replace to login/signup root
+    router.replace('/');
+  };
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Profile Screen</Text>
-      <Text style={styles.paragraph}>Placeholder for User Profile and Settings</Text>
-    </View>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* ── User Header Profile Block ── */}
+        <View style={styles.headerBlock}>
+          <View style={styles.avatarContainer}>
+            <Text style={styles.avatarText}>M</Text>
+          </View>
+          <View style={styles.userInfoStack}>
+            <Text style={styles.userName}>Muntasir Hossain</Text>
+            <Text style={styles.userEmail}>adormuntasir@gmail.com</Text>
+          </View>
+          <TouchableOpacity style={styles.editButton} activeOpacity={0.7}>
+            <Feather name="edit-2" size={16} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Summary Activity Stats Cards ── */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statsCard}>
+            <Text style={styles.statsValue}>12</Text>
+            <Text style={styles.statsLabel}>Transactions</Text>
+          </View>
+          <View style={styles.statsCard}>
+            <Text style={styles.statsValue}>৳17k</Text>
+            <Text style={styles.statsLabel}>This Month</Text>
+          </View>
+          <View style={styles.statsCard}>
+            <Text style={styles.statsValue}>৳5k</Text>
+            <Text style={styles.statsLabel}>Saved</Text>
+          </View>
+        </View>
+
+        {/* ── Preferences Group Card ── */}
+        <View style={styles.groupContainer}>
+          <Text style={styles.groupHeader}>PREFERENCES</Text>
+          <View style={styles.groupCard}>
+            {/* Language Row */}
+            <TouchableOpacity style={styles.rowItem} activeOpacity={0.6}>
+              <View style={styles.rowLeft}>
+                <View style={[styles.iconWrapper, { backgroundColor: '#E8F7F1' }]}>
+                  <Ionicons name="globe-outline" size={18} color="#10B981" />
+                </View>
+                <Text style={styles.rowTitle}>Language</Text>
+              </View>
+              <View style={styles.rowRight}>
+                <Text style={styles.rowRightText}>English</Text>
+                <Feather name="chevron-right" size={16} color="#94A3B8" />
+              </View>
+            </TouchableOpacity>
+
+            {/* Notifications Row */}
+            <View style={styles.rowItem}>
+              <View style={styles.rowLeft}>
+                <View style={[styles.iconWrapper, { backgroundColor: '#EFF6FF' }]}>
+                  <Ionicons name="notifications-outline" size={18} color="#3B82F6" />
+                </View>
+                <Text style={styles.rowTitle}>Notifications</Text>
+              </View>
+              <Switch
+                trackColor={{ false: '#E2E8F0', true: '#A7F3D0' }}
+                thumbColor={notificationsEnabled ? '#0FB384' : '#F1F5F9'}
+                ios_backgroundColor="#E2E8F0"
+                onValueChange={setNotificationsEnabled}
+                value={notificationsEnabled}
+              />
+            </View>
+
+            {/* Dark Mode Row */}
+            <View style={[styles.rowItem, styles.lastRowItem]}>
+              <View style={styles.rowLeft}>
+                <View style={[styles.iconWrapper, { backgroundColor: '#F5F3FF' }]}>
+                  <Ionicons name="moon-outline" size={18} color="#8B5CF6" />
+                </View>
+                <Text style={styles.rowTitle}>Dark Mode</Text>
+              </View>
+              <Switch
+                trackColor={{ false: '#E2E8F0', true: '#DDD6FE' }}
+                thumbColor={darkModeEnabled ? '#7C3AED' : '#F1F5F9'}
+                ios_backgroundColor="#E2E8F0"
+                onValueChange={setDarkModeEnabled}
+                value={darkModeEnabled}
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* ── Account Group Card ── */}
+        <View style={styles.groupContainer}>
+          <Text style={styles.groupHeader}>ACCOUNT</Text>
+          <View style={styles.groupCard}>
+            {/* Security Row */}
+            <TouchableOpacity style={styles.rowItem} activeOpacity={0.6}>
+              <View style={styles.rowLeft}>
+                <View style={[styles.iconWrapper, { backgroundColor: '#E8F7F1' }]}>
+                  <Ionicons name="shield-checkmark-outline" size={18} color="#10B981" />
+                </View>
+                <Text style={styles.rowTitle}>Security</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+
+            {/* Help & Support Row */}
+            <TouchableOpacity style={[styles.rowItem, styles.lastRowItem]} activeOpacity={0.6}>
+              <View style={styles.rowLeft}>
+                <View style={[styles.iconWrapper, { backgroundColor: '#FEF3C7' }]}>
+                  <Ionicons name="help-circle-outline" size={18} color="#F59E0B" />
+                </View>
+                <Text style={styles.rowTitle}>Help & Support</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── Logout Action & Footer ── */}
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          activeOpacity={0.8}
+        >
+          <Feather name="log-out" size={18} color="#EF4444" style={styles.logoutIcon} />
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.versionText}>Version 1.0.0</Text>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+    gap: 16,
+  },
+  headerBlock: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    gap: 12,
   },
-  title: {
-    fontSize: 20,
-    lineHeight: 22,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 8,
+  avatarContainer: {
+    backgroundColor: '#E6F4EA',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  paragraph: {
+  avatarText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0FB384',
+  },
+  userInfoStack: {
+    flex: 1,
+    gap: 2,
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  userEmail: {
     fontSize: 13,
     lineHeight: 15,
-    fontWeight: 'normal',
-    color: '#6B7280',
+    fontWeight: '400',
+    color: '#64748B',
+  },
+  editButton: {
+    backgroundColor: '#F1F5F9',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statsCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  statsValue: {
+    fontSize: 20,
+    lineHeight: 22,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  statsLabel: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#64748B',
+  },
+  groupContainer: {
+    gap: 8,
+  },
+  groupHeader: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '700',
+    color: '#94A3B8',
+    paddingLeft: 4,
+  },
+  groupCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
+  rowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  lastRowItem: {
+    borderBottomWidth: 0,
+  },
+  rowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0F172A',
+  },
+  rowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rowRightText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#64748B',
+  },
+  logoutButton: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+    borderRadius: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  logoutIcon: {
+    marginRight: 2,
+  },
+  logoutText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
+  versionText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: 4,
   },
 });
