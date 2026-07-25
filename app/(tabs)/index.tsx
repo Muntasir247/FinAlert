@@ -14,6 +14,7 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 function CircularProgress({ pct, label = 'used' }: { pct: number; label?: string }) {
   const angle = pct * 360;
   const rightAngle = Math.min(angle, 180);
+  const leftAngle = Math.max(angle - 180, 0);
 
   return (
     <View style={styles.cpContainer}>
@@ -21,12 +22,8 @@ function CircularProgress({ pct, label = 'used' }: { pct: number; label?: string
       <View style={styles.cpRightHalf}>
         <View
           style={[
-            styles.cpRightArc,
-            {
-              borderLeftColor: 'transparent',
-              borderBottomColor: 'transparent',
-              transform: [{ rotate: `${rightAngle - 90}deg` }],
-            },
+            styles.cpArc,
+            { transform: [{ rotate: `${rightAngle - 90}deg` }] },
           ]}
         />
       </View>
@@ -34,12 +31,8 @@ function CircularProgress({ pct, label = 'used' }: { pct: number; label?: string
         <View style={styles.cpLeftHalf}>
           <View
             style={[
-              styles.cpLeftArc,
-              {
-                borderRightColor: 'transparent',
-                borderTopColor: 'transparent',
-                transform: [{ rotate: `${angle - 270}deg` }],
-              },
+              styles.cpArc,
+              { transform: [{ rotate: `${leftAngle - 90}deg` }] },
             ]}
           />
         </View>
@@ -62,6 +55,35 @@ function ProgressBar({ pct, color = '#0FB384' }: { pct: number; color?: string }
   );
 }
 
+// ── Savings Goal Card ───────────────────────────────────────────────────
+
+function SavingsCard({
+  icon,
+  iconBg,
+  title,
+  progress,
+  progressColor,
+  amount,
+}: {
+  icon: React.ReactNode;
+  iconBg: string;
+  title: string;
+  progress: number;
+  progressColor: string;
+  amount: string;
+}) {
+  return (
+    <View style={styles.savingsCard}>
+      <View style={[styles.savingsIconBox, { backgroundColor: iconBg }]}>
+        {icon}
+      </View>
+      <Text style={styles.savingsTitle}>{title}</Text>
+      <ProgressBar pct={progress} color={progressColor} />
+      <Text style={styles.savingsAmount}>{amount}</Text>
+    </View>
+  );
+}
+
 // ── Home Screen ─────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
@@ -78,16 +100,16 @@ export default function HomeScreen() {
             <Text style={styles.nameText}>Name 👋</Text>
           </View>
           <View style={styles.iconRow}>
-            <View style={styles.iconButton}>
+            <TouchableOpacity style={styles.iconButton}>
               <Feather name="mic" size={20} color="#091E15" />
-            </View>
-            <View style={styles.iconButton}>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton}>
               <Feather name="aperture" size={20} color="#091E15" />
-            </View>
+            </TouchableOpacity>
             <View>
-              <View style={styles.iconButton}>
+              <TouchableOpacity style={styles.iconButton}>
                 <Ionicons name="notifications-outline" size={20} color="#091E15" />
-              </View>
+              </TouchableOpacity>
               <View style={styles.badgeContainer}>
                 <Text style={styles.badgeText}>3</Text>
               </View>
@@ -148,26 +170,31 @@ export default function HomeScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.carouselContent}
-          style={styles.carousel}
         >
-          <View style={styles.savingsCard}>
-            <Ionicons name="shield-checkmark-outline" size={28} color="#3B82F6" />
-            <Text style={styles.savingsTitle}>Emergency Fund</Text>
-            <ProgressBar pct={0.3} color="#3B82F6" />
-            <Text style={styles.savingsAmount}>৳15,000 of ৳50,000</Text>
-          </View>
-          <View style={styles.savingsCard}>
-            <Ionicons name="airplane-outline" size={28} color="#0FB384" />
-            <Text style={styles.savingsTitle}>Trip Fund</Text>
-            <ProgressBar pct={0.34} color="#0FB384" />
-            <Text style={styles.savingsAmount}>৳8,500 of ৳25,000</Text>
-          </View>
-          <View style={styles.savingsCard}>
-            <Ionicons name="phone-portrait-outline" size={28} color="#8B5CF6" />
-            <Text style={styles.savingsTitle}>New Phone</Text>
-            <ProgressBar pct={0.6} color="#8B5CF6" />
-            <Text style={styles.savingsAmount}>৳12,000 of ৳20,000</Text>
-          </View>
+          <SavingsCard
+            icon={<Ionicons name="shield-checkmark-outline" size={20} color="#3B82F6" />}
+            iconBg="#DBEAFE"
+            title="Emergency Fund"
+            progress={0.3}
+            progressColor="#3B82F6"
+            amount="৳15,000 of ৳50,000"
+          />
+          <SavingsCard
+            icon={<Ionicons name="airplane-outline" size={20} color="#0FB384" />}
+            iconBg="#D1FAE5"
+            title="Trip Fund"
+            progress={0.34}
+            progressColor="#0FB384"
+            amount="৳8,500 of ৳25,000"
+          />
+          <SavingsCard
+            icon={<Ionicons name="phone-portrait-outline" size={20} color="#8B5CF6" />}
+            iconBg="#EDE9FE"
+            title="New Phone"
+            progress={0.6}
+            progressColor="#8B5CF6"
+            amount="৳12,000 of ৳20,000"
+          />
         </ScrollView>
 
         {/* ── Recent Transactions Feed ── */}
@@ -361,20 +388,10 @@ const styles = StyleSheet.create({
   cpRightHalf: {
     position: 'absolute',
     top: 0,
-    right: 0,
+    left: 36,
     width: 36,
     height: 72,
     overflow: 'hidden',
-  },
-  cpRightArc: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 5,
-    borderColor: '#0FB384',
   },
   cpLeftHalf: {
     position: 'absolute',
@@ -384,15 +401,17 @@ const styles = StyleSheet.create({
     height: 72,
     overflow: 'hidden',
   },
-  cpLeftArc: {
+  cpArc: {
     position: 'absolute',
-    right: 0,
     top: 0,
+    left: -36,
     width: 72,
     height: 72,
     borderRadius: 36,
     borderWidth: 5,
     borderColor: '#0FB384',
+    borderLeftColor: 'transparent',
+    borderBottomColor: 'transparent',
   },
   cpCenter: {
     backgroundColor: '#F4FBF7',
@@ -416,15 +435,15 @@ const styles = StyleSheet.create({
   // Progress Bar
   pbBg: {
     width: '100%',
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#E5E7EB',
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#F1F5F9',
     overflow: 'hidden',
-    marginTop: 4,
+    marginVertical: 8,
   },
   pbFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 3,
   },
 
   // Section Headers
@@ -492,34 +511,36 @@ const styles = StyleSheet.create({
   },
 
   // Savings Carousel
-  carousel: {
+  carouselContent: {
+    paddingRight: 16,
+    gap: 12,
     marginBottom: 24,
   },
-  carouselContent: {
-    paddingHorizontal: 16,
-    gap: 16,
-  },
   savingsCard: {
-    width: 140,
+    width: 150,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+  },
+  savingsIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   savingsTitle: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '700',
     color: '#091E15',
-    marginTop: 8,
+    marginBottom: 2,
   },
   savingsAmount: {
     fontSize: 12,
-    color: '#6B7280',
-    marginTop: 6,
+    color: '#64748B',
   },
 
   // Transaction Feed
