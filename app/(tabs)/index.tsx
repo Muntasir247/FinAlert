@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
+import { useAuth } from '../../context/AuthContext';
 
 // ── Circular Progress Ring ──────────────────────────────────────────────
 
@@ -87,6 +88,8 @@ function SavingsCard({
 // ── Home Screen ─────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
+  const { profile } = useAuth();
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
@@ -97,7 +100,7 @@ export default function HomeScreen() {
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.greetingText}>Good morning,</Text>
-            <Text style={styles.nameText}>Name 👋</Text>
+            <Text style={styles.nameText}>{profile?.full_name || 'Name'} 👋</Text>
           </View>
           <View style={styles.iconRow}>
             <TouchableOpacity style={styles.iconButton}>
