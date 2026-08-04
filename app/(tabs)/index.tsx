@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { useTransactions } from '../../context/TransactionsContext';
+import AddTransactionModal from '../../components/AddTransactionModal';
+import { TRANSACTION_CATEGORIES } from '../../lib/transactionCategories';
 
 // ── Circular Progress Ring ──────────────────────────────────────────────
 
@@ -89,6 +92,13 @@ function SavingsCard({
 
 export default function HomeScreen() {
   const { profile } = useAuth();
+  const { transactions } = useTransactions();
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const recentTransactions = transactions.slice(0, 3);
+
+  const categoryMeta = (label: string) =>
+    TRANSACTION_CATEGORIES.find((c) => c.label === label) ?? TRANSACTION_CATEGORIES[TRANSACTION_CATEGORIES.length - 1];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -131,7 +141,7 @@ export default function HomeScreen() {
                 of ৳53,000 · <Text style={styles.spentText}>৳17,000 spent</Text>
               </Text>
             </View>
-            <TouchableOpacity style={styles.fab}>
+            <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)} accessibilityRole="button" accessibilityLabel="Add transaction">
               <Ionicons name="add" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
@@ -209,43 +219,40 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.transactionSection}>
-          {/* Monthly Salary */}
-          <View style={styles.transactionRow}>
-            <View style={[styles.txIconBase, styles.txIconGreen]}>
-              <Feather name="briefcase" size={18} color="#0FB384" />
+          {recentTransactions.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No transactions yet. Tap + to add one.</Text>
             </View>
-            <View style={styles.txTextArea}>
-              <Text style={styles.txName}>Monthly Salary</Text>
-              <Text style={styles.txMeta}>salary · 2026-06-01</Text>
-            </View>
-            <Text style={styles.amountGreen}>+৳45,000</Text>
-          </View>
-
-          {/* Lunch at restaurant */}
-          <View style={styles.transactionRow}>
-            <View style={[styles.txIconBase, styles.txIconRed]}>
-              <Ionicons name="restaurant-outline" size={18} color="#EF4444" />
-            </View>
-            <View style={styles.txTextArea}>
-              <Text style={styles.txName}>Lunch at restaurant</Text>
-              <Text style={styles.txMeta}>food · 2026-06-10</Text>
-            </View>
-            <Text style={styles.amountRed}>-৳1,200</Text>
-          </View>
-
-          {/* House Rent */}
-          <View style={styles.transactionRowLast}>
-            <View style={[styles.txIconBase, styles.txIconBlue]}>
-              <Ionicons name="home-outline" size={18} color="#3B82F6" />
-            </View>
-            <View style={styles.txTextArea}>
-              <Text style={styles.txName}>House Rent</Text>
-              <Text style={styles.txMeta}>rent · 2026-06-05</Text>
-            </View>
-            <Text style={styles.amountRed}>-৳25,000</Text>
-          </View>
+          ) : (
+            recentTransactions.map((tx, index) => {
+              const meta = categoryMeta(tx.category);
+              const isLast = index === recentTransactions.length - 1;
+              const isIncome = tx.type === 'income';
+              return (
+                <View
+                  key={tx.id}
+                  style={[styles.transactionRow, isLast && styles.transactionRowLast]}
+                >
+                  <View style={[styles.txIconBase, { backgroundColor: meta.bg }]}>
+                    <Text style={styles.txIconEmoji}>{meta.emoji}</Text>
+                  </View>
+                  <View style={styles.txTextArea}>
+                    <Text style={styles.txName}>{tx.description || tx.category}</Text>
+                    <Text style={styles.txMeta}>
+                      {tx.category.toLowerCase()} · {tx.date}
+                    </Text>
+                  </View>
+                  <Text style={isIncome ? styles.amountGreen : styles.amountRed}>
+                    {isIncome ? '+' : '-'}৳{tx.amount.toLocaleString()}
+                  </Text>
+                </View>
+              );
+            })
+          )}
         </View>
       </ScrollView>
+
+      <AddTransactionModal visible={modalVisible} onClose={() => setModalVisible(false)} />
     </SafeAreaView>
   );
 }
@@ -569,14 +576,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  txIconGreen: {
-    backgroundColor: '#E8F7F1',
-  },
-  txIconRed: {
-    backgroundColor: '#FEE2E2',
-  },
-  txIconBlue: {
-    backgroundColor: '#DBEAFE',
+  txIconEmoji: {
+    fontSize: 18,
   },
   txTextArea: {
     flex: 1,
@@ -601,5 +602,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#EF4444',
+  },
+  emptyState: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#6B7280',
   },
 });

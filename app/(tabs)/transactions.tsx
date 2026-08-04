@@ -9,89 +9,46 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
+import { useTransactions } from '../../context/TransactionsContext';
+import { TRANSACTION_CATEGORIES } from '../../lib/transactionCategories';
+import type { Transaction } from '../../lib/transactions';
 
 const FILTERS = ['All', 'Income', 'Expense'] as const;
 
-const TRANSACTIONS = [
-  {
-    date: 'Wed, Jun 10',
-    netDaily: -1650,
-    items: [
-      {
-        iconName: 'restaurant-outline' as const,
-        iconBg: '#FEE2E2',
-        iconColor: '#EF4444',
-        title: 'Lunch at restaurant',
-        category: 'Food & Dining',
-        amount: -1200,
-      },
-      {
-        iconName: 'car-outline' as const,
-        iconBg: '#DBEAFE',
-        iconColor: '#3B82F6',
-        title: 'Bus Ticket',
-        category: 'Transport',
-        amount: -450,
-      },
-    ],
-  },
-  {
-    date: 'Tue, Jun 9',
-    netDaily: 1800,
-    items: [
-      {
-        iconName: 'cart-outline' as const,
-        iconBg: '#FEF3C7',
-        iconColor: '#F59E0B',
-        title: 'Weekly Grocery',
-        category: 'Groceries',
-        amount: -3200,
-      },
-      {
-        iconName: 'desktop-outline' as const,
-        iconBg: '#E8F7F1',
-        iconColor: '#0FB384',
-        title: 'Freelance Project',
-        category: 'Freelance',
-        amount: 5000,
-      },
-    ],
-  },
-  {
-    date: 'Mon, Jun 8',
-    netDaily: -4750,
-    items: [
-      {
-        iconName: 'car-outline' as const,
-        iconBg: '#DBEAFE',
-        iconColor: '#3B82F6',
-        title: 'Uber Ride',
-        category: 'Transport',
-        amount: -850,
-      },
-      {
-        iconName: 'restaurant-outline' as const,
-        iconBg: '#FEE2E2',
-        iconColor: '#EF4444',
-        title: 'Dinner with family',
-        category: 'Food & Dining',
-        amount: -2400,
-      },
-      {
-        iconName: 'car-outline' as const,
-        iconBg: '#DBEAFE',
-        iconColor: '#3B82F6',
-        title: 'Gas Station',
-        category: 'Transport',
-        amount: -1500,
-      },
-    ],
-  },
-];
+function formatDateLabel(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function groupByDate(txs: Transaction[]) {
+  const groups: { date: string; items: Transaction[]; netDaily: number }[] = [];
+  for (const tx of txs) {
+    const last = groups[groups.length - 1];
+    if (last && last.date === tx.date) {
+      last.items.push(tx);
+      last.netDaily += tx.type === 'income' ? tx.amount : -tx.amount;
+    } else {
+      const netDaily = tx.type === 'income' ? tx.amount : -tx.amount;
+      groups.push({ date: tx.date, items: [tx], netDaily });
+    }
+  }
+  return groups;
+}
 
 export default function TransactionsScreen() {
+  const { transactions } = useTransactions();
   const [activeTab, setActiveTab] = useState<'transactions' | 'budget'>('transactions');
   const [activeFilter, setActiveFilter] = useState<string>('All');
+
+  const filtered =
+    activeFilter === 'Income'
+      ? transactions.filter((t) => t.type === 'income')
+      : activeFilter === 'Expense'
+        ? transactions.filter((t) => t.type === 'expense')
+        : transactions;
+
+  const grouped = groupByDate(filtered);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -201,44 +158,55 @@ export default function TransactionsScreen() {
             </View>
 
             {/* ── Grouped Transaction List ── */}
-            {TRANSACTIONS.map((group) => (
-              <View key={group.date} style={styles.dateGroup}>
-                <View style={styles.dateBanner}>
-                  <Text style={styles.dateLabel}>{group.date}</Text>
-                  <Text
-                    style={[
-                      styles.netDaily,
-                      { color: group.netDaily >= 0 ? '#0FB384' : '#EF4444' },
-                    ]}
-                  >
-                    {group.netDaily >= 0 ? '+' : ''}৳{Math.abs(group.netDaily).toLocaleString()}
-                  </Text>
-                </View>
-
-                {group.items.map((item, idx) => (
-                  <View key={idx} style={styles.txCard}>
-                    <View style={[styles.txIconBadge, { backgroundColor: item.iconBg }]}>
-                      <Ionicons name={item.iconName} size={18} color={item.iconColor} />
-                    </View>
-                    <View style={styles.txCenter}>
-                      <Text style={styles.txTitle}>{item.title}</Text>
-                      <Text style={styles.txCategory}>{item.category}</Text>
-                    </View>
+            {grouped.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>No transactions yet.</Text>
+              </View>
+            ) : (
+              grouped.map((group) => (
+                <View key={group.date} style={styles.dateGroup}>
+                  <View style={styles.dateBanner}>
+                    <Text style={styles.dateLabel}>{formatDateLabel(group.date)}</Text>
                     <Text
                       style={[
-                        styles.txAmount,
-                        { color: item.amount >= 0 ? '#0FB384' : '#EF4444' },
+                        styles.netDaily,
+                        { color: group.netDaily >= 0 ? '#0FB384' : '#EF4444' },
                       ]}
                     >
-                      {item.amount >= 0 ? '+' : ''}৳{Math.abs(item.amount).toLocaleString()}
+                      {group.netDaily >= 0 ? '+' : ''}৳{Math.abs(group.netDaily).toLocaleString()}
                     </Text>
-                    <TouchableOpacity style={styles.txDropdown}>
-                      <Feather name="chevron-down" size={16} color="#94A3B8" />
-                    </TouchableOpacity>
                   </View>
-                ))}
-              </View>
-            ))}
+
+                  {group.items.map((item, idx) => {
+                    const meta =
+                      TRANSACTION_CATEGORIES.find((c) => c.label === item.category) ??
+                      TRANSACTION_CATEGORIES[TRANSACTION_CATEGORIES.length - 1];
+                    return (
+                      <View key={item.id} style={styles.txCard}>
+                        <View style={[styles.txIconBadge, { backgroundColor: meta.bg }]}>
+                          <Text style={styles.txIconEmoji}>{meta.emoji}</Text>
+                        </View>
+                        <View style={styles.txCenter}>
+                          <Text style={styles.txTitle}>{item.description || item.category}</Text>
+                          <Text style={styles.txCategory}>{item.category}</Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.txAmount,
+                            { color: item.type === 'income' ? '#0FB384' : '#EF4444' },
+                          ]}
+                        >
+                          {item.type === 'income' ? '+' : ''}৳{item.amount.toLocaleString()}
+                        </Text>
+                        <TouchableOpacity style={styles.txDropdown}>
+                          <Feather name="chevron-down" size={16} color="#94A3B8" />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              ))
+            )}
           </>
         ) : (
           <View style={styles.budgetCard}>
@@ -470,6 +438,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  txIconEmoji: {
+    fontSize: 18,
+  },
   txCenter: {
     flex: 1,
     marginLeft: 12,
@@ -550,5 +521,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#0FB384',
+  },
+  emptyState: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#6B7280',
   },
 });

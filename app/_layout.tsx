@@ -2,7 +2,9 @@ import '../global.css';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { TransactionsProvider } from '../context/TransactionsContext';
 import { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 
@@ -31,6 +33,16 @@ function NavigationLayout() {
     }
   }, [session, segments, isLoading]);
 
+  useEffect(() => {
+    // The welcome screen hides the native splash via its own 2.5s timer — but
+    // only while it stays mounted. Any time the user leaves that screen (signed-in
+    // redirect, tapping Log In/Sign Up), that timer is cleared and the splash
+    // would stay frozen. Hide it here once we're no longer on the welcome route.
+    if (!isLoading && segments[0] !== 'index' && segments[0] !== undefined) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isLoading, segments]);
+
   if (isLoading) {
     return (
       <View className="flex-1 bg-green-black justify-center items-center">
@@ -56,10 +68,12 @@ function NavigationLayout() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <SafeAreaProvider>
-        <StatusBar style="dark" />
-        <NavigationLayout />
-      </SafeAreaProvider>
+      <TransactionsProvider>
+        <SafeAreaProvider>
+          <StatusBar style="dark" />
+          <NavigationLayout />
+        </SafeAreaProvider>
+      </TransactionsProvider>
     </AuthProvider>
   );
 }
