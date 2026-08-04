@@ -9,18 +9,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { useNavigation } from 'expo-router';
+import { useAuth } from '../../context/AuthContext';
 
 export default function ProfileScreen() {
-  const rootNav = useNavigation('/');
+  const { profile, signOut } = useAuth();
 
   // Local state for preferences toggles
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
 
-  const handleLogout = () => {
-    // Replace the tab layout in the root stack with the login/signup screen
-    (rootNav as any).replace('index');
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (e) {
+      console.error('Error signing out:', e);
+    }
   };
 
   return (
@@ -32,16 +35,19 @@ export default function ProfileScreen() {
         {/* ── User Header Profile Block ── */}
         <View style={styles.headerBlock}>
           <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>M</Text>
+            <Text style={styles.avatarText}>
+              {(profile?.full_name || 'U').charAt(0).toUpperCase()}
+            </Text>
           </View>
           <View style={styles.userInfoStack}>
-            <Text style={styles.userName}>Muntasir Hossain</Text>
-            <Text style={styles.userEmail}>adormuntasir@gmail.com</Text>
+            <Text style={styles.userName}>{profile?.full_name || 'FinAlert User'}</Text>
+            <Text style={styles.userEmail}>{profile?.email || 'No email associated'}</Text>
           </View>
           <TouchableOpacity style={styles.editButton} activeOpacity={0.7}>
             <Feather name="edit-2" size={16} color="#64748B" />
           </TouchableOpacity>
         </View>
+
 
         {/* ── Summary Activity Stats Cards ── */}
         <View style={styles.statsContainer}>
@@ -186,7 +192,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: 22,
+    fontSize: 20,
+    lineHeight: 22,
     fontWeight: '700',
     color: '#0FB384',
   },
@@ -195,7 +202,8 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   userName: {
-    fontSize: 16,
+    fontSize: 20,
+    lineHeight: 22,
     fontWeight: '700',
     color: '#0F172A',
   },
@@ -246,7 +254,7 @@ const styles = StyleSheet.create({
   groupHeader: {
     fontSize: 13,
     lineHeight: 15,
-    fontWeight: '700',
+    fontWeight: '400',
     color: '#94A3B8',
     paddingLeft: 4,
   },
@@ -283,7 +291,7 @@ const styles = StyleSheet.create({
   },
   rowTitle: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '400',
     color: '#0F172A',
   },
   rowRight: {
@@ -314,7 +322,7 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '500',
     color: '#EF4444',
   },
   versionText: {
