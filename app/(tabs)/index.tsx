@@ -100,6 +100,25 @@ export default function HomeScreen() {
   const categoryMeta = (label: string) =>
     TRANSACTION_CATEGORIES.find((c) => c.label === label) ?? TRANSACTION_CATEGORIES[TRANSACTION_CATEGORIES.length - 1];
 
+  // ── Budget card: derived from this month's transactions ──
+  const now = new Date();
+  const currentMonthKey = now.getFullYear() * 100 + (now.getMonth() + 1);
+
+  let monthIncome = 0;
+  let monthSpent = 0;
+  for (const tx of transactions) {
+    const [y, m] = tx.date.split('-').map(Number);
+    if (y * 100 + m !== currentMonthKey) continue;
+    if (tx.type === 'income') monthIncome += tx.amount;
+    else monthSpent += tx.amount;
+  }
+  const budgetTotal = monthIncome;
+  const spent = monthSpent;
+  const available = budgetTotal - spent;
+  const spentPct = budgetTotal > 0 ? Math.min(spent / budgetTotal, 1) : 0;
+
+  const formatMoney = (n: number) => `৳${Math.round(n).toLocaleString()}`;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
@@ -133,12 +152,12 @@ export default function HomeScreen() {
         {/* ── Available Balance Card ── */}
         <View style={styles.card}>
           <View style={styles.cardRow}>
-            <CircularProgress pct={0.32} />
+            <CircularProgress pct={spentPct} />
             <View style={styles.cardTextStack}>
               <Text style={styles.availableLabel}>Available this month</Text>
-              <Text style={styles.balanceAmount}>৳36,000</Text>
+              <Text style={styles.balanceAmount}>{formatMoney(available)}</Text>
               <Text style={styles.balanceDetail}>
-                of ৳53,000 · <Text style={styles.spentText}>৳17,000 spent</Text>
+                of {formatMoney(budgetTotal)} · <Text style={styles.spentText}>{formatMoney(spent)} spent</Text>
               </Text>
             </View>
             <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)} accessibilityRole="button" accessibilityLabel="Add transaction">

@@ -1,12 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { fetchTransactions, insertTransaction } from '../lib/transactions';
+import {
+  fetchTransactions,
+  insertTransaction,
+  updateTransaction as updateTransactionDb,
+  deleteTransaction as deleteTransactionDb,
+} from '../lib/transactions';
 import type { Transaction, NewTransaction } from '../lib/transactions';
 
 interface TransactionsContextType {
   transactions: Transaction[];
   isLoading: boolean;
   addTransaction: (input: NewTransaction) => Promise<{ error: any }>;
+  updateTransaction: (txId: string, input: NewTransaction) => Promise<{ error: any }>;
+  deleteTransaction: (txId: string) => Promise<{ error: any }>;
   refreshTransactions: () => Promise<void>;
 }
 
@@ -64,9 +71,52 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     [user]
   );
 
+  const updateTransaction = useCallback(
+    async (txId: string, input: NewTransaction): Promise<{ error: any }> => {
+      if (!user) {
+        return { error: { message: 'You must be signed in to edit a transaction.' } };
+      }
+      try {
+        const updated = await updateTransactionDb(txId, input);
+        setTransactions((prev) =>
+          prev.map((tx) => (tx.id === updated.id ? updated : tx))
+        );
+        return { error: null };
+      } catch (error) {
+        console.error('Error updating transaction:', error);
+        return { error };
+      }
+    },
+    [user]
+  );
+
+  const deleteTransaction = useCallback(
+    async (txId: string): Promise<{ error: any }> => {
+      if (!user) {
+        return { error: { message: 'You must be signed in to delete a transaction.' } };
+      }
+      try {
+        await deleteTransactionDb(txId);
+        setTransactions((prev) => prev.filter((tx) => tx.id !== txId));
+        return { error: null };
+      } catch (error) {
+        console.error('Error deleting transaction:', error);
+        return { error };
+      }
+    },
+    [user]
+  );
+
   return (
     <TransactionsContext.Provider
-      value={{ transactions, isLoading, addTransaction, refreshTransactions }}
+      value={{
+        transactions,
+        isLoading,
+        addTransaction,
+        updateTransaction,
+        deleteTransaction,
+        refreshTransactions,
+      }}
     >
       {children}
     </TransactionsContext.Provider>

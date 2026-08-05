@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  Alert,
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +13,7 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { useTransactions } from '../../context/TransactionsContext';
 import { TRANSACTION_CATEGORIES } from '../../lib/transactionCategories';
 import type { Transaction } from '../../lib/transactions';
+import AddTransactionModal from '../../components/AddTransactionModal';
 
 const FILTERS = ['All', 'Income', 'Expense'] as const;
 
@@ -37,9 +39,12 @@ function groupByDate(txs: Transaction[]) {
 }
 
 export default function TransactionsScreen() {
-  const { transactions } = useTransactions();
+  const { transactions, deleteTransaction } = useTransactions();
   const [activeTab, setActiveTab] = useState<'transactions' | 'budget'>('transactions');
   const [activeFilter, setActiveFilter] = useState<string>('All');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
 
   const filtered =
     activeFilter === 'Income'
@@ -49,6 +54,51 @@ export default function TransactionsScreen() {
         : transactions;
 
   const grouped = groupByDate(filtered);
+
+  // ── Stats: derived from all transactions ──
+  let totalIncome = 0;
+  let totalExpense = 0;
+  for (const tx of transactions) {
+    if (tx.type === 'income') totalIncome += tx.amount;
+    else totalExpense += tx.amount;
+  }
+  const formatMoney = (n: number) => `৳${Math.round(n).toLocaleString()}`;
+
+  const toggleExpanded = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
+
+  const handleEdit = (item: Transaction) => {
+    setExpandedId(null);
+    setEditingTx(item);
+    setModalVisible(true);
+  };
+
+  const handleDelete = (item: Transaction) => {
+    Alert.alert(
+      'Delete transaction?',
+      `This will remove ${item.type === 'income' ? '+' : '-'}৳${item.amount.toLocaleString()} and update your balance.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await deleteTransaction(item.id);
+            if (error) {
+              console.error('Failed to delete transaction:', error);
+            }
+            setExpandedId(null);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleModalClose = () => {
+    setModalVisible(false);
+    setEditingTx(null);
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -63,7 +113,15 @@ export default function TransactionsScreen() {
             <TouchableOpacity style={styles.headerBtn}>
               <Feather name="sliders" size={20} color="#091E15" />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.headerBtn, styles.headerBtnPrimary]}>
+            <TouchableOpacity
+              style={[styles.headerBtn, styles.headerBtnPrimary]}
+              onPress={() => {
+                setEditingTx(null);
+                setModalVisible(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Add transaction"
+            >
               <Ionicons name="add" size={20} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
@@ -73,15 +131,15 @@ export default function TransactionsScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statsCard}>
             <Text style={styles.statsLabel}>Income</Text>
-            <Text style={styles.statsIncome}>৳53,000</Text>
+            <Text style={styles.statsIncome}>{formatMoney(totalIncome)}</Text>
           </View>
           <View style={styles.statsCard}>
             <Text style={styles.statsLabel}>Expense</Text>
-            <Text style={styles.statsExpense}>৳17,000</Text>
+            <Text style={styles.statsExpense}>{formatMoney(totalExpense)}</Text>
           </View>
           <View style={styles.statsCard}>
             <Text style={styles.statsLabel}>Remaining</Text>
-            <Text style={styles.statsRemaining}>৳36,000</Text>
+            <Text style={styles.statsRemaining}>{formatMoney(totalIncome - totalExpense)}</Text>
           </View>
         </View>
 
@@ -181,26 +239,68 @@ export default function TransactionsScreen() {
                     const meta =
                       TRANSACTION_CATEGORIES.find((c) => c.label === item.category) ??
                       TRANSACTION_CATEGORIES[TRANSACTION_CATEGORIES.length - 1];
+                    const isExpanded = expandedId === item.id;
                     return (
-                      <View key={item.id} style={styles.txCard}>
-                        <View style={[styles.txIconBadge, { backgroundColor: meta.bg }]}>
-                          <Text style={styles.txIconEmoji}>{meta.emoji}</Text>
-                        </View>
-                        <View style={styles.txCenter}>
-                          <Text style={styles.txTitle}>{item.description || item.category}</Text>
-                          <Text style={styles.txCategory}>{item.category}</Text>
-                        </View>
-                        <Text
-                          style={[
-                            styles.txAmount,
-                            { color: item.type === 'income' ? '#0FB384' : '#EF4444' },
-                          ]}
+                      <View key={item.id}>
+                        <TouchableOpacity
+                          style={styles.txCard}
+                          activeOpacity={0.7}
+                          onPress={() => toggleExpanded(item.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${item.description || item.category} transaction`}
+                          accessibilityState={{ expanded: isExpanded }}
                         >
-                          {item.type === 'income' ? '+' : ''}৳{item.amount.toLocaleString()}
-                        </Text>
-                        <TouchableOpacity style={styles.txDropdown}>
-                          <Feather name="chevron-down" size={16} color="#94A3B8" />
+                          <View style={[styles.txIconBadge, { backgroundColor: meta.bg }]}>
+                            <Text style={styles.txIconEmoji}>{meta.emoji}</Text>
+                          </View>
+                          <View style={styles.txCenter}>
+                            <Text style={styles.txTitle}>{item.description || item.category}</Text>
+                            <Text style={styles.txCategory}>{item.category}</Text>
+                          </View>
+                          <Text
+                            style={[
+                              styles.txAmount,
+                              { color: item.type === 'income' ? '#0FB384' : '#EF4444' },
+                            ]}
+                          >
+                            {item.type === 'income' ? '+' : ''}৳{item.amount.toLocaleString()}
+                          </Text>
+                          <TouchableOpacity
+                            style={styles.txDropdown}
+                            onPress={() => toggleExpanded(item.id)}
+                            accessibilityRole="button"
+                            accessibilityLabel={isExpanded ? 'Collapse' : 'Expand'}
+                          >
+                            <Feather
+                              name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                              size={16}
+                              color="#94A3B8"
+                            />
+                          </TouchableOpacity>
                         </TouchableOpacity>
+
+                        {isExpanded && (
+                          <View style={styles.txActionsRow}>
+                            <TouchableOpacity
+                              style={styles.txActionEdit}
+                              onPress={() => handleEdit(item)}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Edit ${item.description || item.category} transaction`}
+                            >
+                              <Feather name="edit-2" size={16} color="#0FB384" />
+                              <Text style={styles.txActionEditText}>Edit</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.txActionDelete}
+                              onPress={() => handleDelete(item)}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Delete ${item.description || item.category} transaction`}
+                            >
+                              <Feather name="trash-2" size={16} color="#EF4444" />
+                              <Text style={styles.txActionDeleteText}>Delete</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
                       </View>
                     );
                   })}
@@ -223,6 +323,12 @@ export default function TransactionsScreen() {
           </View>
         )}
       </ScrollView>
+
+      <AddTransactionModal
+        visible={modalVisible}
+        onClose={handleModalClose}
+        editing={editingTx}
+      />
     </SafeAreaView>
   );
 }
@@ -469,6 +575,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
+  },
+
+  // ── Expandable Action Row (Edit / Delete) ──
+  txActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: -4,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  txActionEdit: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: '#E8F7F1',
+    borderWidth: 1,
+    borderColor: '#0FB384',
+  },
+  txActionEditText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#0FB384',
+  },
+  txActionDelete: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  txActionDeleteText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#EF4444',
   },
 
   // ── Budget Limits Card ──

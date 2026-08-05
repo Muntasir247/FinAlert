@@ -12,29 +12,35 @@ import {
   Animated,
   StyleSheet,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTransactions } from '../context/TransactionsContext';
 import { TRANSACTION_CATEGORIES } from '../lib/transactionCategories';
-import type { TransactionType } from '../lib/transactions';
+import type { Transaction, TransactionType } from '../lib/transactions';
 
 const SHEET_MAX_HEIGHT = 620;
 
 export default function AddTransactionModal({
   visible,
   onClose,
+  editing = null,
 }: {
   visible: boolean;
   onClose: () => void;
+  editing?: Transaction | null;
 }) {
   const insets = useSafeAreaInsets();
-  const { addTransaction } = useTransactions();
+  const { addTransaction, updateTransaction } = useTransactions();
 
   const [type, setType] = useState<TransactionType>('expense');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<string | null>(null);
   const [description, setDescription] = useState('');
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(new Date());
+  const [showPicker, setShowPicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -43,15 +49,22 @@ export default function AddTransactionModal({
 
   useEffect(() => {
     if (visible) {
-      const today = new Date();
-      const dd = String(today.getDate()).padStart(2, '0');
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const yyyy = today.getFullYear();
-      setDate(`${dd}/${mm}/${yyyy}`);
-      setType('expense');
-      setAmount('');
-      setCategory(null);
-      setDescription('');
+      if (editing) {
+        const [y, m, d] = editing.date.split('-').map(Number);
+        setType(editing.type);
+        setAmount(String(editing.amount));
+        setCategory(editing.category);
+        setDescription(editing.description ?? '');
+        setDate(new Date(y, m - 1, d));
+      } else {
+        setType('expense');
+        setAmount('');
+        setCategory(null);
+        setDescription('');
+        setDate(new Date());
+      }
+      setShowPicker(false);
+      setSubmitting(false);
       setErrorMsg(null);
 
       Animated.parallel([
@@ -70,7 +83,7 @@ export default function AddTransactionModal({
       translateY.setValue(SHEET_MAX_HEIGHT);
       backdropOpacity.setValue(0);
     }
-  }, [visible]);
+  }, [visible, editing]);
 
   const handleClose = () => {
     if (submitting) return;
@@ -91,27 +104,50 @@ export default function AddTransactionModal({
   const numericAmount = Number.parseFloat(amount);
   const isValid = numericAmount > 0 && category !== null;
 
+  const formatDisplayDate = (d: Date) => {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${d.getFullYear()}`;
+  };
+
+  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowPicker(false);
+      if (event.type === 'set' && selectedDate) {
+        setDate(selectedDate);
+      }
+    } else if (selectedDate) {
+      setDate(selectedDate);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!isValid || submitting) return;
 
     setSubmitting(true);
     setErrorMsg(null);
 
-    const [dd, mm, yyyy] = date.split('/');
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
     const isoDate = `${yyyy}-${mm}-${dd}`;
 
-    const { error } = await addTransaction({
+    const payload = {
       type,
       amount: Math.round(numericAmount * 100) / 100,
       category: category as string,
       description: description.trim() ? description.trim() : null,
       date: isoDate,
-    });
+    };
+
+    const { error } = editing
+      ? await updateTransaction(editing.id, payload)
+      : await addTransaction(payload);
 
     setSubmitting(false);
 
     if (error) {
-      setErrorMsg(error?.message || 'Failed to add transaction. Please try again.');
+      setErrorMsg(error?.message || 'Failed to save transaction. Please try again.');
       return;
     }
 
@@ -151,7 +187,7 @@ export default function AddTransactionModal({
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Add Transaction</Text>
+            <Text style={styles.title}>{editing ? 'Edit Transaction' : 'Add Transaction'}</Text>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={handleClose}
@@ -270,10 +306,26 @@ export default function AddTransactionModal({
             {/* Date */}
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Date</Text>
-              <View style={styles.dateInputWrap}>
+              <TouchableOpacity
+                style={styles.dateInputWrap}
+                onPress={() => setShowPicker(true)}
+                disabled={submitting}
+                accessibilityRole="button"
+                accessibilityLabel="Select transaction date"
+              >
                 <Ionicons name="calendar-outline" size={18} color="#6B7280" />
-                <Text style={styles.dateText}>{date}</Text>
-              </View>
+                <Text style={styles.dateText}>{formatDisplayDate(date)}</Text>
+                <Feather name="chevron-down" size={16} color="#6B7280" />
+              </TouchableOpacity>
+
+              {showPicker && (
+                <DateTimePicker
+                  value={date}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={handleDateChange}
+                />
+              )}
             </View>
 
             {/* Error */}
@@ -300,7 +352,7 @@ export default function AddTransactionModal({
                     !isValid && styles.submitButtonTextDisabled,
                   ]}
                 >
-                  Add Transaction
+                  {editing ? 'Save Changes' : 'Add Transaction'}
                 </Text>
               )}
             </TouchableOpacity>
@@ -480,6 +532,7 @@ const styles = StyleSheet.create({
     height: 52,
   },
   dateText: {
+    flex: 1,
     fontSize: 14,
     fontWeight: '400',
     color: '#091E15',

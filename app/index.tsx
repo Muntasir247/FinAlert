@@ -15,11 +15,7 @@ import Animated, {
   withDelay,
   Easing,
 } from 'react-native-reanimated';
-import * as SplashScreen from 'expo-splash-screen';
 import { useRouter } from 'expo-router';
-
-// Keep the native splash visible until our animation is ready to start
-SplashScreen.preventAutoHideAsync();
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
@@ -37,25 +33,19 @@ export default function WelcomeScreen() {
   useEffect(() => {
     const easing = Easing.out(Easing.cubic);
 
-    // Hold the native splash (1-A green screen) for 2500ms so it is
-    // clearly visible, then hide it and immediately begin the 1-B entry.
-    const splashTimer = setTimeout(async () => {
-      await SplashScreen.hideAsync();
+    // The green splash in the root layout covers the 2.5s opening hold, so
+    // the welcome entry animation can begin as soon as this screen mounts.
+    // Staggered orchestration: logo → title → subtext → buttons
+    logoOpacity.value = withDelay(60, withTiming(1, { duration: 520, easing }));
+    logoTranslateY.value = withDelay(60, withTiming(0, { duration: 480, easing }));
 
-      // Staggered orchestration: logo → title → subtext → buttons
-      logoOpacity.value = withDelay(60, withTiming(1, { duration: 520, easing }));
-      logoTranslateY.value = withDelay(60, withTiming(0, { duration: 480, easing }));
+    titleOpacity.value = withDelay(220, withTiming(1, { duration: 420, easing }));
+    titleTranslateY.value = withDelay(220, withTiming(0, { duration: 380, easing }));
 
-      titleOpacity.value = withDelay(220, withTiming(1, { duration: 420, easing }));
-      titleTranslateY.value = withDelay(220, withTiming(0, { duration: 380, easing }));
+    subtextOpacity.value = withDelay(360, withTiming(1, { duration: 380, easing }));
 
-      subtextOpacity.value = withDelay(360, withTiming(1, { duration: 380, easing }));
-
-      buttonsOpacity.value = withDelay(480, withTiming(1, { duration: 480, easing }));
-      buttonsTranslateY.value = withDelay(480, withTiming(0, { duration: 440, easing }));
-    }, 2500);
-
-    return () => clearTimeout(splashTimer);
+    buttonsOpacity.value = withDelay(480, withTiming(1, { duration: 480, easing }));
+    buttonsTranslateY.value = withDelay(480, withTiming(0, { duration: 440, easing }));
   }, []);
 
   // --- Animated styles ---

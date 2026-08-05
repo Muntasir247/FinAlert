@@ -59,3 +59,35 @@ export async function insertTransaction(
 
   return data as Transaction;
 }
+
+export async function updateTransaction(
+  txId: string,
+  updates: NewTransaction
+): Promise<Transaction> {
+  const { data, error } = await supabase
+    .from('transactions')
+    .update({
+      type: updates.type,
+      amount: updates.amount,
+      category: updates.category,
+      description: updates.description,
+      date: updates.date,
+    })
+    .eq('id', txId)
+    .select()
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as Transaction;
+}
+
+export async function deleteTransaction(txId: string): Promise<void> {
+  const { error } = await supabase.from('transactions').delete().eq('id', txId);
+
+  if (error) {
+    throw error;
+  }
+}

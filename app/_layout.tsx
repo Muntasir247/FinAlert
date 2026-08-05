@@ -3,15 +3,54 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { TransactionsProvider } from '../context/TransactionsContext';
-import { useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, StyleSheet } from 'react-native';
+
+const MIN_SPLASH_MS = 2500;
+
+// ── Green Loading Screen ───────────────────────────────────────────────────
+// Full-screen brand splash shown on every app open. Acts as the loading
+// screen while auth/profile state is being resolved and for a minimum hold.
+function GreenLoadingScreen() {
+  return (
+    <LinearGradient
+      colors={['#02C78E', '#0FB384']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.splashRoot}
+    >
+      <Image
+        source={require('../assets/images/logo_light.png')}
+        style={styles.splashLogo}
+        resizeMode="contain"
+      />
+      <ActivityIndicator size="large" color="#FFFFFF" style={styles.splashSpinner} />
+    </LinearGradient>
+  );
+}
 
 function NavigationLayout() {
   const { session, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const [showSplash, setShowSplash] = useState(true);
+
+  // Show the green loading screen on every app open: keep it mounted for a
+  // minimum duration after auth resolves so it reads as a real splash.
+  useEffect(() => {
+    if (isLoading) return;
+    const timer = setTimeout(() => setShowSplash(false), MIN_SPLASH_MS);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
+  // Our green loading screen replaces the native splash visually, so the
+  // native splash can be released as soon as this screen is rendered.
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (isLoading) return;
@@ -33,22 +72,8 @@ function NavigationLayout() {
     }
   }, [session, segments, isLoading]);
 
-  useEffect(() => {
-    // The welcome screen hides the native splash via its own 2.5s timer — but
-    // only while it stays mounted. Any time the user leaves that screen (signed-in
-    // redirect, tapping Log In/Sign Up), that timer is cleared and the splash
-    // would stay frozen. Hide it here once we're no longer on the welcome route.
-    if (!isLoading && segments[0] !== 'index' && segments[0] !== undefined) {
-      SplashScreen.hideAsync().catch(() => {});
-    }
-  }, [isLoading, segments]);
-
-  if (isLoading) {
-    return (
-      <View className="flex-1 bg-green-black justify-center items-center">
-        <ActivityIndicator size="large" color="#0FB384" />
-      </View>
-    );
+  if (isLoading || showSplash) {
+    return <GreenLoadingScreen />;
   }
 
   return (
@@ -77,4 +102,19 @@ export default function RootLayout() {
     </AuthProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  splashRoot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  splashLogo: {
+    width: 120,
+    height: 120,
+  },
+  splashSpinner: {
+    marginTop: 32,
+  },
+});
 
