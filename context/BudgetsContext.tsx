@@ -1,27 +1,51 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from 'react';
 import { useAuth } from './AuthContext';
-import { fetchBudgetPlan, saveBudgetPlan as saveBudgetPlanDb } from '../lib/budgets';
-import type { BudgetPlan, SaveBudgetInput } from '../lib/budgets';
+import { useTransactions } from './TransactionsContext';
+import {
+  fetchBudgetPlan,
+  saveBudgetPlan as saveBudgetPlanDb,
+  computeCategoryBudgetsWithSpend,
+} from '../lib/budgets';
+import type {
+  Budget,
+  BudgetPlan,
+  CategoryBudgetWithSpend,
+  SaveBudgetInput,
+} from '../lib/budgets';
 
 interface BudgetsContextType {
-  budgetPlan: BudgetPlan | null;
+  budget: Budget | null;
+  categoryBudgets: CategoryBudgetWithSpend[];
+  monthlySpent: number;
   isLoading: boolean;
   refreshBudgets: () => Promise<void>;
   saveBudgetPlan: (input: SaveBudgetInput) => Promise<{ error: any }>;
+  budgetModalVisible: boolean;
+  openBudgetModal: () => void;
+  closeBudgetModal: () => void;
 }
 
 const BudgetsContext = createContext<BudgetsContextType | undefined>(undefined);
 
 export const BudgetsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const [budgetPlan, setBudgetPlan] = useState<BudgetPlan | null>(null);
+  const { transactions } = useTransactions();
+  const [plan, setPlan] = useState<BudgetPlan | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [budgetModalVisible, setBudgetModalVisible] = useState(false);
 
   const loadBudgets = useCallback(async (userId: string) => {
     setIsLoading(true);
     try {
-      const plan = await fetchBudgetPlan(userId);
-      setBudgetPlan(plan);
+      const loaded = await fetchBudgetPlan(userId);
+      setPlan(loaded);
     } catch (e) {
       console.error('Failed to load budget plan:', e);
     } finally {
@@ -31,7 +55,7 @@ export const BudgetsProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const refreshBudgets = useCallback(async () => {
     if (!user) {
-      setBudgetPlan(null);
+      setPlan(null);
       setIsLoading(false);
       return;
     }
@@ -42,7 +66,7 @@ export const BudgetsProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (user) {
       loadBudgets(user.id);
     } else {
-      setBudgetPlan(null);
+      setPlan(null);
       setIsLoading(false);
     }
   }, [user, loadBudgets]);
@@ -53,8 +77,8 @@ export const BudgetsProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return { error: { message: 'You must be signed in to save a budget plan.' } };
       }
       try {
-        const plan = await saveBudgetPlanDb(user.id, input);
-        setBudgetPlan(plan);
+        const saved = await saveBudgetPlanDb(user.id, input);
+        setPlan(saved);
         return { error: null };
       } catch (error) {
         console.error('Error saving budget plan:', error);
@@ -64,9 +88,44 @@ export const BudgetsProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [user]
   );
 
+  const budget = plan?.budget ?? null;
+
+  // Live per-category usage: plan limits combined with this month's expenses.
+  // Recomputes automatically whenever transactions or the plan change.
+  const categoryBudgets = useMemo(
+    () => (plan ? computeCategoryBudgetsWithSpend(plan.categoryBudgets, transactions) : []),
+    [plan, transactions]
+  );
+
+  // Total spent this month across all expense transactions.
+  const monthlySpent = useMemo(() => {
+    const now = new Date();
+    const monthKey = now.getFullYear() * 100 + (now.getMonth() + 1);
+    let total = 0;
+    for (const tx of transactions) {
+      if (tx.type !== 'expense') continue;
+      const [y, m] = tx.date.split('-').map(Number);
+      if (y * 100 + m === monthKey) total += tx.amount;
+    }
+    return total;
+  }, [transactions]);
+
+  const openBudgetModal = useCallback(() => setBudgetModalVisible(true), []);
+  const closeBudgetModal = useCallback(() => setBudgetModalVisible(false), []);
+
   return (
     <BudgetsContext.Provider
-      value={{ budgetPlan, isLoading, refreshBudgets, saveBudgetPlan }}
+      value={{
+        budget,
+        categoryBudgets,
+        monthlySpent,
+        isLoading,
+        refreshBudgets,
+        saveBudgetPlan,
+        budgetModalVisible,
+        openBudgetModal,
+        closeBudgetModal,
+      }}
     >
       {children}
     </BudgetsContext.Provider>

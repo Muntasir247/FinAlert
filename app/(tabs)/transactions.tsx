@@ -11,9 +11,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useTransactions } from '../../context/TransactionsContext';
+import { useBudgets } from '../../context/BudgetsContext';
 import { TRANSACTION_CATEGORIES } from '../../lib/transactionCategories';
 import type { Transaction } from '../../lib/transactions';
 import AddTransactionModal from '../../components/AddTransactionModal';
+import CircularProgress from '../../components/CircularProgress';
 
 const FILTERS = ['All', 'Income', 'Expense'] as const;
 
@@ -40,6 +42,7 @@ function groupByDate(txs: Transaction[]) {
 
 export default function TransactionsScreen() {
   const { transactions, deleteTransaction } = useTransactions();
+  const { budget, categoryBudgets, monthlySpent, openBudgetModal } = useBudgets();
   const [activeTab, setActiveTab] = useState<'transactions' | 'budget'>('transactions');
   const [activeFilter, setActiveFilter] = useState<string>('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -63,6 +66,15 @@ export default function TransactionsScreen() {
     else totalExpense += tx.amount;
   }
   const formatMoney = (n: number) => `৳${Math.round(n).toLocaleString()}`;
+
+  // ── Budget overview (bound to shared budget state) ──
+  const monthlyBudgetTotal = budget?.total_spending_budget ?? 0;
+  const monthlyBudgetUsedPct =
+    monthlyBudgetTotal > 0 ? (monthlySpent / monthlyBudgetTotal) * 100 : 0;
+  const monthlyRemaining = monthlyBudgetTotal - monthlySpent;
+
+  const budgetUsedColor =
+    monthlyBudgetUsedPct >= 100 ? '#EF4444' : monthlyBudgetUsedPct >= 75 ? '#D97706' : '#0FB384';
 
   const toggleExpanded = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
@@ -308,6 +320,68 @@ export default function TransactionsScreen() {
               ))
             )}
           </>
+        ) : budget ? (
+          <>
+            {/* ── Monthly Budget Used Overview ── */}
+            <View style={styles.budgetOverviewCard}>
+              <CircularProgress pct={Math.min(monthlyBudgetUsedPct / 100, 1)} label="used" />
+              <View style={styles.budgetOverviewText}>
+                <Text style={styles.budgetOverviewLabel}>Monthly Budget Used</Text>
+                <Text style={[styles.budgetOverviewSpent, { color: budgetUsedColor }]}>
+                  Spent: {formatMoney(monthlySpent)}
+                </Text>
+                <Text style={styles.budgetOverviewRemaining}>
+                  Remaining: {formatMoney(monthlyRemaining)}
+                </Text>
+              </View>
+            </View>
+
+            {/* ── By Category ── */}
+            <Text style={styles.budgetSectionHeader}>BY CATEGORY</Text>
+            {categoryBudgets.map((cb) => {
+              const cat =
+                TRANSACTION_CATEGORIES.find((c) => c.label === cb.category) ??
+                TRANSACTION_CATEGORIES[TRANSACTION_CATEGORIES.length - 1];
+              const overLimit = cb.percentage_used > 100;
+              const barColor = overLimit ? '#EF4444' : '#0FB384';
+              return (
+                <View key={cb.category} style={styles.catBudgetCard}>
+                  <View style={[styles.catBudgetIcon, { backgroundColor: cat.bg }]}>
+                    <Text style={styles.catBudgetEmoji}>{cat.emoji}</Text>
+                  </View>
+                  <View style={styles.catBudgetInfo}>
+                    <View style={styles.catBudgetHeader}>
+                      <Text style={styles.catBudgetName}>{cb.category}</Text>
+                      <Text style={[styles.catBudgetPct, { color: barColor }]}>
+                        {Math.round(cb.percentage_used)}%
+                      </Text>
+                    </View>
+                    <Text style={styles.catBudgetAmounts}>
+                      {formatMoney(cb.spent)} / {formatMoney(cb.limit)}
+                    </Text>
+                    <View style={styles.catBudgetBar}>
+                      <View
+                        style={[
+                          styles.catBudgetBarFill,
+                          { width: `${Math.min(cb.percentage_used, 100)}%`, backgroundColor: barColor },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+
+            {/* ── Edit Budget Plan ── */}
+            <TouchableOpacity
+              style={styles.budgetBtn}
+              onPress={openBudgetModal}
+              accessibilityRole="button"
+              accessibilityLabel="Edit Budget Plan"
+            >
+              <Text style={styles.budgetBtnLabel}>Edit Budget Plan</Text>
+            </TouchableOpacity>
+          </>
         ) : (
           <View style={styles.budgetCard}>
             <View style={styles.budgetIconBox}>
@@ -317,7 +391,12 @@ export default function TransactionsScreen() {
             <Text style={styles.budgetParagraph}>
               Enter your income and savings target to automatically calculate spending limits for each category.
             </Text>
-            <TouchableOpacity style={styles.budgetBtn}>
+            <TouchableOpacity
+              style={styles.budgetBtn}
+              onPress={openBudgetModal}
+              accessibilityRole="button"
+              accessibilityLabel="Set Up Budget"
+            >
               <Text style={styles.budgetBtnLabel}>+ Set Up Budget</Text>
             </TouchableOpacity>
           </View>
@@ -630,6 +709,103 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     alignItems: 'center',
     marginBottom: 24,
+  },
+  budgetOverviewCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+  },
+  budgetOverviewText: {
+    flex: 1,
+  },
+  budgetOverviewLabel: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#6B7280',
+    marginBottom: 6,
+  },
+  budgetOverviewSpent: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0FB384',
+  },
+  budgetOverviewRemaining: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  budgetSectionHeader: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  catBudgetCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  catBudgetIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  catBudgetEmoji: {
+    fontSize: 18,
+  },
+  catBudgetInfo: {
+    flex: 1,
+  },
+  catBudgetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  catBudgetName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#091E15',
+  },
+  catBudgetPct: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '500',
+  },
+  catBudgetAmounts: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 6,
+  },
+  catBudgetBar: {
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#F1F5F9',
+    overflow: 'hidden',
+  },
+  catBudgetBarFill: {
+    height: '100%',
+    borderRadius: 2.5,
+    backgroundColor: '#0FB384',
   },
   budgetIconBox: {
     width: 64,

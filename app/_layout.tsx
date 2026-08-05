@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { TransactionsProvider } from '../context/TransactionsContext';
 import { BudgetsProvider } from '../context/BudgetsContext';
+import BudgetSetupModal from '../components/BudgetSetupModal';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet } from 'react-native';
 
@@ -99,6 +100,7 @@ export default function RootLayout() {
           <SafeAreaProvider>
             <StatusBar style="dark" />
             <NavigationLayout />
+            <BudgetSetupModal />
           </SafeAreaProvider>
         </BudgetsProvider>
       </TransactionsProvider>

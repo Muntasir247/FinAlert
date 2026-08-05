@@ -44,15 +44,23 @@ const STEP_TITLES: Record<Step, string> = {
   3: 'Summary',
 };
 
-export default function BudgetSetupModal({
-  visible,
-  onClose,
-}: {
-  visible: boolean;
-  onClose: () => void;
-}) {
+export default function BudgetSetupModal() {
   const insets = useSafeAreaInsets();
-  const { budgetPlan, saveBudgetPlan } = useBudgets();
+  const {
+    budget,
+    categoryBudgets,
+    saveBudgetPlan,
+    budgetModalVisible,
+    closeBudgetModal,
+  } = useBudgets();
+
+  // Snapshot the latest plan data so the open effect only depends on
+  // visibility (avoids re-seeding the form if transactions/plan re-render
+  // while the modal is already open).
+  const budgetRef = useRef(budget);
+  budgetRef.current = budget;
+  const categoryBudgetsRef = useRef(categoryBudgets);
+  categoryBudgetsRef.current = categoryBudgets;
 
   const [step, setStep] = useState<Step>(1);
   const [incomeText, setIncomeText] = useState('');
@@ -87,25 +95,28 @@ export default function BudgetSetupModal({
 
   // ── Lifecycle ──
   useEffect(() => {
-    if (visible) {
+    if (budgetModalVisible) {
       setStep(1);
       setSubmitting(false);
       setErrorMsg(null);
 
-      if (budgetPlan) {
+      const existingBudget = budgetRef.current;
+      const existingCategories = categoryBudgetsRef.current;
+
+      if (existingBudget) {
         // Prefill the wizard with the previously saved plan so adjusting it
         // keeps the user's existing values.
-        setIncomeText(String(budgetPlan.budget.monthly_income));
-        setSavingsPct(budgetPlan.budget.savings_target_percentage);
+        setIncomeText(String(existingBudget.monthly_income));
+        setSavingsPct(existingBudget.savings_target_percentage);
         const next: Record<string, string> = {};
         for (const { label } of DEFAULT_SPLITS) {
-          const saved = budgetPlan.categoryBudgets.find((cb) => cb.category === label);
-          next[label] = saved ? String(saved.allocated_amount) : '0';
+          const saved = existingCategories.find((cb) => cb.category === label);
+          next[label] = saved ? String(saved.limit) : '0';
         }
         setAllocations(next);
         setAllocationSource({
-          income: budgetPlan.budget.monthly_income,
-          savingsPct: budgetPlan.budget.savings_target_percentage,
+          income: existingBudget.monthly_income,
+          savingsPct: existingBudget.savings_target_percentage,
         });
       } else {
         setIncomeText('');
@@ -130,7 +141,7 @@ export default function BudgetSetupModal({
       translateY.setValue(SHEET_MAX_HEIGHT);
       backdropOpacity.setValue(0);
     }
-  }, [visible, budgetPlan]);
+  }, [budgetModalVisible]);
 
   const handleClose = () => {
     if (submitting) return;
@@ -145,7 +156,7 @@ export default function BudgetSetupModal({
         duration: 220,
         useNativeDriver: true,
       }),
-    ]).start(onClose);
+    ]).start(closeBudgetModal);
   };
 
   const goToStep = (next: Step) => {
@@ -232,7 +243,7 @@ export default function BudgetSetupModal({
 
   return (
     <Modal
-      visible={visible}
+      visible={budgetModalVisible}
       transparent
       animationType="none"
       onRequestClose={handleClose}

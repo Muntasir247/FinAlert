@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import type { Transaction } from './transactions';
 
 export interface Budget {
   id: string;
@@ -35,6 +36,48 @@ export interface SaveBudgetInput {
     allocated_amount: number;
     percentage_of_budget: number;
   }[];
+}
+
+export interface CategoryBudgetWithSpend {
+  category: string;
+  limit: number;
+  spent: number;
+  remaining: number;
+  percentage_used: number;
+  percentage_of_budget: number;
+}
+
+// Combine the plan's category limits with the current month's logged expenses
+// to produce live per-category budget usage.
+export function computeCategoryBudgetsWithSpend(
+  categoryBudgets: CategoryBudget[],
+  transactions: Transaction[],
+  now: Date = new Date()
+): CategoryBudgetWithSpend[] {
+  const monthKey = now.getFullYear() * 100 + (now.getMonth() + 1);
+
+  const spentByCategory: Record<string, number> = {};
+  for (const tx of transactions) {
+    if (tx.type !== 'expense') continue;
+    const [y, m] = tx.date.split('-').map(Number);
+    if (y * 100 + m !== monthKey) continue;
+    spentByCategory[tx.category] = (spentByCategory[tx.category] || 0) + tx.amount;
+  }
+
+  return categoryBudgets.map((cb) => {
+    const spent = spentByCategory[cb.category] || 0;
+    const limit = cb.allocated_amount;
+    const remaining = limit - spent;
+    const percentage_used = limit > 0 ? (spent / limit) * 100 : 0;
+    return {
+      category: cb.category,
+      limit,
+      spent,
+      remaining,
+      percentage_used,
+      percentage_of_budget: cb.percentage_of_budget,
+    };
+  });
 }
 
 // Fetch the user's most recent budget plan (budget + its category limits).
