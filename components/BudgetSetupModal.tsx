@@ -52,12 +52,18 @@ export default function BudgetSetupModal({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const { saveBudgetPlan } = useBudgets();
+  const { budgetPlan, saveBudgetPlan } = useBudgets();
 
   const [step, setStep] = useState<Step>(1);
   const [incomeText, setIncomeText] = useState('');
   const [savingsPct, setSavingsPct] = useState(SAVINGS_DEFAULT);
   const [allocations, setAllocations] = useState<Record<string, string>>({});
+  // Income/savings values that generated the current allocations. Used to
+  // preserve manual category tweaks unless the user changes income/savings.
+  const [allocationSource, setAllocationSource] = useState<{
+    income: number;
+    savingsPct: number;
+  } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -65,7 +71,9 @@ export default function BudgetSetupModal({
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
   // ── Derived values ──
-  const income = Number.parseFloat(incomeText);
+  // `|| 0` guards against empty input (parseFloat('') = NaN), which would
+  // otherwise be serialized as null by Supabase and violate the NOT NULL check.
+  const income = Number.parseFloat(incomeText) || 0;
   const savingsAmount = income > 0 ? (income * savingsPct) / 100 : 0;
   const spendingBudget = income > 0 ? income - savingsAmount : 0;
 
@@ -81,11 +89,30 @@ export default function BudgetSetupModal({
   useEffect(() => {
     if (visible) {
       setStep(1);
-      setIncomeText('');
-      setSavingsPct(SAVINGS_DEFAULT);
-      setAllocations({});
       setSubmitting(false);
       setErrorMsg(null);
+
+      if (budgetPlan) {
+        // Prefill the wizard with the previously saved plan so adjusting it
+        // keeps the user's existing values.
+        setIncomeText(String(budgetPlan.budget.monthly_income));
+        setSavingsPct(budgetPlan.budget.savings_target_percentage);
+        const next: Record<string, string> = {};
+        for (const { label } of DEFAULT_SPLITS) {
+          const saved = budgetPlan.categoryBudgets.find((cb) => cb.category === label);
+          next[label] = saved ? String(saved.allocated_amount) : '0';
+        }
+        setAllocations(next);
+        setAllocationSource({
+          income: budgetPlan.budget.monthly_income,
+          savingsPct: budgetPlan.budget.savings_target_percentage,
+        });
+      } else {
+        setIncomeText('');
+        setSavingsPct(SAVINGS_DEFAULT);
+        setAllocations({});
+        setAllocationSource(null);
+      }
 
       Animated.parallel([
         Animated.timing(translateY, {
@@ -103,7 +130,7 @@ export default function BudgetSetupModal({
       translateY.setValue(SHEET_MAX_HEIGHT);
       backdropOpacity.setValue(0);
     }
-  }, [visible]);
+  }, [visible, budgetPlan]);
 
   const handleClose = () => {
     if (submitting) return;
@@ -127,24 +154,48 @@ export default function BudgetSetupModal({
   };
 
   const handleNextFromStep1 = () => {
-    if (income <= 0) return;
-    const next: Record<string, string> = {};
-    let assigned = 0;
-    DEFAULT_SPLITS.forEach(({ label, pct }, index) => {
-      if (index === DEFAULT_SPLITS.length - 1) {
-        next[label] = String(Math.round((spendingBudget - assigned) * 100) / 100);
-      } else {
-        const val = Math.round(spendingBudget * pct) / 100;
-        next[label] = String(val);
-        assigned += val;
-      }
-    });
-    setAllocations(next);
+    if (income <= 0) {
+      setErrorMsg('Budget limits cannot be zero. Enter a monthly income greater than 0.');
+      return;
+    }
+
+    // Re-distribute only when income or savings changed; otherwise keep the
+    // user's manual category tweaks.
+    const sourceMatches =
+      allocationSource?.income === income && allocationSource.savingsPct === savingsPct;
+
+    if (!sourceMatches) {
+      const next: Record<string, string> = {};
+      let assigned = 0;
+      DEFAULT_SPLITS.forEach(({ label, pct }, index) => {
+        if (index === DEFAULT_SPLITS.length - 1) {
+          next[label] = String(Math.round((spendingBudget - assigned) * 100) / 100);
+        } else {
+          const val = Math.round(spendingBudget * pct) / 100;
+          next[label] = String(val);
+          assigned += val;
+        }
+      });
+      setAllocations(next);
+      setAllocationSource({ income, savingsPct });
+    }
+
+    setErrorMsg(null);
     setStep(2);
   };
 
   const handleSave = async () => {
     if (submitting) return;
+
+    if (income <= 0) {
+      setErrorMsg('Budget limits cannot be zero. Enter a monthly income greater than 0.');
+      return;
+    }
+
+    if (allocatedTotal <= 0) {
+      setErrorMsg('Budget limits cannot be zero. Allocate at least one category.');
+      return;
+    }
 
     setSubmitting(true);
     setErrorMsg(null);
@@ -287,6 +338,11 @@ export default function BudgetSetupModal({
                       accessibilityLabel="Monthly income"
                     />
                   </View>
+                  {incomeText.trim().length > 0 && income <= 0 && (
+                    <Text style={styles.fieldErrorText}>
+                      Monthly income must be greater than 0.
+                    </Text>
+                  )}
                 </View>
 
                 {/* Savings Target Slider */}
@@ -631,6 +687,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#091E15',
     padding: 0,
+  },
+  fieldErrorText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#EF4444',
+    marginTop: 6,
   },
 
   // ── Info banner ──
