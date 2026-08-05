@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -42,12 +42,20 @@ function groupByDate(txs: Transaction[]) {
 
 export default function TransactionsScreen() {
   const { transactions, deleteTransaction } = useTransactions();
-  const { budget, categoryBudgets, monthlySpent, openBudgetModal } = useBudgets();
+  const { budget, categoryBudgets, monthlySpent, openBudgetModal, budgetTabRequested, clearBudgetTabRequest } =
+    useBudgets();
   const [activeTab, setActiveTab] = useState<'transactions' | 'budget'>('transactions');
   const [activeFilter, setActiveFilter] = useState<string>('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+
+  useEffect(() => {
+    if (budgetTabRequested) {
+      setActiveTab('budget');
+      clearBudgetTabRequest();
+    }
+  }, [budgetTabRequested, clearBudgetTabRequest]);
 
   const filtered =
     activeFilter === 'Income'
@@ -122,7 +130,12 @@ export default function TransactionsScreen() {
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>Transactions</Text>
           <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.headerBtn}>
+            <TouchableOpacity
+              style={styles.headerBtn}
+              onPress={openBudgetModal}
+              accessibilityRole="button"
+              accessibilityLabel="Set up or edit budget limits"
+            >
               <Feather name="sliders" size={20} color="#091E15" />
             </TouchableOpacity>
             <TouchableOpacity

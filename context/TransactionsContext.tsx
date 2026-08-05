@@ -11,6 +11,7 @@ import type { Transaction, NewTransaction } from '../lib/transactions';
 interface TransactionsContextType {
   transactions: Transaction[];
   isLoading: boolean;
+  hasLoaded: boolean;
   addTransaction: (input: NewTransaction) => Promise<{ error: any }>;
   updateTransaction: (txId: string, input: NewTransaction) => Promise<{ error: any }>;
   deleteTransaction: (txId: string) => Promise<{ error: any }>;
@@ -23,12 +24,20 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const loadTransactions = useCallback(async (userId: string) => {
     setIsLoading(true);
     try {
       const data = await fetchTransactions(userId);
-      setTransactions(data);
+      const seen = new Set<string>();
+      const deduped = (data ?? []).filter((tx) => {
+        if (seen.has(tx.id)) return false;
+        seen.add(tx.id);
+        return true;
+      });
+      setTransactions(deduped);
+      setHasLoaded(true);
     } catch (e) {
       console.error('Failed to load transactions:', e);
     } finally {
@@ -40,6 +49,7 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!user) {
       setTransactions([]);
       setIsLoading(false);
+      setHasLoaded(false);
       return;
     }
     await loadTransactions(user.id);
@@ -51,6 +61,7 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } else {
       setTransactions([]);
       setIsLoading(false);
+      setHasLoaded(false);
     }
   }, [user, loadTransactions]);
 
@@ -112,6 +123,7 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       value={{
         transactions,
         isLoading,
+        hasLoaded,
         addTransaction,
         updateTransaction,
         deleteTransaction,

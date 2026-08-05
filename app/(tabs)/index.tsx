@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { useTransactions } from '../../context/TransactionsContext';
 import { useBudgets } from '../../context/BudgetsContext';
@@ -59,10 +60,12 @@ function SavingsCard({
 export default function HomeScreen() {
   const { profile } = useAuth();
   const { transactions } = useTransactions();
-  const { budget, openBudgetModal } = useBudgets();
+  const { budget, categoryBudgets, openBudgetModal, requestBudgetTab } = useBudgets();
+  const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
 
   const recentTransactions = transactions.slice(0, 3);
+  const topCategoryBudgets = categoryBudgets.slice(0, 3);
 
   const categoryMeta = (label: string) =>
     TRANSACTION_CATEGORIES.find((c) => c.label === label) ?? TRANSACTION_CATEGORIES[TRANSACTION_CATEGORIES.length - 1];
@@ -87,6 +90,11 @@ export default function HomeScreen() {
   const spentPct = budgetTotal > 0 ? Math.min(spent / budgetTotal, 1) : 0;
 
   const formatMoney = (n: number) => `৳${Math.round(n).toLocaleString()}`;
+
+  const handleSeeAllBudgets = () => {
+    requestBudgetTab();
+    router.navigate('/(tabs)/transactions');
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -138,22 +146,71 @@ export default function HomeScreen() {
         {/* ── Budgets Section ── */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Budgets</Text>
-          <TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleSeeAllBudgets}
+            accessibilityRole="button"
+            accessibilityLabel="See all budgets"
+          >
             <Text style={styles.seeAllText}>See all</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.dashedBox}>
-          <Ionicons name="pie-chart-outline" size={32} color="#9CA3AF" />
-          <TouchableOpacity
-            onPress={openBudgetModal}
-            accessibilityRole="button"
-            accessibilityLabel="Set up budget limits"
-          >
-            <Text style={styles.dashedLink}>
-              {budget ? 'Adjust budget limits →' : 'Set up budget limits →'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {budget ? (
+          <View style={styles.budgetCardList}>
+            {topCategoryBudgets.map((cb) => {
+              const meta = categoryMeta(cb.category);
+              const over = cb.percentage_used > 100;
+              const barColor = over ? '#EF4444' : '#0FB384';
+              return (
+                <TouchableOpacity
+                  key={cb.category}
+                  style={styles.budgetCard}
+                  onPress={openBudgetModal}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit budget for ${cb.category}`}
+                >
+                  <View style={[styles.budgetCardIcon, { backgroundColor: meta.bg }]}>
+                    <Text style={styles.budgetCardEmoji}>{meta.emoji}</Text>
+                  </View>
+                  <View style={styles.budgetCardInfo}>
+                    <View style={styles.budgetCardHeader}>
+                      <Text style={styles.budgetCardName} numberOfLines={1}>
+                        {cb.category}
+                      </Text>
+                      <Text style={[styles.budgetCardPct, { color: barColor }]}>
+                        {Math.round(cb.percentage_used)}%
+                      </Text>
+                    </View>
+                    <Text style={styles.budgetCardAmounts}>
+                      {formatMoney(cb.spent)} / {formatMoney(cb.limit)}
+                    </Text>
+                    <View style={styles.budgetCardBar}>
+                      <View
+                        style={[
+                          styles.budgetCardBarFill,
+                          {
+                            width: `${Math.min(cb.percentage_used, 100)}%`,
+                            backgroundColor: barColor,
+                          },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.dashedBox}>
+            <Ionicons name="pie-chart-outline" size={32} color="#9CA3AF" />
+            <TouchableOpacity
+              onPress={openBudgetModal}
+              accessibilityRole="button"
+              accessibilityLabel="Set up budget limits"
+            >
+              <Text style={styles.dashedLink}>Set up budget limits →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* ── AI Financial Insight Banner ── */}
         <View style={styles.aiBanner}>
@@ -421,6 +478,67 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#0FB384',
     marginTop: 8,
+  },
+
+  // Budget Category Cards (when a plan exists)
+  budgetCardList: {
+    gap: 10,
+    marginBottom: 24,
+  },
+  budgetCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    gap: 12,
+  },
+  budgetCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  budgetCardEmoji: {
+    fontSize: 18,
+  },
+  budgetCardInfo: {
+    flex: 1,
+  },
+  budgetCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  budgetCardName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#091E15',
+    flex: 1,
+    marginRight: 8,
+  },
+  budgetCardPct: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  budgetCardAmounts: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  budgetCardBar: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#F1F5F9',
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  budgetCardBarFill: {
+    height: '100%',
+    borderRadius: 3,
   },
 
   // AI Banner
