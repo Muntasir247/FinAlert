@@ -10,7 +10,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useTransactions } from '../../context/TransactionsContext';
+import { useBudgets } from '../../context/BudgetsContext';
 import AddTransactionModal from '../../components/AddTransactionModal';
+import BudgetSetupModal from '../../components/BudgetSetupModal';
 import { TRANSACTION_CATEGORIES } from '../../lib/transactionCategories';
 
 // ── Circular Progress Ring ──────────────────────────────────────────────
@@ -93,14 +95,16 @@ function SavingsCard({
 export default function HomeScreen() {
   const { profile } = useAuth();
   const { transactions } = useTransactions();
+  const { budgetPlan } = useBudgets();
   const [modalVisible, setModalVisible] = useState(false);
+  const [budgetModalVisible, setBudgetModalVisible] = useState(false);
 
   const recentTransactions = transactions.slice(0, 3);
 
   const categoryMeta = (label: string) =>
     TRANSACTION_CATEGORIES.find((c) => c.label === label) ?? TRANSACTION_CATEGORIES[TRANSACTION_CATEGORIES.length - 1];
 
-  // ── Budget card: derived from this month's transactions ──
+  // ── Budget card: derived from saved plan + this month's transactions ──
   const now = new Date();
   const currentMonthKey = now.getFullYear() * 100 + (now.getMonth() + 1);
 
@@ -112,7 +116,10 @@ export default function HomeScreen() {
     if (tx.type === 'income') monthIncome += tx.amount;
     else monthSpent += tx.amount;
   }
-  const budgetTotal = monthIncome;
+  // Preferred source of the "total" is the saved budget's spending budget;
+  // fall back to this month's income when no plan has been set up yet.
+  const budgetTotal =
+    budgetPlan?.budget.total_spending_budget ?? monthIncome;
   const spent = monthSpent;
   const available = budgetTotal - spent;
   const spentPct = budgetTotal > 0 ? Math.min(spent / budgetTotal, 1) : 0;
@@ -175,8 +182,14 @@ export default function HomeScreen() {
         </View>
         <View style={styles.dashedBox}>
           <Ionicons name="pie-chart-outline" size={32} color="#9CA3AF" />
-          <TouchableOpacity>
-            <Text style={styles.dashedLink}>Set up budget limits →</Text>
+          <TouchableOpacity
+            onPress={() => setBudgetModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Set up budget limits"
+          >
+            <Text style={styles.dashedLink}>
+              {budgetPlan ? 'Adjust budget limits →' : 'Set up budget limits →'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -272,6 +285,10 @@ export default function HomeScreen() {
       </ScrollView>
 
       <AddTransactionModal visible={modalVisible} onClose={() => setModalVisible(false)} />
+      <BudgetSetupModal
+        visible={budgetModalVisible}
+        onClose={() => setBudgetModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }

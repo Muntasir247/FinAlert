@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { TransactionsProvider } from '../context/TransactionsContext';
+import { BudgetsProvider } from '../context/BudgetsContext';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet } from 'react-native';
 
@@ -94,10 +95,12 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <TransactionsProvider>
-        <SafeAreaProvider>
-          <StatusBar style="dark" />
-          <NavigationLayout />
-        </SafeAreaProvider>
+        <BudgetsProvider>
+          <SafeAreaProvider>
+            <StatusBar style="dark" />
+            <NavigationLayout />
+          </SafeAreaProvider>
+        </BudgetsProvider>
       </TransactionsProvider>
     </AuthProvider>
   );
