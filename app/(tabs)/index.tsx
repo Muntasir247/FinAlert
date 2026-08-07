@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { ComponentProps, useState } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,16 @@ import { useAuth } from '../../context/AuthContext';
 import { useTransactions } from '../../context/TransactionsContext';
 import { useBudgets } from '../../context/BudgetsContext';
 import { useNotifications } from '../../context/NotificationsContext';
+import { useSavingsGoals } from '../../context/SavingsGoalsContext';
 import AddTransactionModal from '../../components/AddTransactionModal';
 import CircularProgress from '../../components/CircularProgress';
+import SavingsGoalsManager from '../../components/SavingsGoalsManager';
 import { TRANSACTION_CATEGORIES } from '../../lib/transactionCategories';
+import { savingsGoalIconName, savingsGoalTint } from '../../lib/savingsGoals';
+import type { SavingsGoal } from '../../lib/savingsGoals';
+
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
+type SavingsSheetView = 'list' | 'add' | 'create';
 
 // ── Horizontal Progress Bar ─────────────────────────────────────────────
 
@@ -29,29 +36,27 @@ function ProgressBar({ pct, color = '#0FB384' }: { pct: number; color?: string }
 
 // ── Savings Goal Card ───────────────────────────────────────────────────
 
-function SavingsCard({
-  icon,
-  iconBg,
-  title,
-  progress,
-  progressColor,
-  amount,
-}: {
-  icon: React.ReactNode;
-  iconBg: string;
-  title: string;
-  progress: number;
-  progressColor: string;
-  amount: string;
-}) {
+function SavingsGoalCard({ goal }: { goal: SavingsGoal }) {
+  const pct = goal.target_amount > 0 ? (goal.current_amount / goal.target_amount) * 100 : 0;
+  const barPct = Math.min(pct, 100) / 100;
+  const color = goal.color;
   return (
     <View style={styles.savingsCard}>
-      <View style={[styles.savingsIconBox, { backgroundColor: iconBg }]}>
-        {icon}
+      <View style={[styles.savingsIconBox, { backgroundColor: savingsGoalTint(color) }]}>
+        <Ionicons name={savingsGoalIconName(goal.icon) as IoniconName} size={20} color={color} />
       </View>
-      <Text style={styles.savingsTitle}>{title}</Text>
-      <ProgressBar pct={progress} color={progressColor} />
-      <Text style={styles.savingsAmount}>{amount}</Text>
+      <Text style={styles.savingsTitle} numberOfLines={1}>
+        {goal.name}
+      </Text>
+      <View style={styles.savingsPctRow}>
+        <Text style={[styles.savingsPct, { color }]}>{Math.round(pct)}%</Text>
+        <Text style={styles.savingsPctLabel}>saved</Text>
+      </View>
+      <ProgressBar pct={barPct} color={color} />
+      <Text style={styles.savingsAmount}>
+        ৳{Math.round(goal.current_amount).toLocaleString()} of ৳
+        {Math.round(goal.target_amount).toLocaleString()}
+      </Text>
     </View>
   );
 }
@@ -63,8 +68,16 @@ export default function HomeScreen() {
   const { transactions } = useTransactions();
   const { budget, categoryBudgets, openBudgetModal, requestBudgetTab } = useBudgets();
   const { unreadCount } = useNotifications();
+  const { goals: savingsGoals } = useSavingsGoals();
   const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
+  const [savingsSheetVisible, setSavingsSheetVisible] = useState(false);
+  const [savingsSheetView, setSavingsSheetView] = useState<SavingsSheetView>('list');
+
+  const openSavingsSheet = (view: SavingsSheetView) => {
+    setSavingsSheetView(view);
+    setSavingsSheetVisible(true);
+  };
 
   const recentTransactions = transactions.slice(0, 3);
   const topCategoryBudgets = categoryBudgets.slice(0, 3);
@@ -234,8 +247,12 @@ export default function HomeScreen() {
 
         {/* ── Savings Goals Section ── */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Savings Goal</Text>
-          <TouchableOpacity>
+          <Text style={styles.sectionTitle}>Savings Goals</Text>
+          <TouchableOpacity
+            onPress={() => openSavingsSheet('list')}
+            accessibilityRole="button"
+            accessibilityLabel="See all savings goals"
+          >
             <Text style={styles.seeAllText}>See all</Text>
           </TouchableOpacity>
         </View>
@@ -244,30 +261,20 @@ export default function HomeScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.carouselContent}
         >
-          <SavingsCard
-            icon={<Ionicons name="shield-checkmark-outline" size={20} color="#3B82F6" />}
-            iconBg="#DBEAFE"
-            title="Emergency Fund"
-            progress={0.3}
-            progressColor="#3B82F6"
-            amount="৳15,000 of ৳50,000"
-          />
-          <SavingsCard
-            icon={<Ionicons name="airplane-outline" size={20} color="#0FB384" />}
-            iconBg="#D1FAE5"
-            title="Trip Fund"
-            progress={0.34}
-            progressColor="#0FB384"
-            amount="৳8,500 of ৳25,000"
-          />
-          <SavingsCard
-            icon={<Ionicons name="phone-portrait-outline" size={20} color="#8B5CF6" />}
-            iconBg="#EDE9FE"
-            title="New Phone"
-            progress={0.6}
-            progressColor="#8B5CF6"
-            amount="৳12,000 of ৳20,000"
-          />
+          {savingsGoals.map((goal) => (
+            <SavingsGoalCard key={goal.id} goal={goal} />
+          ))}
+          <TouchableOpacity
+            style={styles.newGoalCard}
+            onPress={() => openSavingsSheet('create')}
+            accessibilityRole="button"
+            accessibilityLabel="Create new savings goal"
+          >
+            <View style={styles.newGoalIconBox}>
+              <Text style={styles.newGoalEmoji}>🎯</Text>
+            </View>
+            <Text style={styles.newGoalText}>New Goal</Text>
+          </TouchableOpacity>
         </ScrollView>
 
         {/* ── Recent Transactions Feed ── */}
@@ -313,6 +320,11 @@ export default function HomeScreen() {
       </ScrollView>
 
       <AddTransactionModal visible={modalVisible} onClose={() => setModalVisible(false)} />
+      <SavingsGoalsManager
+        visible={savingsSheetVisible}
+        initialView={savingsSheetView}
+        onClose={() => setSavingsSheetVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -605,8 +617,51 @@ const styles = StyleSheet.create({
     color: '#091E15',
     marginBottom: 2,
   },
+  savingsPctRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 2,
+  },
+  savingsPct: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  savingsPctLabel: {
+    fontSize: 11,
+    fontWeight: '400',
+    color: '#94A3B8',
+  },
   savingsAmount: {
     fontSize: 12,
+    color: '#64748B',
+  },
+  newGoalCard: {
+    width: 150,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#CBD5E1',
+    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  newGoalIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  newGoalEmoji: {
+    fontSize: 18,
+  },
+  newGoalText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#64748B',
   },
 

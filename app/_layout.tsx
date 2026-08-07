@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 import { TransactionsProvider } from '../context/TransactionsContext';
 import { BudgetsProvider } from '../context/BudgetsContext';
 import { NotificationsProvider } from '../context/NotificationsContext';
+import { SavingsGoalsProvider } from '../context/SavingsGoalsContext';
 import BudgetSetupModal from '../components/BudgetSetupModal';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet } from 'react-native';
@@ -100,11 +101,13 @@ export default function RootLayout() {
       <TransactionsProvider>
         <BudgetsProvider>
           <NotificationsProvider>
-            <SafeAreaProvider>
-              <StatusBar style="dark" />
-              <NavigationLayout />
-              <BudgetSetupModal />
-            </SafeAreaProvider>
+            <SavingsGoalsProvider>
+              <SafeAreaProvider>
+                <StatusBar style="dark" />
+                <NavigationLayout />
+                <BudgetSetupModal />
+              </SafeAreaProvider>
+            </SavingsGoalsProvider>
           </NotificationsProvider>
         </BudgetsProvider>
       </TransactionsProvider>
