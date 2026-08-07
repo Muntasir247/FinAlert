@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { TransactionsProvider } from '../context/TransactionsContext';
 import { BudgetsProvider } from '../context/BudgetsContext';
+import { NotificationsProvider } from '../context/NotificationsContext';
 import BudgetSetupModal from '../components/BudgetSetupModal';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet } from 'react-native';
@@ -88,6 +89,7 @@ function NavigationLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="notifications" />
     </Stack>
   );
 }
@@ -97,11 +99,13 @@ export default function RootLayout() {
     <AuthProvider>
       <TransactionsProvider>
         <BudgetsProvider>
-          <SafeAreaProvider>
-            <StatusBar style="dark" />
-            <NavigationLayout />
-            <BudgetSetupModal />
-          </SafeAreaProvider>
+          <NotificationsProvider>
+            <SafeAreaProvider>
+              <StatusBar style="dark" />
+              <NavigationLayout />
+              <BudgetSetupModal />
+            </SafeAreaProvider>
+          </NotificationsProvider>
         </BudgetsProvider>
       </TransactionsProvider>
     </AuthProvider>

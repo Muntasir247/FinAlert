@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { useTransactions } from '../../context/TransactionsContext';
 import { useBudgets } from '../../context/BudgetsContext';
+import { useNotifications } from '../../context/NotificationsContext';
 import AddTransactionModal from '../../components/AddTransactionModal';
 import CircularProgress from '../../components/CircularProgress';
 import { TRANSACTION_CATEGORIES } from '../../lib/transactionCategories';
@@ -61,6 +62,7 @@ export default function HomeScreen() {
   const { profile } = useAuth();
   const { transactions } = useTransactions();
   const { budget, categoryBudgets, openBudgetModal, requestBudgetTab } = useBudgets();
+  const { unreadCount } = useNotifications();
   const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -116,12 +118,19 @@ export default function HomeScreen() {
               <Feather name="aperture" size={20} color="#091E15" />
             </TouchableOpacity>
             <View>
-              <TouchableOpacity style={styles.iconButton}>
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => router.push('/notifications')}
+                accessibilityRole="button"
+                accessibilityLabel="Notifications"
+              >
                 <Ionicons name="notifications-outline" size={20} color="#091E15" />
               </TouchableOpacity>
-              <View style={styles.badgeContainer}>
-                <Text style={styles.badgeText}>3</Text>
-              </View>
+              {unreadCount > 0 && (
+                <View style={styles.badgeContainer}>
+                  <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
