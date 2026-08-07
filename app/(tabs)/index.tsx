@@ -17,6 +17,8 @@ import { useSavingsGoals } from '../../context/SavingsGoalsContext';
 import AddTransactionModal from '../../components/AddTransactionModal';
 import CircularProgress from '../../components/CircularProgress';
 import SavingsGoalsManager from '../../components/SavingsGoalsManager';
+import VoiceEntryModal from '../../components/VoiceEntryModal';
+import ScanInvoiceModal from '../../components/ScanInvoiceModal';
 import { TRANSACTION_CATEGORIES } from '../../lib/transactionCategories';
 import { savingsGoalIconName, savingsGoalTint } from '../../lib/savingsGoals';
 import type { SavingsGoal } from '../../lib/savingsGoals';
@@ -73,6 +75,8 @@ export default function HomeScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [savingsSheetVisible, setSavingsSheetVisible] = useState(false);
   const [savingsSheetView, setSavingsSheetView] = useState<SavingsSheetView>('list');
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
 
   const openSavingsSheet = (view: SavingsSheetView) => {
     setSavingsSheetView(view);
@@ -124,10 +128,20 @@ export default function HomeScreen() {
             <Text style={styles.nameText}>{profile?.full_name || 'Name'} 👋</Text>
           </View>
           <View style={styles.iconRow}>
-            <TouchableOpacity style={styles.iconButton}>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => setIsVoiceModalOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Voice entry"
+            >
               <Feather name="mic" size={20} color="#091E15" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => setIsScanModalOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Scan invoice"
+            >
               <Feather name="aperture" size={20} color="#091E15" />
             </TouchableOpacity>
             <View>
@@ -324,6 +338,14 @@ export default function HomeScreen() {
         visible={savingsSheetVisible}
         initialView={savingsSheetView}
         onClose={() => setSavingsSheetVisible(false)}
+      />
+      <VoiceEntryModal
+        visible={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+      />
+      <ScanInvoiceModal
+        visible={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
       />
     </SafeAreaView>
   );
