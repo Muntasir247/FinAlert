@@ -1,32 +1,90 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Modal,
   View,
   Text,
   TouchableOpacity,
+  ActivityIndicator,
   Animated,
   StyleSheet,
 } from 'react-native';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Voice, {
+  SpeechErrorEvent,
+  SpeechResultsEvent,
+} from '@react-native-voice/voice';
+import { parseVoiceIntent } from '../services/voiceIntentService';
+import type { VoiceIntent } from '../services/voiceIntentService';
 
-const SHEET_MAX_HEIGHT = 420;
+const SHEET_MAX_HEIGHT = 500;
+
+type Status = 'idle' | 'listening' | 'processing' | 'error';
+
+type LangKey = 'bn-BD' | 'en-US';
+
+const LANGUAGES: { key: LangKey; label: string }[] = [
+  { key: 'bn-BD', label: 'বাংলা' },
+  { key: 'en-US', label: 'English' },
+];
+
+const friendlyError = (err: SpeechErrorEvent) => {
+  const code = err.error?.code ?? '';
+  const message = err.error?.message ?? '';
+  if (code === '7' || /no match|no-speech/i.test(message)) {
+    return 'Could not understand that. Please speak more clearly and try again.';
+  }
+  if (code === '8' || /not allowed|permission/i.test(message)) {
+    return 'Microphone permission denied. Enable it in Settings to use voice entry.';
+  }
+  if (code === '5' || /busy/i.test(message)) {
+    return 'Speech recognition is busy. Wait a moment and try again.';
+  }
+  return message || 'Speech recognition failed. Please try again.';
+};
 
 export default function VoiceEntryModal({
   visible,
   onClose,
+  onIntent,
 }: {
   visible: boolean;
   onClose: () => void;
+  onIntent: (intent: VoiceIntent) => void;
 }) {
   const insets = useSafeAreaInsets();
+
+  const [lang, setLang] = useState<LangKey>('bn-BD');
+  const [status, setStatus] = useState<Status>('idle');
+  const [partialText, setPartialText] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const translateY = useRef(new Animated.Value(SHEET_MAX_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(1)).current;
 
+  const transcriptRef = useRef('');
+  const finalizeRef = useRef(false);
+  const langRef = useRef(lang);
+  const onIntentRef = useRef(onIntent);
+
+  useEffect(() => {
+    langRef.current = lang;
+  }, [lang]);
+
+  useEffect(() => {
+    onIntentRef.current = onIntent;
+  }, [onIntent]);
+
   useEffect(() => {
     if (visible) {
+      setLang('bn-BD');
+      setStatus('idle');
+      setPartialText('');
+      setErrorMsg(null);
+      transcriptRef.current = '';
+      finalizeRef.current = false;
+
       Animated.parallel([
         Animated.timing(translateY, {
           toValue: 0,
@@ -45,9 +103,9 @@ export default function VoiceEntryModal({
     }
   }, [visible, translateY, backdropOpacity]);
 
-  // Subtle pulsing ring on the mic button while the sheet is open.
+  // Pulsing ring on the mic button while actively listening.
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || status !== 'listening') return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
@@ -64,9 +122,110 @@ export default function VoiceEntryModal({
     );
     loop.start();
     return () => loop.stop();
-  }, [visible, pulse]);
+  }, [visible, status, pulse]);
+
+  const finalize = async () => {
+    if (finalizeRef.current) return;
+    const text = transcriptRef.current.trim();
+    if (!text) {
+      setStatus('idle');
+      setErrorMsg('No speech detected. Tap the mic and try again.');
+      return;
+    }
+
+    finalizeRef.current = true;
+    setStatus('processing');
+
+    try {
+      const intent = await parseVoiceIntent(text);
+      if (intent.action === 'UNKNOWN') {
+        finalizeRef.current = false;
+        setStatus('error');
+        setErrorMsg('Could not understand command. Try: "Spent 500 on food"');
+        return;
+      }
+      onIntentRef.current(intent);
+    } catch (err) {
+      finalizeRef.current = false;
+      setStatus('error');
+      setErrorMsg(err instanceof Error ? err.message : 'Could not process that request.');
+    }
+  };
+
+  // Attach voice event handlers once. They only touch stable refs + state setters.
+  useEffect(() => {
+    Voice.onSpeechPartialResults = (e: SpeechResultsEvent) => {
+      const text = e.value?.[0] ?? '';
+      transcriptRef.current = text;
+      setPartialText(text);
+    };
+
+    Voice.onSpeechResults = (e: SpeechResultsEvent) => {
+      const text = e.value?.[0] ?? '';
+      transcriptRef.current = text;
+      setPartialText(text);
+    };
+
+    Voice.onSpeechEnd = () => {
+      if (finalizeRef.current) return;
+      setStatus('processing');
+      finalize();
+    };
+
+    Voice.onSpeechError = (e: SpeechErrorEvent) => {
+      if (finalizeRef.current) return;
+      setStatus('error');
+      setErrorMsg(friendlyError(e));
+    };
+
+    return () => {
+      Voice.removeAllListeners();
+      Voice.destroy();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startListening = async () => {
+    setErrorMsg(null);
+    setPartialText('');
+    transcriptRef.current = '';
+    finalizeRef.current = false;
+    setStatus('listening');
+
+    try {
+      const available = await Voice.isAvailable();
+      if (!available) {
+        setStatus('error');
+        setErrorMsg('Speech recognition is not available on this device.');
+        return;
+      }
+      await Voice.start(langRef.current);
+    } catch (err) {
+      setStatus('error');
+      setErrorMsg('Could not start the microphone. Check your permissions in Settings.');
+      console.error('Voice.start failed:', err);
+    }
+  };
+
+  const stopListening = () => {
+    setStatus('processing');
+    Voice.stop().catch(() => {
+      if (!finalizeRef.current) {
+        finalizeRef.current = false;
+        setStatus('idle');
+        setErrorMsg('Speech recognition stopped unexpectedly.');
+      }
+    });
+  };
+
+  const handleMicPress = () => {
+    if (status === 'listening') stopListening();
+    else if (status === 'idle' || status === 'error') startListening();
+  };
 
   const handleClose = () => {
+    Voice.cancel().catch(() => {});
+    finalizeRef.current = false;
     Animated.parallel([
       Animated.timing(translateY, {
         toValue: SHEET_MAX_HEIGHT,
@@ -80,6 +239,10 @@ export default function VoiceEntryModal({
       }),
     ]).start(onClose);
   };
+
+  const isListening = status === 'listening';
+  const isProcessing = status === 'processing';
+  const micDisabled = isProcessing;
 
   return (
     <Modal
@@ -124,16 +287,103 @@ export default function VoiceEntryModal({
 
           {/* Body */}
           <View style={styles.body}>
-            <Animated.View style={[styles.micOuter, { transform: [{ scale: pulse }] }]}>
-              <View style={styles.micButton}>
-                <Feather name="mic" size={40} color="#FFFFFF" />
-              </View>
+            <Animated.View
+              style={[
+                styles.micOuter,
+                isListening && styles.micOuterActive,
+                { transform: [{ scale: pulse }] },
+              ]}
+            >
+              {isProcessing ? (
+                <View style={styles.micButton}>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.micButton, isListening && styles.micButtonActive]}
+                  onPress={handleMicPress}
+                  disabled={micDisabled}
+                  accessibilityRole="button"
+                  accessibilityState={{ busy: isProcessing }}
+                  accessibilityLabel={
+                    isListening ? 'Stop recording' : 'Start voice recording'
+                  }
+                >
+                  <Ionicons
+                    name={isListening ? 'stop' : 'mic'}
+                    size={40}
+                    color="#FFFFFF"
+                  />
+                </TouchableOpacity>
+              )}
             </Animated.View>
 
-            <Text style={styles.instruction}>Tap the mic and speak your expense or income</Text>
-            <Text style={styles.hint}>
-              Example: {"Spent 500 taka on food"} or {"Received 10000 salary"}
-            </Text>
+            {/* Transcript / status area */}
+            <View style={styles.statusArea}>
+              {isProcessing ? (
+                <>
+                  {partialText ? (
+                    <Text style={styles.partialText}>{partialText}</Text>
+                  ) : null}
+                  <Text style={styles.processingText}>
+                    Understanding your request...
+                  </Text>
+                </>
+              ) : isListening ? (
+                <>
+                  <Text style={styles.partialText}>
+                    {partialText || 'Listening...'}
+                  </Text>
+                  <Text style={styles.hint}>Tap the button when you are done</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.instruction}>
+                    Tap the mic and speak your expense or income
+                  </Text>
+                  <Text style={styles.hint}>
+                    Example: {"Spent 500 taka on food"} or {"Received 10000 salary"}
+                  </Text>
+                </>
+              )}
+            </View>
+
+            {errorMsg && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{errorMsg}</Text>
+              </View>
+            )}
+
+            {/* Language picker */}
+            <View style={styles.langRow}>
+              {LANGUAGES.map((item) => {
+                const isActive = lang === item.key;
+                return (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[
+                      styles.langChip,
+                      isActive && styles.langChipActive,
+                      isProcessing && styles.langChipDisabled,
+                    ]}
+                    onPress={() => setLang(item.key)}
+                    disabled={isProcessing}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
+                    accessibilityLabel={`Language ${item.label}`}
+                  >
+                    <Text
+                      style={[
+                        styles.langChipText,
+                        isActive && styles.langChipTextActive,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         </Animated.View>
       </View>
@@ -204,6 +454,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#D1FAE5',
     marginBottom: 20,
   },
+  micOuterActive: {
+    backgroundColor: '#FEE2E2',
+  },
   micButton: {
     width: 76,
     height: 76,
@@ -217,6 +470,16 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
+  micButtonActive: {
+    backgroundColor: '#EF4444',
+    shadowColor: '#EF4444',
+  },
+  statusArea: {
+    alignItems: 'center',
+    minHeight: 52,
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
   instruction: {
     fontSize: 16,
     fontWeight: '500',
@@ -224,11 +487,73 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
   },
+  partialText: {
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '500',
+    color: '#091E15',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  processingText: {
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '400',
+    color: '#6B7280',
+    textAlign: 'center',
+  },
   hint: {
     fontSize: 13,
     lineHeight: 15,
     fontWeight: '400',
     color: '#94A3B8',
     textAlign: 'center',
+  },
+  errorBox: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    alignSelf: 'stretch',
+  },
+  errorText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#DC2626',
+    textAlign: 'center',
+  },
+  langRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  langChip: {
+    paddingHorizontal: 20,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  langChipActive: {
+    backgroundColor: '#E8F7F1',
+    borderColor: '#0FB384',
+  },
+  langChipDisabled: {
+    opacity: 0.5,
+  },
+  langChipText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#334155',
+  },
+  langChipTextActive: {
+    color: '#0FB384',
+    fontWeight: '600',
   },
 });

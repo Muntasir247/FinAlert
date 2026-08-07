@@ -19,6 +19,9 @@ import CircularProgress from '../../components/CircularProgress';
 import SavingsGoalsManager from '../../components/SavingsGoalsManager';
 import VoiceEntryModal from '../../components/VoiceEntryModal';
 import ScanInvoiceModal from '../../components/ScanInvoiceModal';
+import type { AddTransactionPrefill } from '../../components/AddTransactionModal';
+import type { SavingsGoalsPrefill } from '../../components/SavingsGoalsManager';
+import type { VoiceIntent } from '../../services/voiceIntentService';
 import { TRANSACTION_CATEGORIES } from '../../lib/transactionCategories';
 import { savingsGoalIconName, savingsGoalTint } from '../../lib/savingsGoals';
 import type { SavingsGoal } from '../../lib/savingsGoals';
@@ -77,10 +80,65 @@ export default function HomeScreen() {
   const [savingsSheetView, setSavingsSheetView] = useState<SavingsSheetView>('list');
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  const [txPrefill, setTxPrefill] = useState<AddTransactionPrefill | null>(null);
+  const [savingsPrefill, setSavingsPrefill] = useState<SavingsGoalsPrefill | null>(null);
 
   const openSavingsSheet = (view: SavingsSheetView) => {
+    setSavingsPrefill(null);
     setSavingsSheetView(view);
     setSavingsSheetVisible(true);
+  };
+
+  // Route a parsed voice intent to the right pre-filled modal. The voice sheet
+  // closes first; the target modal opens a beat later to avoid Modal overlap.
+  const handleVoiceIntent = (intent: VoiceIntent) => {
+    setIsVoiceModalOpen(false);
+    setTimeout(() => {
+      switch (intent.action) {
+        case 'ADD_EXPENSE':
+        case 'ADD_INCOME':
+          setTxPrefill({
+            type: intent.action === 'ADD_EXPENSE' ? 'expense' : 'income',
+            amount: intent.amount,
+            category: intent.category,
+            description: intent.description,
+          });
+          setModalVisible(true);
+          break;
+        case 'CREATE_SAVINGS_GOAL':
+          setSavingsPrefill({
+            goalName: intent.goal_name,
+            targetAmount: intent.target_amount,
+          });
+          setSavingsSheetView('create');
+          setSavingsSheetVisible(true);
+          break;
+        case 'ADD_SAVINGS_CONTRIBUTION': {
+          const goal = intent.goal_name
+            ? savingsGoals.find((g) =>
+                g.name.toLowerCase().includes(intent.goal_name!.toLowerCase())
+              )
+            : undefined;
+          if (goal) {
+            setSavingsPrefill({ goalId: goal.id, amount: intent.amount });
+            setSavingsSheetVisible(true);
+          } else {
+            setSavingsPrefill({
+              goalName: intent.goal_name,
+              targetAmount: intent.target_amount,
+            });
+            setSavingsSheetView('create');
+            setSavingsSheetVisible(true);
+          }
+          break;
+        }
+        case 'SET_BUDGET_LIMIT':
+          openBudgetModal();
+          break;
+        default:
+          break;
+      }
+    }, 150);
   };
 
   const recentTransactions = transactions.slice(0, 3);
@@ -333,15 +391,27 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      <AddTransactionModal visible={modalVisible} onClose={() => setModalVisible(false)} />
+      <AddTransactionModal
+        visible={modalVisible}
+        prefill={txPrefill}
+        onClose={() => {
+          setModalVisible(false);
+          setTxPrefill(null);
+        }}
+      />
       <SavingsGoalsManager
         visible={savingsSheetVisible}
         initialView={savingsSheetView}
-        onClose={() => setSavingsSheetVisible(false)}
+        prefill={savingsPrefill}
+        onClose={() => {
+          setSavingsSheetVisible(false);
+          setSavingsPrefill(null);
+        }}
       />
       <VoiceEntryModal
         visible={isVoiceModalOpen}
         onClose={() => setIsVoiceModalOpen(false)}
+        onIntent={handleVoiceIntent}
       />
       <ScanInvoiceModal
         visible={isScanModalOpen}

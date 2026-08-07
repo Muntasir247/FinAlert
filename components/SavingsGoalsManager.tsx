@@ -33,13 +33,22 @@ const PRESET_PILLS = [500, 1000, 2000, 5000];
 
 const fmtMoney = (n: number) => `৳${Math.round(n).toLocaleString()}`;
 
+export interface SavingsGoalsPrefill {
+  goalId?: string;
+  amount?: number;
+  goalName?: string;
+  targetAmount?: number;
+}
+
 export default function SavingsGoalsManager({
   visible,
   initialView = 'list',
+  prefill,
   onClose,
 }: {
   visible: boolean;
   initialView?: SheetView;
+  prefill?: SavingsGoalsPrefill | null;
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -87,6 +96,19 @@ export default function SavingsGoalsManager({
       setCreateSubmitting(false);
       setCreateError(null);
 
+      if (prefill?.goalId) {
+        const goal = goals.find((g) => g.id === prefill.goalId);
+        if (goal) {
+          setSelectedGoal(goal);
+          if (prefill.amount != null) setAmountText(String(prefill.amount));
+          setView('add');
+        }
+      } else if (prefill?.goalName) {
+        setNameText(prefill.goalName);
+        if (prefill.targetAmount != null) setTargetText(String(prefill.targetAmount));
+        setView('create');
+      }
+
       Animated.parallel([
         Animated.timing(translateY, {
           toValue: 0,
@@ -103,7 +125,7 @@ export default function SavingsGoalsManager({
       translateY.setValue(SHEET_MAX_HEIGHT);
       backdropOpacity.setValue(0);
     }
-  }, [visible, initialView]);
+  }, [visible, initialView, prefill, goals]);
 
   const handleClose = () => {
     if (addSubmitting || createSubmitting) return;

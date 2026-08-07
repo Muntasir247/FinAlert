@@ -23,14 +23,23 @@ import type { Transaction, TransactionType } from '../lib/transactions';
 
 const SHEET_MAX_HEIGHT = 620;
 
+export interface AddTransactionPrefill {
+  type?: TransactionType;
+  amount?: number;
+  category?: string;
+  description?: string;
+}
+
 export default function AddTransactionModal({
   visible,
   onClose,
   editing = null,
+  prefill,
 }: {
   visible: boolean;
   onClose: () => void;
   editing?: Transaction | null;
+  prefill?: AddTransactionPrefill | null;
 }) {
   const insets = useSafeAreaInsets();
   const { addTransaction, updateTransaction } = useTransactions();
@@ -56,6 +65,12 @@ export default function AddTransactionModal({
         setCategory(editing.category);
         setDescription(editing.description ?? '');
         setDate(new Date(y, m - 1, d));
+      } else if (prefill) {
+        setType(prefill.type ?? 'expense');
+        setAmount(prefill.amount != null ? String(prefill.amount) : '');
+        setCategory(prefill.category ?? null);
+        setDescription(prefill.description ?? '');
+        setDate(new Date());
       } else {
         setType('expense');
         setAmount('');
@@ -83,7 +98,7 @@ export default function AddTransactionModal({
       translateY.setValue(SHEET_MAX_HEIGHT);
       backdropOpacity.setValue(0);
     }
-  }, [visible, editing]);
+  }, [visible, editing, prefill]);
 
   const handleClose = () => {
     if (submitting) return;
