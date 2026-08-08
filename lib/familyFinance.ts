@@ -45,6 +45,8 @@ export interface AddExpenseInput {
   assignments: { memberId: string; amount: number }[];
 }
 
+export type UpdateExpenseInput = AddExpenseInput;
+
 export interface AddTransactionInput {
   type: FamilyTransactionType;
   expenseId: string;
@@ -140,6 +142,45 @@ export async function recordFamilyTransaction(input: AddTransactionInput): Promi
     p_type: input.type,
     p_amount: Math.round(input.amount * 100) / 100,
     p_note: input.note,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function updateFamilyExpense(
+  expenseId: string,
+  input: UpdateExpenseInput
+): Promise<void> {
+  const { error } = await supabase.rpc('update_family_expense', {
+    p_expense_id: expenseId,
+    p_category: input.category,
+    p_total: Math.round(input.total * 100) / 100,
+    p_assignments: input.assignments.map((a) => ({
+      memberId: a.memberId,
+      amount: Math.round(a.amount * 100) / 100,
+    })),
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function deleteFamilyExpense(expenseId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_family_expense', {
+    p_expense_id: expenseId,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function deleteFamilyTransaction(txId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_family_transaction', {
+    p_tx_id: txId,
   });
 
   if (error) {

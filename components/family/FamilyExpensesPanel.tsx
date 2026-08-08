@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import AddExpenseModal from './AddExpenseModal';
 import { expenseCategoryMeta, formatMoney, initialsOf } from './familyConstants';
-import type { FamilyFinanceApi } from './useFamilyFinance';
+import type { FamilyFinanceApi, SharedExpense } from './useFamilyFinance';
 
 interface FamilyExpensesPanelProps {
   finance: FamilyFinanceApi;
@@ -11,7 +11,23 @@ interface FamilyExpensesPanelProps {
 
 export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProps) {
   const [addVisible, setAddVisible] = useState(false);
-  const { expenses, finances } = finance;
+  const [editingExpense, setEditingExpense] = useState<SharedExpense | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<SharedExpense | null>(null);
+  const [busy, setBusy] = useState(false);
+  const { expenses, finances, isAdmin } = finance;
+
+  const handleDelete = async () => {
+    if (!confirmDelete || busy) return;
+    setBusy(true);
+    try {
+      await finance.deleteExpense(confirmDelete.id);
+      setConfirmDelete(null);
+    } catch (error) {
+      console.error('Failed to delete expense:', error);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <View>
@@ -55,7 +71,29 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.totalAmount}>{formatMoney(expense.total)}</Text>
+                <View style={styles.cardHeaderRight}>
+                  {isAdmin && (
+                    <View style={styles.adminActions}>
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => setEditingExpense(expense)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Edit ${expense.category}`}
+                      >
+                        <Feather name="edit-2" size={16} color="#3B82F6" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => setConfirmDelete(expense)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete ${expense.category}`}
+                      >
+                        <Feather name="trash-2" size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  <Text style={styles.totalAmount}>{formatMoney(expense.total)}</Text>
+                </View>
               </View>
 
               {/* Progress */}
@@ -101,11 +139,53 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
       )}
 
       <AddExpenseModal
-        visible={addVisible}
+        visible={addVisible || !!editingExpense}
         finances={finances}
-        onClose={() => setAddVisible(false)}
-        onSubmit={finance.addExpense}
+        editing={editingExpense}
+        onClose={() => {
+          setAddVisible(false);
+          setEditingExpense(null);
+        }}
+        onSubmit={(input) => {
+          if (editingExpense) {
+            return finance.updateExpense(editingExpense.id, input);
+          }
+          return finance.addExpense(input);
+        }}
       />
+
+      {confirmDelete && (
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            <View style={styles.confirmIconWrap}>
+              <Feather name="alert-triangle" size={24} color="#EF4444" />
+            </View>
+            <Text style={styles.confirmTitle}>Delete shared expense?</Text>
+            <Text style={styles.confirmText}>
+              This will remove "{confirmDelete.category}" (৳
+              {Math.round(confirmDelete.total).toLocaleString()}) and all its payment records.
+            </Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={[styles.confirmBtn, styles.cancelBtn]}
+                onPress={() => setConfirmDelete(null)}
+                disabled={busy}
+                accessibilityRole="button"
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmBtn, styles.deleteBtn]}
+                onPress={handleDelete}
+                disabled={busy}
+                accessibilityRole="button"
+              >
+                <Text style={styles.deleteBtnText}>{busy ? 'Deleting…' : 'Delete'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -273,5 +353,92 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#3B82F6',
     marginBottom: 1,
+  },
+  cardHeaderRight: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  adminActions: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  actionBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  confirmOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+    zIndex: 50,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 20,
+    alignItems: 'center',
+  },
+  confirmIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  confirmTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#091E15',
+    marginBottom: 6,
+  },
+  confirmText: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '400',
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  confirmBtn: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtn: {
+    backgroundColor: '#F1F5F9',
+  },
+  cancelBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  deleteBtn: {
+    backgroundColor: '#EF4444',
+  },
+  deleteBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

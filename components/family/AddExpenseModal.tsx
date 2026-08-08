@@ -1,18 +1,25 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import FamilySheetModal from './FamilySheetModal';
 import { EXPENSE_CATEGORIES, formatMoney } from './familyConstants';
-import type { MemberFinance, AddExpenseInput } from './useFamilyFinance';
+import type { MemberFinance, SharedExpense, AddExpenseInput } from './useFamilyFinance';
 
 interface AddExpenseModalProps {
   visible: boolean;
   finances: MemberFinance[];
   onClose: () => void;
   onSubmit: (input: AddExpenseInput) => void;
+  editing?: SharedExpense | null;
 }
 
-export default function AddExpenseModal({ visible, finances, onClose, onSubmit }: AddExpenseModalProps) {
+export default function AddExpenseModal({
+  visible,
+  finances,
+  onClose,
+  onSubmit,
+  editing = null,
+}: AddExpenseModalProps) {
   const [category, setCategory] = useState(EXPENSE_CATEGORIES[0].label);
   const [totalText, setTotalText] = useState('');
   const [assignments, setAssignments] = useState<Record<string, string>>({});
@@ -27,6 +34,25 @@ export default function AddExpenseModal({ visible, finances, onClose, onSubmit }
   const counterColor =
     balance < -0.01 ? '#EF4444' : Math.abs(balance) < 0.01 ? '#0FB384' : '#D97706';
   const canSubmit = total > 0 && assignedTotal > 0 && balance >= -0.01;
+
+  useEffect(() => {
+    if (visible) {
+      if (editing) {
+        setCategory(EXPENSE_CATEGORIES.find((c) => c.label === editing.category)?.label ?? EXPENSE_CATEGORIES[0].label);
+        setTotalText(String(editing.total));
+        setAssignments(
+          Object.fromEntries(
+            editing.contributors.map((c) => [c.memberId, c.amount > 0 ? String(c.amount) : ''])
+          )
+        );
+      } else {
+        setCategory(EXPENSE_CATEGORIES[0].label);
+        setTotalText('');
+        setAssignments({});
+      }
+      setErrorMsg(null);
+    }
+  }, [visible, editing]);
 
   const handleClose = () => {
     if (visible) {
@@ -54,13 +80,13 @@ export default function AddExpenseModal({ visible, finances, onClose, onSubmit }
       });
       handleClose();
     } catch (error) {
-      console.error('Failed to add expense:', error);
-      setErrorMsg('Failed to add expense. Please try again.');
+      console.error('Failed to save expense:', error);
+      setErrorMsg('Failed to save expense. Please try again.');
     }
   };
 
   return (
-    <FamilySheetModal visible={visible} title="Add Shared Expense" onClose={handleClose} keyboardAvoiding>
+    <FamilySheetModal visible={visible} title={editing ? 'Edit Shared Expense' : 'Add Shared Expense'} onClose={handleClose} keyboardAvoiding>
       {/* Category selector */}
       <Text style={styles.label}>Category</Text>
       <View style={styles.grid}>
@@ -173,8 +199,8 @@ export default function AddExpenseModal({ visible, finances, onClose, onSubmit }
         accessibilityRole="button"
         accessibilityLabel="Add Expense"
       >
-        <Ionicons name="add" size={18} color="#FFFFFF" />
-        <Text style={styles.submitBtnText}>Add Expense</Text>
+        <Ionicons name={editing ? 'checkmark' : 'add'} size={18} color="#FFFFFF" />
+        <Text style={styles.submitBtnText}>{editing ? 'Save Changes' : 'Add Expense'}</Text>
       </TouchableOpacity>
     </FamilySheetModal>
   );

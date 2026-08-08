@@ -7,6 +7,9 @@ import {
   updateFamilyMemberRole,
   updateOwnContribution,
   removeFamilyMember,
+  updateFamilyExpense,
+  deleteFamilyExpense,
+  deleteFamilyTransaction,
 } from '../../lib/familyFinance';
 import type {
   MemberFinance,
@@ -14,6 +17,7 @@ import type {
   FamilyTransaction,
   AddExpenseInput,
   AddTransactionInput,
+  UpdateExpenseInput,
 } from '../../lib/familyFinance';
 
 export type {
@@ -23,6 +27,7 @@ export type {
   FamilyTransactionType,
   AddExpenseInput,
   AddTransactionInput,
+  UpdateExpenseInput,
   ExpenseContributor,
 } from '../../lib/familyFinance';
 
@@ -39,7 +44,10 @@ export interface FamilyFinanceApi {
   expenseStatus: (expense: SharedExpense) => 'Paid' | 'Partial';
   memberShare: (expense: SharedExpense, memberId: string) => number;
   addExpense: (input: AddExpenseInput) => Promise<void>;
+  updateExpense: (expenseId: string, input: UpdateExpenseInput) => Promise<void>;
+  deleteExpense: (expenseId: string) => Promise<void>;
   recordTransaction: (input: AddTransactionInput) => Promise<void>;
+  deleteTransaction: (txId: string) => Promise<void>;
   changeRole: (memberId: string, role: FamilyRole, limit: number) => Promise<void>;
   updateOwnContribution: (memberId: string, limit: number) => Promise<void>;
   removeMember: (memberId: string) => Promise<void>;
@@ -112,8 +120,23 @@ export function useFamilyFinance(familyId: string | null, currentUserId?: string
     await reload();
   };
 
+  const editExpense = async (expenseId: string, input: UpdateExpenseInput) => {
+    await updateFamilyExpense(expenseId, input);
+    await reload();
+  };
+
+  const removeExpense = async (expenseId: string) => {
+    await deleteFamilyExpense(expenseId);
+    await reload();
+  };
+
   const recordTx = async (input: AddTransactionInput) => {
     await recordFamilyTransaction(input);
+    await reload();
+  };
+
+  const removeTx = async (txId: string) => {
+    await deleteFamilyTransaction(txId);
     await reload();
   };
 
@@ -145,7 +168,10 @@ export function useFamilyFinance(familyId: string | null, currentUserId?: string
     expenseStatus,
     memberShare,
     addExpense,
+    updateExpense: editExpense,
+    deleteExpense: removeExpense,
     recordTransaction: recordTx,
+    deleteTransaction: removeTx,
     changeRole,
     updateOwnContribution: changeOwnContribution,
     removeMember,

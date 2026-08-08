@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import AddTransactionModal from './AddTransactionModal';
 import { expenseCategoryMeta, formatDateLabel, formatMoney, initialsOf } from './familyConstants';
 import type { FamilyFinanceApi, FamilyTransaction, FamilyTransactionType } from './useFamilyFinance';
@@ -30,7 +30,23 @@ function groupByDate(txs: FamilyTransaction[]) {
 
 export default function FamilyTransactionsPanel({ finance }: FamilyTransactionsPanelProps) {
   const [modalVisible, setModalVisible] = useState(false);
+  const [confirmTx, setConfirmTx] = useState<FamilyTransaction | null>(null);
+  const [busy, setBusy] = useState(false);
   const groups = groupByDate(finance.transactions);
+  const myMemberId = finance.me?.memberId;
+
+  const handleDeleteTx = async () => {
+    if (!confirmTx || busy) return;
+    setBusy(true);
+    try {
+      await finance.deleteTransaction(confirmTx.id);
+      setConfirmTx(null);
+    } catch (error) {
+      console.error('Failed to delete transaction:', error);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -75,9 +91,21 @@ export default function FamilyTransactionsPanel({ finance }: FamilyTransactionsP
                       <Text style={styles.txCategory}>{tx.expenseCategory}</Text>
                     </View>
                   </View>
-                  <Text style={[styles.txAmount, { color: meta.tint }]}>
-                    {tx.type === 'extra' ? '+' : ''}{formatMoney(tx.amount)}
-                  </Text>
+                  <View style={styles.txAmountWrap}>
+                    <Text style={[styles.txAmount, { color: meta.tint }]}>
+                      {tx.type === 'extra' ? '+' : ''}{formatMoney(tx.amount)}
+                    </Text>
+                    {tx.memberId === myMemberId && (
+                      <TouchableOpacity
+                        style={styles.deleteBtn}
+                        onPress={() => setConfirmTx(tx)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete ${meta.label} transaction`}
+                      >
+                        <Feather name="trash-2" size={14} color="#EF4444" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               );
             })}
@@ -86,6 +114,39 @@ export default function FamilyTransactionsPanel({ finance }: FamilyTransactionsP
       )}
 
       <AddTransactionModal visible={modalVisible} finance={finance} onClose={() => setModalVisible(false)} />
+
+      {confirmTx && (
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            <View style={styles.confirmIconWrap}>
+              <Feather name="alert-triangle" size={24} color="#EF4444" />
+            </View>
+            <Text style={styles.confirmTitle}>Delete this transaction?</Text>
+            <Text style={styles.confirmText}>
+              {confirmTx.type === 'payment' ? 'Payment' : confirmTx.type === 'extra' ? 'Extra' : 'Unable'}{' '}
+              of {formatMoney(confirmTx.amount)} will be removed from {confirmTx.expenseCategory}.
+            </Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={[styles.confirmBtn, styles.cancelBtn]}
+                onPress={() => setConfirmTx(null)}
+                disabled={busy}
+                accessibilityRole="button"
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmBtn, styles.deleteBtnBg]}
+                onPress={handleDeleteTx}
+                disabled={busy}
+                accessibilityRole="button"
+              >
+                <Text style={styles.deleteBtnText}>{busy ? 'Deleting…' : 'Delete'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -203,5 +264,88 @@ const styles = StyleSheet.create({
   txAmount: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  txAmountWrap: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  deleteBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEF2F2',
+  },
+  confirmOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+    zIndex: 50,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 20,
+    alignItems: 'center',
+  },
+  confirmIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  confirmTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#091E15',
+    marginBottom: 6,
+  },
+  confirmText: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '400',
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  confirmBtn: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtn: {
+    backgroundColor: '#F1F5F9',
+  },
+  cancelBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  deleteBtnBg: {
+    backgroundColor: '#EF4444',
+  },
+  deleteBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
