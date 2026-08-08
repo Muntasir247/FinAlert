@@ -12,7 +12,7 @@ import { SavingsGoalsProvider } from '../context/SavingsGoalsContext';
 import { FamilyProvider } from '../context/FamilyContext';
 import BudgetSetupModal from '../components/BudgetSetupModal';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, Text } from 'react-native';
 
 const MIN_SPLASH_MS = 2500;
 
@@ -32,6 +32,7 @@ function GreenLoadingScreen() {
         style={styles.splashLogo}
         resizeMode="contain"
       />
+      <Text style={styles.splashTitle}>FinAlert</Text>
       <ActivityIndicator size="large" color="#FFFFFF" style={styles.splashSpinner} />
     </LinearGradient>
   );
@@ -127,6 +128,14 @@ const styles = StyleSheet.create({
   splashLogo: {
     width: 120,
     height: 120,
+  },
+  splashTitle: {
+    marginTop: 20,
+    fontSize: 32,
+    lineHeight: 34,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 1,
   },
   splashSpinner: {
     marginTop: 32,
