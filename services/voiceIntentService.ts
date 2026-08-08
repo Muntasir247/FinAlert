@@ -18,7 +18,9 @@ export interface VoiceIntent {
 }
 
 const GEMINI_ENDPOINT =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent';
+
+const MAX_AMOUNT = 1_000_000_000;
 
 const EXPENSE_CATEGORIES = TRANSACTION_CATEGORIES.map((c) => c.label).join(', ');
 
@@ -35,7 +37,7 @@ Rules:
 - If the request is unrelated or unclear, action is UNKNOWN.
 - Always use the app's exact category labels when filling "category".
 - "description" should be a short human-friendly summary of the transaction (keep the original language).
-- "amount" and "target_amount" are positive numbers in BDT.
+- "amount" and "target_amount" must be the amount as a plain number string with digits only (e.g. "500", "5000.50"). Convert Bangla digits or written-out words to standard digits.
 
 Respond with JSON only.`;
 
@@ -53,11 +55,11 @@ const RESPONSE_SCHEMA = {
         'UNKNOWN',
       ],
     },
-    amount: { type: 'NUMBER' },
+    amount: { type: 'STRING' },
     category: { type: 'STRING' },
     goal_name: { type: 'STRING' },
     description: { type: 'STRING' },
-    target_amount: { type: 'NUMBER' },
+    target_amount: { type: 'STRING' },
   },
   required: ['action'],
 };
@@ -76,18 +78,20 @@ const isValidAction = (value: unknown): value is VoiceIntentAction =>
   ].includes(value);
 
 const toNumber = (value: unknown): number | undefined => {
-  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-    return value;
+  let n: number;
+  if (typeof value === 'number') {
+    n = value;
+  } else if (typeof value === 'string') {
+    n = Number.parseFloat(value);
+  } else {
+    return undefined;
   }
-  if (typeof value === 'string') {
-    const parsed = Number.parseFloat(value);
-    if (Number.isFinite(parsed) && parsed > 0) return parsed;
-  }
-  return undefined;
+  if (!Number.isFinite(n) || n <= 0 || n > MAX_AMOUNT) return undefined;
+  return Math.round(n * 100) / 100;
 };
 
 /**
- * Sends the transcribed text to Gemini 1.5 Flash and returns a structured
+ * Sends the transcribed text to Gemini 3.5 Flash and returns a structured
  * VoiceIntent. Throws VoiceIntentError with a user-friendly message when the
  * key is missing, the network fails, or the model output cannot be parsed.
  */
