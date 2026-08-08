@@ -9,6 +9,7 @@ import { TransactionsProvider } from '../context/TransactionsContext';
 import { BudgetsProvider } from '../context/BudgetsContext';
 import { NotificationsProvider } from '../context/NotificationsContext';
 import { SavingsGoalsProvider } from '../context/SavingsGoalsContext';
+import { FamilyProvider } from '../context/FamilyContext';
 import BudgetSetupModal from '../components/BudgetSetupModal';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet } from 'react-native';
@@ -102,11 +103,13 @@ export default function RootLayout() {
         <BudgetsProvider>
           <NotificationsProvider>
             <SavingsGoalsProvider>
-              <SafeAreaProvider>
-                <StatusBar style="dark" />
-                <NavigationLayout />
-                <BudgetSetupModal />
-              </SafeAreaProvider>
+              <FamilyProvider>
+                <SafeAreaProvider>
+                  <StatusBar style="dark" />
+                  <NavigationLayout />
+                  <BudgetSetupModal />
+                </SafeAreaProvider>
+              </FamilyProvider>
             </SavingsGoalsProvider>
           </NotificationsProvider>
         </BudgetsProvider>

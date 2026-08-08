@@ -4,10 +4,14 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
+import { useFamily } from '../../context/FamilyContext';
+import InviteFamilyModal from '../../components/InviteFamilyModal';
+import FamilyJoinScreen from '../../components/FamilyJoinScreen';
 
 const SUB_TABS: { label: string; key: 'overview' | 'members' | 'expenses' | 'goals' }[] = [
   { label: 'Overview', key: 'overview' },
@@ -64,7 +68,29 @@ const ROLE_TEXT_COLOR: Record<string, string> = {
 };
 
 export default function FamilyScreen() {
+  const { family, members, isLoading } = useFamily();
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'members' | 'expenses' | 'goals'>('overview');
+  const [inviteModalVisible, setInviteModalVisible] = useState(false);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0FB384" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!family) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <FamilyJoinScreen />
+      </SafeAreaView>
+    );
+  }
+
+  const memberCount = members.length;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -76,10 +102,18 @@ export default function FamilyScreen() {
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.headerTitle}>Family Finance</Text>
-            <Text style={styles.headerSubtext}>4 members</Text>
+            <Text style={styles.headerSubtext}>
+              {memberCount} {memberCount === 1 ? 'member' : 'members'}
+            </Text>
           </View>
-          <TouchableOpacity style={styles.inviteBtn}>
-            <Feather name="user-plus" size={20} color="#091E15" />
+          <TouchableOpacity
+            style={styles.inviteBtn}
+            onPress={() => setInviteModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Invite to family"
+          >
+            <Feather name="user-plus" size={18} color="#0FB384" />
+            <Text style={styles.inviteBtnLabel}>Invite</Text>
           </TouchableOpacity>
         </View>
 
@@ -139,7 +173,12 @@ export default function FamilyScreen() {
                   </View>
                 ))}
               </View>
-              <TouchableOpacity style={styles.inviteMemberBtn}>
+              <TouchableOpacity
+                style={styles.inviteMemberBtn}
+                onPress={() => setInviteModalVisible(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Invite member"
+              >
                 <View style={styles.inviteMemberCircle}>
                   <Text style={styles.inviteMemberPlus}>+</Text>
                 </View>
@@ -308,6 +347,13 @@ export default function FamilyScreen() {
           </View>
         )}
       </ScrollView>
+
+      <InviteFamilyModal
+        visible={inviteModalVisible}
+        code={family.invite_code}
+        familyName={family.name}
+        onClose={() => setInviteModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -343,14 +389,26 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   inviteBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
+    height: 40,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#0FB384',
     backgroundColor: '#FFFFFF',
+  },
+  inviteBtnLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0FB384',
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // ── Summary Metrics ──
