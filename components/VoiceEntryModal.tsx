@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
+  PermissionsAndroid,
+  Platform,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -190,6 +192,35 @@ export default function VoiceEntryModal({
     setPartialText('');
     transcriptRef.current = '';
     finalizeRef.current = false;
+
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          {
+            title: 'Microphone Access',
+            message:
+              'FinAlert needs microphone access to capture your voice entries.',
+            buttonPositive: 'Allow',
+            buttonNegative: 'Not Now',
+            buttonNeutral: 'Ask Me Later',
+          }
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          setStatus('error');
+          setErrorMsg(
+            'Microphone permission is required for voice entry. Enable it in Settings to try again.'
+          );
+          return;
+        }
+      } catch (err) {
+        setStatus('error');
+        setErrorMsg('Could not request microphone access. Please try again.');
+        console.error('Microphone permission request failed:', err);
+        return;
+      }
+    }
+
     setStatus('listening');
 
     try {
