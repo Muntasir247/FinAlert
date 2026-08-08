@@ -35,10 +35,11 @@
       "expo-secure-store",
       "@react-native-community/datetimepicker",
       [
-        "@react-native-voice/voice",
+        "expo-speech-recognition",
         {
           "microphonePermission": "FinAlert uses your microphone to capture voice entries.",
-          "speechRecognitionPermission": "FinAlert uses speech recognition to turn your voice into transactions."
+          "speechRecognitionPermission": "FinAlert uses speech recognition to turn your voice into transactions.",
+          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
         }
       ]
     ],

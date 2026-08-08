@@ -6,16 +6,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
-  PermissionsAndroid,
-  Platform,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Voice, {
-  SpeechErrorEvent,
-  SpeechResultsEvent,
-} from '@react-native-voice/voice';
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from 'expo-speech-recognition';
+import type { ExpoSpeechRecognitionErrorEvent } from 'expo-speech-recognition';
 import { parseVoiceIntent } from '../services/voiceIntentService';
 import type { VoiceIntent } from '../services/voiceIntentService';
 
@@ -30,19 +29,26 @@ const LANGUAGES: { key: LangKey; label: string }[] = [
   { key: 'en-US', label: 'English' },
 ];
 
-const friendlyError = (err: SpeechErrorEvent) => {
-  const code = err.error?.code ?? '';
-  const message = err.error?.message ?? '';
-  if (code === '7' || /no match|no-speech/i.test(message)) {
-    return 'Could not understand that. Please speak more clearly and try again.';
+const friendlyError = (err: ExpoSpeechRecognitionErrorEvent) => {
+  switch (err.error) {
+    case 'not-allowed':
+      return 'Microphone permission denied. Enable it in Settings to use voice entry.';
+    case 'audio-capture':
+      return 'Could not access the microphone. Check your permissions in Settings.';
+    case 'no-speech':
+    case 'speech-timeout':
+      return 'Could not understand that. Please speak more clearly and try again.';
+    case 'language-not-supported':
+      return 'This language is not supported on your device. Try switching to English.';
+    case 'busy':
+      return 'Speech recognition is busy. Wait a moment and try again.';
+    case 'network':
+      return 'Speech recognition needs a network connection. Check your connection and try again.';
+    case 'service-not-allowed':
+      return 'Speech recognition is not available on this device.';
+    default:
+      return err.message || 'Speech recognition failed. Please try again.';
   }
-  if (code === '8' || /not allowed|permission/i.test(message)) {
-    return 'Microphone permission denied. Enable it in Settings to use voice entry.';
-  }
-  if (code === '5' || /busy/i.test(message)) {
-    return 'Speech recognition is busy. Wait a moment and try again.';
-  }
-  return message || 'Speech recognition failed. Please try again.';
 };
 
 export default function VoiceEntryModal({
@@ -69,6 +75,11 @@ export default function VoiceEntryModal({
   const finalizeRef = useRef(false);
   const langRef = useRef(lang);
   const onIntentRef = useRef(onIntent);
+  const visibleRef = useRef(visible);
+
+  useEffect(() => {
+    visibleRef.current = visible;
+  }, [visible]);
 
   useEffect(() => {
     langRef.current = lang;
@@ -102,6 +113,10 @@ export default function VoiceEntryModal({
     } else {
       translateY.setValue(SHEET_MAX_HEIGHT);
       backdropOpacity.setValue(0);
+      finalizeRef.current = false;
+      try {
+        ExpoSpeechRecognitionModule.abort();
+      } catch {}
     }
   }, [visible, translateY, backdropOpacity]);
 
@@ -154,38 +169,40 @@ export default function VoiceEntryModal({
     }
   };
 
-  // Attach voice event handlers once. They only touch stable refs + state setters.
-  useEffect(() => {
-    Voice.onSpeechPartialResults = (e: SpeechResultsEvent) => {
-      const text = e.value?.[0] ?? '';
-      transcriptRef.current = text;
-      setPartialText(text);
-    };
-
-    Voice.onSpeechResults = (e: SpeechResultsEvent) => {
-      const text = e.value?.[0] ?? '';
-      transcriptRef.current = text;
-      setPartialText(text);
-    };
-
-    Voice.onSpeechEnd = () => {
-      if (finalizeRef.current) return;
+  // Listen for recognition events. Handlers only touch stable refs + state setters.
+  useSpeechRecognitionEvent('result', (event) => {
+    const text = event.results[0]?.transcript ?? '';
+    transcriptRef.current = text;
+    setPartialText(text);
+    if (event.isFinal && !finalizeRef.current) {
       setStatus('processing');
       finalize();
-    };
+    }
+  });
 
-    Voice.onSpeechError = (e: SpeechErrorEvent) => {
-      if (finalizeRef.current) return;
-      setStatus('error');
-      setErrorMsg(friendlyError(e));
-    };
+  useSpeechRecognitionEvent('nomatch', () => {
+    if (!visibleRef.current || finalizeRef.current) return;
+    setStatus('idle');
+    setErrorMsg('Could not understand that. Please speak more clearly and try again.');
+  });
 
-    return () => {
-      Voice.removeAllListeners();
-      Voice.destroy();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useSpeechRecognitionEvent('end', () => {
+    if (!visibleRef.current || finalizeRef.current) return;
+    if (transcriptRef.current.trim()) {
+      setStatus('processing');
+      finalize();
+    } else {
+      setStatus('idle');
+      setErrorMsg('No speech detected. Tap the mic and try again.');
+    }
+  });
+
+  useSpeechRecognitionEvent('error', (event) => {
+    if (!visibleRef.current || finalizeRef.current) return;
+    if (event.error === 'aborted') return;
+    setStatus('error');
+    setErrorMsg(friendlyError(event));
+  });
 
   const startListening = async () => {
     setErrorMsg(null);
@@ -193,71 +210,54 @@ export default function VoiceEntryModal({
     transcriptRef.current = '';
     finalizeRef.current = false;
 
-    if (Platform.OS === 'android') {
-      try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-          {
-            title: 'Microphone Access',
-            message:
-              'FinAlert needs microphone access to capture your voice entries.',
-            buttonPositive: 'Allow',
-            buttonNegative: 'Not Now',
-            buttonNeutral: 'Ask Me Later',
-          }
-        );
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          setStatus('error');
-          setErrorMsg(
-            'Microphone permission is required for voice entry. Enable it in Settings to try again.'
-          );
-          return;
-        }
-      } catch (err) {
-        setStatus('error');
-        setErrorMsg('Could not request microphone access. Please try again.');
-        console.error('Microphone permission request failed:', err);
-        return;
-      }
-    }
-
-    setStatus('listening');
-
-    let available: 0 | 1;
+    let permission;
     try {
-      available = await Voice.isAvailable();
+      permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
     } catch (err) {
       setStatus('error');
-      const detail = err instanceof Error ? err.message : String(err);
-      setErrorMsg(`Speech check failed: ${detail}`);
-      console.error('Voice.isAvailable failed:', err);
+      setErrorMsg('Could not request microphone access. Please try again.');
+      console.error('Microphone permission request failed:', err);
       return;
     }
-    if (!available) {
+    if (!permission.granted) {
+      setStatus('error');
+      setErrorMsg(
+        'Microphone permission is required for voice entry. Enable it in Settings to try again.'
+      );
+      return;
+    }
+
+    if (!ExpoSpeechRecognitionModule.isRecognitionAvailable()) {
       setStatus('error');
       setErrorMsg('Speech recognition is not available on this device.');
       return;
     }
 
+    setStatus('listening');
+
     try {
-      await Voice.start(langRef.current);
+      ExpoSpeechRecognitionModule.start({
+        lang: langRef.current,
+        interimResults: true,
+        continuous: false,
+      });
     } catch (err) {
       setStatus('error');
-      const detail = err instanceof Error ? err.message : String(err);
-      setErrorMsg(`Could not start the microphone (${detail}).`);
-      console.error('Voice.start failed:', err);
+      setErrorMsg('Could not start the microphone. Please try again.');
+      console.error('Speech recognition start failed:', err);
     }
   };
 
   const stopListening = () => {
     setStatus('processing');
-    Voice.stop().catch(() => {
-      if (!finalizeRef.current) {
-        finalizeRef.current = false;
-        setStatus('idle');
-        setErrorMsg('Speech recognition stopped unexpectedly.');
-      }
-    });
+    try {
+      ExpoSpeechRecognitionModule.stop();
+    } catch (err) {
+      finalizeRef.current = false;
+      setStatus('idle');
+      setErrorMsg('Speech recognition stopped unexpectedly.');
+      console.error('Speech recognition stop failed:', err);
+    }
   };
 
   const handleMicPress = () => {
@@ -266,7 +266,9 @@ export default function VoiceEntryModal({
   };
 
   const handleClose = () => {
-    Voice.cancel().catch(() => {});
+    try {
+      ExpoSpeechRecognitionModule.abort();
+    } catch {}
     finalizeRef.current = false;
     Animated.parallel([
       Animated.timing(translateY, {
