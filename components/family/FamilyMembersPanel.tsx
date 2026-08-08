@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import ChangeRoleModal from './ChangeRoleModal';
+import ContributionModal from './ContributionModal';
 import MemberDetailModal from './MemberDetailModal';
 import { ROLE_BG, ROLE_TEXT_COLOR, formatMoney, initialsOf } from './familyConstants';
 import type { FamilyFinanceApi, MemberFinance } from './useFamilyFinance';
@@ -13,6 +14,7 @@ interface FamilyMembersPanelProps {
 export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps) {
   const [detailMember, setDetailMember] = useState<MemberFinance | null>(null);
   const [roleMember, setRoleMember] = useState<MemberFinance | null>(null);
+  const [contribMember, setContribMember] = useState<MemberFinance | null>(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
   const { finances, me, isAdmin } = finance;
@@ -89,6 +91,17 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
                 <View style={styles.actionRow}>
                   <TouchableOpacity
                     style={styles.actionBtn}
+                    onPress={() => setContribMember(m)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Set contribution for ${m.name}`}
+                  >
+                    <Ionicons name="wallet-outline" size={16} color="#0FB384" />
+                    <Text style={styles.actionBtnText}>
+                      {m.limit > 0 ? 'Edit Contribution' : 'Add Contribution'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionBtn}
                     onPress={() => setRoleMember(m)}
                     accessibilityRole="button"
                     accessibilityLabel={`Change role for ${m.name}`}
@@ -147,6 +160,21 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
               await finance.changeRole(roleMember.memberId, role, limit);
             } catch (error) {
               console.error('Failed to change role:', error);
+            }
+          }
+        }}
+      />
+      <ContributionModal
+        visible={contribMember !== null}
+        member={contribMember}
+        onClose={() => setContribMember(null)}
+        onSave={async (amount) => {
+          if (contribMember) {
+            setContribMember(null);
+            try {
+              await finance.changeRole(contribMember.memberId, contribMember.role, amount);
+            } catch (error) {
+              console.error('Failed to update contribution:', error);
             }
           }
         }}
