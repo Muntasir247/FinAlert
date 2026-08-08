@@ -223,17 +223,28 @@ export default function VoiceEntryModal({
 
     setStatus('listening');
 
+    let available: 0 | 1;
     try {
-      const available = await Voice.isAvailable();
-      if (!available) {
-        setStatus('error');
-        setErrorMsg('Speech recognition is not available on this device.');
-        return;
-      }
+      available = await Voice.isAvailable();
+    } catch (err) {
+      setStatus('error');
+      const detail = err instanceof Error ? err.message : String(err);
+      setErrorMsg(`Speech check failed: ${detail}`);
+      console.error('Voice.isAvailable failed:', err);
+      return;
+    }
+    if (!available) {
+      setStatus('error');
+      setErrorMsg('Speech recognition is not available on this device.');
+      return;
+    }
+
+    try {
       await Voice.start(langRef.current);
     } catch (err) {
       setStatus('error');
-      setErrorMsg('Could not start the microphone. Check your permissions in Settings.');
+      const detail = err instanceof Error ? err.message : String(err);
+      setErrorMsg(`Could not start the microphone (${detail}).`);
       console.error('Voice.start failed:', err);
     }
   };
