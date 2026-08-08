@@ -5,6 +5,7 @@ import {
   addFamilyExpense,
   recordFamilyTransaction,
   updateFamilyMemberRole,
+  updateOwnContribution,
   removeFamilyMember,
 } from '../../lib/familyFinance';
 import type {
@@ -40,6 +41,7 @@ export interface FamilyFinanceApi {
   addExpense: (input: AddExpenseInput) => Promise<void>;
   recordTransaction: (input: AddTransactionInput) => Promise<void>;
   changeRole: (memberId: string, role: FamilyRole, limit: number) => Promise<void>;
+  updateOwnContribution: (memberId: string, limit: number) => Promise<void>;
   removeMember: (memberId: string) => Promise<void>;
 }
 
@@ -120,6 +122,11 @@ export function useFamilyFinance(familyId: string | null, currentUserId?: string
     await reload();
   };
 
+  const changeOwnContribution = async (memberId: string, limit: number) => {
+    await updateOwnContribution(memberId, limit);
+    await reload();
+  };
+
   const removeMember = async (memberId: string) => {
     await removeFamilyMember(memberId);
     await reload();
@@ -140,6 +147,7 @@ export function useFamilyFinance(familyId: string | null, currentUserId?: string
     addExpense,
     recordTransaction: recordTx,
     changeRole,
+    updateOwnContribution: changeOwnContribution,
     removeMember,
   };
 }

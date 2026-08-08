@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import FamilySheetModal from './FamilySheetModal';
@@ -25,12 +25,12 @@ export default function ChangeRoleModal({ visible, member, onClose, onSave }: Ch
   const limit = Number.parseFloat(limitText) || 0;
   const canSave = role === 'Dependent' || limit > 0;
 
-  const handleOpen = () => {
-    if (member) {
+  useEffect(() => {
+    if (visible && member) {
       setRole(member.role === 'Dependent' ? 'Dependent' : 'Contributor');
       setLimitText(member.role === 'Dependent' ? '' : String(member.limit));
     }
-  };
+  }, [visible, member]);
 
   const handleClose = () => {
     if (visible) {

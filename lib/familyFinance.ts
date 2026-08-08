@@ -163,6 +163,17 @@ export async function updateFamilyMemberRole(
   }
 }
 
+export async function updateOwnContribution(memberId: string, limit: number): Promise<void> {
+  const { error } = await supabase.rpc('update_own_contribution', {
+    p_member_id: memberId,
+    p_limit: Math.round(limit * 100) / 100,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function removeFamilyMember(memberId: string): Promise<void> {
   const { error } = await supabase.rpc('remove_family_member', {
     p_member_id: memberId,

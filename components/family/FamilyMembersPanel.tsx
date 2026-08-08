@@ -87,38 +87,60 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
                 <Feather name="chevron-right" size={18} color="#94A3B8" />
               </TouchableOpacity>
 
-              {isAdmin && !isSelf && !confirmRemove && (
-                <View style={styles.actionRow}>
+              {isSelf && m.role !== 'Dependent' && !confirmRemove && (
+                <View style={styles.selfActionRow}>
                   <TouchableOpacity
-                    style={styles.actionBtn}
+                    style={styles.selfActionBtn}
                     onPress={() => setContribMember(m)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Set contribution for ${m.name}`}
+                    accessibilityLabel="Set my contribution"
                   >
                     <Ionicons name="wallet-outline" size={16} color="#0FB384" />
                     <Text style={styles.actionBtnText}>
-                      {m.limit > 0 ? 'Edit Contribution' : 'Add Contribution'}
+                      {m.limit > 0 ? 'Edit My Contribution' : 'Add My Contribution'}
                     </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionBtn}
-                    onPress={() => setRoleMember(m)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Change role for ${m.name}`}
-                  >
-                    <Ionicons name="shield-checkmark-outline" size={16} color="#0FB384" />
-                    <Text style={styles.actionBtnText}>Change Role</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.removeBtn]}
-                    onPress={() => setConfirmRemoveId(m.memberId)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove ${m.name}`}
-                  >
-                    <Feather name="trash-2" size={16} color="#EF4444" />
-                    <Text style={styles.removeBtnText}>Remove</Text>
-                  </TouchableOpacity>
                 </View>
+              )}
+
+              {isAdmin && !isSelf && !confirmRemove && (
+                <>
+                  {m.role !== 'Dependent' && (
+                    <View style={styles.selfActionRow}>
+                      <TouchableOpacity
+                        style={styles.selfActionBtn}
+                        onPress={() => setContribMember(m)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Set contribution for ${m.name}`}
+                      >
+                        <Ionicons name="wallet-outline" size={16} color="#0FB384" />
+                        <Text style={styles.actionBtnText}>
+                          {m.limit > 0 ? 'Edit Contribution' : 'Add Contribution'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      style={styles.actionBtn}
+                      onPress={() => setRoleMember(m)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Change role for ${m.name}`}
+                    >
+                      <Ionicons name="shield-checkmark-outline" size={16} color="#0FB384" />
+                      <Text style={styles.actionBtnText}>Change Role</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.removeBtn]}
+                      onPress={() => setConfirmRemoveId(m.memberId)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${m.name}`}
+                    >
+                      <Feather name="trash-2" size={16} color="#EF4444" />
+                      <Text style={styles.removeBtnText}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
               )}
 
               {confirmRemove && (
@@ -170,9 +192,15 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
         onClose={() => setContribMember(null)}
         onSave={async (amount) => {
           if (contribMember) {
+            const isSelf = me?.memberId === contribMember.memberId;
+            const targetId = contribMember.memberId;
             setContribMember(null);
             try {
-              await finance.changeRole(contribMember.memberId, contribMember.role, amount);
+              if (isSelf) {
+                await finance.updateOwnContribution(targetId, amount);
+              } else {
+                await finance.changeRole(targetId, contribMember.role, amount);
+              }
             } catch (error) {
               console.error('Failed to update contribution:', error);
             }
@@ -312,6 +340,21 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 14,
     paddingBottom: 14,
+  },
+  selfActionRow: {
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+  },
+  selfActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#0FB384',
+    backgroundColor: '#F4FBF7',
   },
   actionBtn: {
     flex: 1,
