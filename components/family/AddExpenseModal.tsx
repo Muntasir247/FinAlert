@@ -97,7 +97,7 @@ export default function AddExpenseModal({ visible, finances, onClose, onSubmit }
         <Text style={styles.noMembers}>No family members yet.</Text>
       ) : (
         finances.map((m) => {
-          const isDependent = m.role === 'Dependent' || m.limit <= 0;
+          const isDependent = m.role === 'Dependent';
           const value = assignments[m.memberId] ?? '';
           return (
             <View key={m.memberId} style={styles.assignRow}>
@@ -115,7 +115,7 @@ export default function AddExpenseModal({ visible, finances, onClose, onSubmit }
               <View style={styles.assignInfo}>
                 <Text style={styles.assignName}>{m.name}</Text>
                 <Text style={[styles.assignLimit, isDependent && styles.assignLimitZero]}>
-                  {isDependent ? 'No contribution' : `Max: ${formatMoney(m.limit)}`}
+                  {isDependent ? 'No contribution' : m.limit > 0 ? `Max: ${formatMoney(m.limit)}` : 'No limit set'}
                 </Text>
               </View>
               <View style={[styles.assignInputWrap, isDependent && styles.assignInputWrapDisabled]}>

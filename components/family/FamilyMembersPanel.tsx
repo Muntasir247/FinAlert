@@ -230,10 +230,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
+    flexShrink: 0,
   },
   rolePillText: {
     fontSize: 11,
     fontWeight: '500',
+    flexShrink: 0,
   },
   tagsRow: {
     flexDirection: 'row',

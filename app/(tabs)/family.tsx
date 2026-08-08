@@ -17,7 +17,7 @@ import { useFamilyFinance } from '../../components/family/useFamilyFinance';
 import FamilyMembersPanel from '../../components/family/FamilyMembersPanel';
 import FamilyExpensesPanel from '../../components/family/FamilyExpensesPanel';
 import FamilyTransactionsPanel from '../../components/family/FamilyTransactionsPanel';
-import { ROLE_BG, ROLE_TEXT_COLOR, initialsOf } from '../../components/family/familyConstants';
+import { ROLE_BG, ROLE_TEXT_COLOR, formatMoney, initialsOf } from '../../components/family/familyConstants';
 
 const SUB_TABS: { label: string; key: 'overview' | 'members' | 'expenses' | 'transactions' }[] = [
   { label: 'Overview', key: 'overview' },
@@ -52,6 +52,9 @@ export default function FamilyScreen() {
   }
 
   const memberCount = members.length;
+  const totalBudget = finance.finances.reduce((sum, m) => sum + m.limit, 0);
+  const totalExpense = finance.expenses.reduce((sum, e) => sum + e.total, 0);
+  const totalPaid = finance.expenses.reduce((sum, e) => sum + finance.expensePaid(e), 0);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -81,12 +84,16 @@ export default function FamilyScreen() {
         {/* ── Summary Metrics ── */}
         <View style={styles.metricsRow}>
           <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Total Family Income</Text>
-            <Text style={styles.metricIncome}>৳95,000</Text>
+            <Text style={styles.metricLabel}>Total Budget</Text>
+            <Text style={styles.metricIncome}>{formatMoney(totalBudget)}</Text>
           </View>
           <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Total Family Expense</Text>
-            <Text style={styles.metricExpense}>৳18,500</Text>
+            <Text style={styles.metricLabel}>Total Expense</Text>
+            <Text style={styles.metricExpense}>{formatMoney(totalExpense)}</Text>
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>Total Paid</Text>
+            <Text style={styles.metricPaid}>{formatMoney(totalPaid)}</Text>
           </View>
         </View>
 
@@ -271,21 +278,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   metricLabel: {
-    fontSize: 13,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 14,
     fontWeight: '400',
     color: '#6B7280',
     marginBottom: 8,
   },
   metricIncome: {
-    fontSize: 20,
+    fontSize: 16,
+    lineHeight: 18,
     fontWeight: '700',
     color: '#0FB384',
   },
   metricExpense: {
-    fontSize: 20,
+    fontSize: 16,
+    lineHeight: 18,
     fontWeight: '700',
     color: '#EF4444',
+  },
+  metricPaid: {
+    fontSize: 16,
+    lineHeight: 18,
+    fontWeight: '700',
+    color: '#0068FF',
   },
 
   // ── Sub-Tab Bar ──
@@ -334,12 +349,15 @@ const styles = StyleSheet.create({
   },
   avatarRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    columnGap: 16,
+    rowGap: 16,
     marginBottom: 20,
   },
   avatarItem: {
     alignItems: 'center',
-    width: 64,
+    minWidth: 64,
   },
   avatarCircle: {
     width: 48,
@@ -359,15 +377,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#091E15',
     marginBottom: 4,
+    maxWidth: 96,
   },
   rolePill: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
+    flexShrink: 0,
+    alignSelf: 'center',
   },
   rolePillText: {
     fontSize: 11,
     fontWeight: '500',
+    flexShrink: 0,
   },
   inviteMemberBtn: {
     flexDirection: 'row',

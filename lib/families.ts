@@ -52,7 +52,23 @@ export async function fetchUserFamily(
 }
 
 // Roster of a family, enriched with each member's display name from profiles.
+// Uses the get_family_roster RPC (security definer) so names resolve even when
+// profiles RLS hides other members' rows; falls back to a direct query if the
+// RPC has not been deployed yet.
 export async function fetchFamilyMembers(familyId: string): Promise<FamilyMember[]> {
+  const { data, error } = await supabase.rpc('get_family_roster', {
+    p_family_id: familyId,
+  });
+
+  if (error) {
+    console.warn('get_family_roster failed, falling back to direct query:', error.message);
+    return fetchFamilyMembersDirect(familyId);
+  }
+
+  return (data ?? []) as FamilyMember[];
+}
+
+async function fetchFamilyMembersDirect(familyId: string): Promise<FamilyMember[]> {
   const { data, error } = await supabase
     .from('family_members')
     .select('*')

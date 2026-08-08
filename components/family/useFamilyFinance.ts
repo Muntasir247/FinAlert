@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { FamilyMember } from '../../lib/families';
-import { daysAgo, toISODate } from './familyConstants';
+import { toISODate } from './familyConstants';
 import type { FamilyRole } from './familyConstants';
 
 export interface MemberFinance {
@@ -70,93 +70,28 @@ export interface FamilyFinanceApi {
   removeMember: (memberId: string) => void;
 }
 
-// ── Seed builders ──────────────────────────────────────────────────────────
-// Deterministic, role-based mock data so every sub-tab is interactive while
-// staying grounded in the family's real member roster.
+// A brand-new family always starts with real members but zero financial data:
+// no budgets, no expenses, no transactions. Values appear only once the Admin
+// creates them, so empty states (৳0 metrics, empty lists) are the default.
+function buildInitialState(members: FamilyMember[]) {
+  const finances: MemberFinance[] = members.map((m) => ({
+    memberId: m.id,
+    userId: m.user_id,
+    name: m.full_name || 'Family Member',
+    role: m.role,
+    limit: 0,
+    extra: 0,
+    unable: 0,
+  }));
 
-const ROLE_CYCLE: FamilyRole[] = ['Admin', 'Contributor', 'Contributor', 'Dependent'];
-const LIMIT_CYCLE = [10000, 8000, 6000];
-
-function buildSeed(members: FamilyMember[]) {
-  const finances: MemberFinance[] = members.map((m, i) => {
-    const role: FamilyRole = m.role === 'Admin' ? 'Admin' : ROLE_CYCLE[i % ROLE_CYCLE.length];
-    const limit = role === 'Dependent' ? 0 : LIMIT_CYCLE[i % LIMIT_CYCLE.length];
-    return {
-      memberId: m.id,
-      userId: m.user_id,
-      name: m.full_name || 'Family Member',
-      role,
-      limit,
-      extra: i === 0 ? 500 : 0,
-      unable: i === 1 ? 1000 : 0,
-    };
-  });
-
-  const pool = finances.filter((m) => m.limit > 0);
-  const expenses: SharedExpense[] = [];
-  const transactions: FamilyTransaction[] = [];
-
-  if (pool.length > 0) {
-    const split = (total: number, paidIdx: number[]) =>
-      pool.map((m, i) => ({
-        memberId: m.memberId,
-        amount: Math.round((total / pool.length) * 100) / 100,
-        paid: paidIdx.includes(i),
-      }));
-
-    const rent = { id: 'exp-rent', category: 'House Rent', total: 8000, contributors: split(8000, [0]) };
-    const grocery = { id: 'exp-grocery', category: 'Grocery', total: 2400, contributors: split(2400, [0]) };
-    const electricity = { id: 'exp-electricity', category: 'Electricity', total: 1200, contributors: split(1200, [0, 1]) };
-    const internet = { id: 'exp-internet', category: 'Internet', total: 800, contributors: split(800, [0, 1]) };
-    expenses.push(rent, grocery, electricity, internet);
-
-    let n = 0;
-    const pushTx = (
-      type: FamilyTransactionType,
-      expense: SharedExpense,
-      member: MemberFinance,
-      amount: number,
-      note: string,
-      date: string
-    ) => {
-      transactions.push({
-        id: `tx-seed-${n++}`,
-        type,
-        expenseId: expense.id,
-        expenseCategory: expense.category,
-        memberId: member.memberId,
-        memberName: member.name,
-        amount,
-        note,
-        date,
-      });
-    };
-
-    pool.forEach((member, i) => {
-      [rent, grocery, electricity, internet].forEach((expense, j) => {
-        const contributor = expense.contributors.find((c) => c.memberId === member.memberId);
-        if (contributor?.paid) {
-          pushTx('payment', expense, member, contributor.amount, `${expense.category} share`, daysAgo((i + j) % 3));
-        }
-      });
-    });
-
-    if (finances[0]) {
-      pushTx('extra', rent, finances[0], 500, 'Extra — medicine', daysAgo(1));
-    }
-    if (finances[1]) {
-      pushTx('unable', rent, finances[1], 1000, 'Cannot pay this month', daysAgo(0));
-    }
-  }
-
-  return { finances, expenses, transactions };
+  return { finances, expenses: [] as SharedExpense[], transactions: [] as FamilyTransaction[] };
 }
 
 export function useFamilyFinance(members: FamilyMember[], currentUserId?: string): FamilyFinanceApi {
-  const seed = useMemo(() => buildSeed(members), [members]);
-  const [finances, setFinances] = useState<MemberFinance[]>(seed.finances);
-  const [expenses, setExpenses] = useState<SharedExpense[]>(seed.expenses);
-  const [transactions, setTransactions] = useState<FamilyTransaction[]>(seed.transactions);
+  const initial = useMemo(() => buildInitialState(members), [members]);
+  const [finances, setFinances] = useState<MemberFinance[]>(initial.finances);
+  const [expenses, setExpenses] = useState<SharedExpense[]>(initial.expenses);
+  const [transactions, setTransactions] = useState<FamilyTransaction[]>(initial.transactions);
 
   const me = finances.find((m) => m.userId === currentUserId) ?? finances[0] ?? null;
   const isAdmin = me?.role === 'Admin';
