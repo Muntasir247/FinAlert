@@ -9,27 +9,44 @@ interface ContributionModalProps {
   visible: boolean;
   member: MemberFinance | null;
   onClose: () => void;
-  onSave: (amount: number) => void;
+  onSave: (amount: number) => Promise<string | null>;
 }
 
 export default function ContributionModal({ visible, member, onClose, onSave }: ContributionModalProps) {
   const [amountText, setAmountText] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const amount = Number.parseFloat(amountText) || 0;
   const hasExisting = (member?.limit ?? 0) > 0;
-  const canSave = amount > 0;
+  const canSave = amount > 0 && !saving;
 
   useEffect(() => {
     if (visible && member) {
       setAmountText(member.limit > 0 ? String(member.limit) : '');
+      setErrorMsg(null);
+      setSaving(false);
     }
   }, [visible, member]);
 
   const handleClose = () => {
     if (visible) {
       setAmountText('');
+      setErrorMsg(null);
+      setSaving(false);
     }
     onClose();
+  };
+
+  const handleSave = async (saveAmount: number) => {
+    if (saving) return;
+    setSaving(true);
+    setErrorMsg(null);
+    const error = await onSave(saveAmount);
+    if (error) {
+      setErrorMsg(error);
+      setSaving(false);
+    }
   };
 
   return (
@@ -84,19 +101,32 @@ export default function ContributionModal({ visible, member, onClose, onSave }: 
 
       <TouchableOpacity
         style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
-        onPress={() => canSave && onSave(amount)}
+        onPress={() => canSave && handleSave(amount)}
         disabled={!canSave}
         accessibilityRole="button"
         accessibilityLabel="Save contribution amount"
       >
-        <Feather name="check" size={18} color="#FFFFFF" />
-        <Text style={styles.saveBtnText}>Save Contribution</Text>
+        {saving ? (
+          <Text style={styles.saveBtnText}>Saving…</Text>
+        ) : (
+          <>
+            <Feather name="check" size={18} color="#FFFFFF" />
+            <Text style={styles.saveBtnText}>Save Contribution</Text>
+          </>
+        )}
       </TouchableOpacity>
+
+      {errorMsg && (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{errorMsg}</Text>
+        </View>
+      )}
 
       {hasExisting && (
         <TouchableOpacity
           style={styles.deleteBtn}
-          onPress={() => onSave(0)}
+          onPress={() => handleSave(0)}
+          disabled={saving}
           accessibilityRole="button"
           accessibilityLabel="Delete contribution"
         >
@@ -210,6 +240,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#FFFFFF',
+  },
+  errorBox: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  errorText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#DC2626',
   },
   deleteBtn: {
     flexDirection: 'row',

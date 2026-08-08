@@ -16,6 +16,7 @@ export default function AddExpenseModal({ visible, finances, onClose, onSubmit }
   const [category, setCategory] = useState(EXPENSE_CATEGORIES[0].label);
   const [totalText, setTotalText] = useState('');
   const [assignments, setAssignments] = useState<Record<string, string>>({});
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const total = Number.parseFloat(totalText) || 0;
   const assignedTotal = finances.reduce(
@@ -25,19 +26,21 @@ export default function AddExpenseModal({ visible, finances, onClose, onSubmit }
   const balance = total - assignedTotal;
   const counterColor =
     balance < -0.01 ? '#EF4444' : Math.abs(balance) < 0.01 ? '#0FB384' : '#D97706';
-  const canSubmit = total > 0 && assignedTotal > 0;
+  const canSubmit = total > 0 && assignedTotal > 0 && balance >= -0.01;
 
   const handleClose = () => {
     if (visible) {
       setCategory(EXPENSE_CATEGORIES[0].label);
       setTotalText('');
       setAssignments({});
+      setErrorMsg(null);
     }
     onClose();
   };
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
+    setErrorMsg(null);
     try {
       await onSubmit({
         category,
@@ -52,6 +55,7 @@ export default function AddExpenseModal({ visible, finances, onClose, onSubmit }
       handleClose();
     } catch (error) {
       console.error('Failed to add expense:', error);
+      setErrorMsg('Failed to add expense. Please try again.');
     }
   };
 
@@ -154,6 +158,12 @@ export default function AddExpenseModal({ visible, finances, onClose, onSubmit }
       )}
       {balance < -0.01 && (
         <Text style={styles.counterError}>Assigned amount exceeds the total.</Text>
+      )}
+
+      {errorMsg && (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{errorMsg}</Text>
+        </View>
       )}
 
       <TouchableOpacity
@@ -330,6 +340,20 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#EF4444',
     marginBottom: 12,
+  },
+  errorBox: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  errorText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#DC2626',
   },
   submitBtn: {
     flexDirection: 'row',

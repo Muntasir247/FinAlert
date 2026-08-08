@@ -10,7 +10,7 @@ interface ChangeRoleModalProps {
   visible: boolean;
   member: MemberFinance | null;
   onClose: () => void;
-  onSave: (role: FamilyRole, limit: number) => void;
+  onSave: (role: FamilyRole, limit: number) => Promise<string | null>;
 }
 
 const ROLE_OPTIONS: { value: Exclude<FamilyRole, 'Admin'>; label: string; description: string }[] = [
@@ -21,14 +21,18 @@ const ROLE_OPTIONS: { value: Exclude<FamilyRole, 'Admin'>; label: string; descri
 export default function ChangeRoleModal({ visible, member, onClose, onSave }: ChangeRoleModalProps) {
   const [role, setRole] = useState<Exclude<FamilyRole, 'Admin'>>('Contributor');
   const [limitText, setLimitText] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const limit = Number.parseFloat(limitText) || 0;
-  const canSave = role === 'Dependent' || limit > 0;
+  const canSave = (role === 'Dependent' || limit > 0) && !saving;
 
   useEffect(() => {
     if (visible && member) {
       setRole(member.role === 'Dependent' ? 'Dependent' : 'Contributor');
       setLimitText(member.role === 'Dependent' ? '' : String(member.limit));
+      setErrorMsg(null);
+      setSaving(false);
     }
   }, [visible, member]);
 
@@ -36,8 +40,21 @@ export default function ChangeRoleModal({ visible, member, onClose, onSave }: Ch
     if (visible) {
       setRole('Contributor');
       setLimitText('');
+      setErrorMsg(null);
+      setSaving(false);
     }
     onClose();
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    setErrorMsg(null);
+    const error = await onSave(role, role === 'Dependent' ? 0 : limit);
+    if (error) {
+      setErrorMsg(error);
+      setSaving(false);
+    }
   };
 
   return (
@@ -129,14 +146,20 @@ export default function ChangeRoleModal({ visible, member, onClose, onSave }: Ch
         <Text style={styles.adminNote}>The family Admin keeps full control and cannot be demoted.</Text>
       )}
 
+      {errorMsg && (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{errorMsg}</Text>
+        </View>
+      )}
+
       <TouchableOpacity
         style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
-        onPress={() => canSave && onSave(role, role === 'Dependent' ? 0 : limit)}
+        onPress={handleSave}
         disabled={!canSave}
         accessibilityRole="button"
         accessibilityLabel="Save role change"
       >
-        <Text style={styles.saveBtnText}>Save</Text>
+        <Text style={styles.saveBtnText}>{saving ? 'Saving…' : 'Save'}</Text>
       </TouchableOpacity>
     </FamilySheetModal>
   );
@@ -262,6 +285,20 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#94A3B8',
     marginBottom: 12,
+  },
+  errorBox: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  errorText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#DC2626',
   },
   saveBtn: {
     flexDirection: 'row',

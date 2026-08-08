@@ -176,13 +176,17 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
         member={roleMember}
         onClose={() => setRoleMember(null)}
         onSave={async (role, limit) => {
-          if (roleMember) {
+          if (!roleMember) return 'Something went wrong. Please try again.';
+          const targetId = roleMember.memberId;
+          try {
+            await finance.changeRole(targetId, role, limit);
             setRoleMember(null);
-            try {
-              await finance.changeRole(roleMember.memberId, role, limit);
-            } catch (error) {
-              console.error('Failed to change role:', error);
-            }
+            return null;
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error);
+            return msg.includes('NOT_ADMIN')
+              ? 'Only the family Admin can change roles.'
+              : 'Failed to change role. Please try again.';
           }
         }}
       />
@@ -191,19 +195,27 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
         member={contribMember}
         onClose={() => setContribMember(null)}
         onSave={async (amount) => {
-          if (contribMember) {
-            const isSelf = me?.memberId === contribMember.memberId;
-            const targetId = contribMember.memberId;
-            setContribMember(null);
-            try {
-              if (isSelf) {
-                await finance.updateOwnContribution(targetId, amount);
-              } else {
-                await finance.changeRole(targetId, contribMember.role, amount);
-              }
-            } catch (error) {
-              console.error('Failed to update contribution:', error);
+          if (!contribMember) return 'Something went wrong. Please try again.';
+          const isSelf = me?.memberId === contribMember.memberId;
+          const targetId = contribMember.memberId;
+          const isAdminSelf = isSelf && finance.isAdmin;
+          try {
+            if (isAdminSelf) {
+              await finance.changeRole(targetId, contribMember.role, amount);
+            } else if (isSelf) {
+              await finance.updateOwnContribution(targetId, amount);
+            } else {
+              await finance.changeRole(targetId, contribMember.role, amount);
             }
+            setContribMember(null);
+            return null;
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error);
+            return msg.includes('NOT_ADMIN')
+              ? 'Only the family Admin can change that contribution.'
+              : msg.includes('NOT_OWN_MEMBER')
+              ? 'You can only update your own contribution.'
+              : 'Failed to update contribution. Please try again.';
           }
         }}
       />

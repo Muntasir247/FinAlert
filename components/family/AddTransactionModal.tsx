@@ -22,10 +22,13 @@ export default function AddTransactionModal({ visible, finance, onClose }: AddTr
   const [expenseId, setExpenseId] = useState<string | null>(null);
   const [amountText, setAmountText] = useState('');
   const [note, setNote] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const amount = Number.parseFloat(amountText) || 0;
   const selectedExpense = finance.expenses.find((e) => e.id === expenseId) ?? null;
-  const canSubmit = expenseId !== null && amount > 0;
+  const remaining = selectedExpense ? Math.max(selectedExpense.total - finance.expensePaid(selectedExpense), 0) : 0;
+  const overpaying = type !== 'unable' && selectedExpense !== null && amount > remaining + 0.01;
+  const canSubmit = expenseId !== null && amount > 0 && !overpaying;
 
   const handleClose = () => {
     if (visible) {
@@ -33,6 +36,7 @@ export default function AddTransactionModal({ visible, finance, onClose }: AddTr
       setExpenseId(null);
       setAmountText('');
       setNote('');
+      setErrorMsg(null);
     }
     onClose();
   };
@@ -49,7 +53,12 @@ export default function AddTransactionModal({ visible, finance, onClose }: AddTr
       });
       handleClose();
     } catch (error) {
-      console.error('Failed to record transaction:', error);
+      const msg = error instanceof Error ? error.message : String(error);
+      setErrorMsg(
+        msg.includes('OVERPAY_EXCEEDS_EXPENSE')
+          ? 'This payment exceeds the remaining amount for the expense.'
+          : 'Failed to record transaction. Please try again.'
+      );
     }
   };
 
@@ -148,6 +157,18 @@ export default function AddTransactionModal({ visible, finance, onClose }: AddTr
       <Text style={styles.helperText}>
         * Paying beyond your assigned amount increases your contribution
       </Text>
+
+      {type !== 'unable' && selectedExpense && (
+        <Text style={[styles.remainingText, overpaying && styles.remainingTextError]}>
+          Remaining to pay: {formatMoney(remaining)}
+        </Text>
+      )}
+
+      {errorMsg && (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{errorMsg}</Text>
+        </View>
+      )}
 
       <TouchableOpacity
         style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
@@ -285,6 +306,30 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#6B7280',
     marginBottom: 16,
+  },
+  remainingText: {
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '500',
+    color: '#0FB384',
+    marginBottom: 12,
+  },
+  remainingTextError: {
+    color: '#EF4444',
+  },
+  errorBox: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#DC2626',
   },
   submitBtn: {
     flexDirection: 'row',
