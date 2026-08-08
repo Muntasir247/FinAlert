@@ -10,40 +10,27 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useFamily } from '../../context/FamilyContext';
+import { useAuth } from '../../context/AuthContext';
 import InviteFamilyModal from '../../components/InviteFamilyModal';
 import FamilyJoinScreen from '../../components/FamilyJoinScreen';
+import { useFamilyFinance } from '../../components/family/useFamilyFinance';
+import FamilyMembersPanel from '../../components/family/FamilyMembersPanel';
+import FamilyExpensesPanel from '../../components/family/FamilyExpensesPanel';
+import FamilyTransactionsPanel from '../../components/family/FamilyTransactionsPanel';
+import { ROLE_BG, ROLE_TEXT_COLOR, initialsOf } from '../../components/family/familyConstants';
 
-const SUB_TABS: { label: string; key: 'overview' | 'members' | 'expenses' | 'goals' }[] = [
+const SUB_TABS: { label: string; key: 'overview' | 'members' | 'expenses' | 'transactions' }[] = [
   { label: 'Overview', key: 'overview' },
   { label: 'Members', key: 'members' },
   { label: 'Expenses', key: 'expenses' },
-  { label: 'Family Goals', key: 'goals' },
+  { label: 'Transactions', key: 'transactions' },
 ];
-
-const ROLE_BG: Record<string, string> = {
-  Admin: '#FEF3C7',
-  Contributor: '#E8F7F1',
-  Dependent: '#F1F5F9',
-};
-
-const ROLE_TEXT_COLOR: Record<string, string> = {
-  Admin: '#D97706',
-  Contributor: '#0FB384',
-  Dependent: '#64748B',
-};
-
-const initialsOf = (name: string) =>
-  name
-    .split(/\s+/)
-    .map((part) => part[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
 
 export default function FamilyScreen() {
   const { family, members, isLoading } = useFamily();
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'members' | 'expenses' | 'goals'>('overview');
+  const { user } = useAuth();
+  const finance = useFamilyFinance(members, user?.id);
+  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'members' | 'expenses' | 'transactions'>('overview');
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
 
   if (isLoading) {
@@ -168,74 +155,41 @@ export default function FamilyScreen() {
             {/* Contributions Feed */}
             <View style={styles.contributionsCard}>
               <Text style={styles.contributionsTitle}>Contributions</Text>
-              <View style={styles.feedEmpty}>
-                <Ionicons name="stats-chart-outline" size={28} color="#94A3B8" />
-                <Text style={styles.feedEmptyText}>No contributions yet.</Text>
-              </View>
+              {finance.transactions.length === 0 ? (
+                <View style={styles.feedEmpty}>
+                  <Ionicons name="stats-chart-outline" size={28} color="#94A3B8" />
+                  <Text style={styles.feedEmptyText}>No contributions yet.</Text>
+                </View>
+              ) : (
+                finance.transactions.slice(0, 4).map((tx) => (
+                  <View key={tx.id} style={styles.feedRow}>
+                    <View style={styles.feedAvatar}>
+                      <Text style={styles.feedAvatarText}>{initialsOf(tx.memberName)}</Text>
+                    </View>
+                    <View style={styles.feedInfo}>
+                      <Text style={styles.feedTitle} numberOfLines={1}>
+                        {tx.memberName} · {tx.note || tx.expenseCategory}
+                      </Text>
+                      <Text style={styles.feedSubtitle}>{tx.expenseCategory}</Text>
+                    </View>
+                    <Text style={styles.feedAmount}>
+                      {tx.type === 'extra' ? '+' : ''}৳{tx.amount.toFixed(0)}
+                    </Text>
+                  </View>
+                ))
+              )}
             </View>
           </>
         )}
 
         {/* ── Members Panel ── */}
-        {activeSubTab === 'members' && (
-          <View style={styles.rosterCard}>
-            {members.map((m, idx) => {
-              const displayName = m.full_name || 'Family Member';
-              return (
-                <View
-                  key={m.id}
-                  style={[styles.rosterRow, idx < members.length - 1 && styles.rosterRowBorder]}
-                >
-                  <View style={[styles.rosterAvatar, { backgroundColor: '#0FB384' }]}>
-                    <Text style={styles.rosterAvatarText}>{initialsOf(displayName)}</Text>
-                  </View>
-                  <View style={styles.rosterInfo}>
-                    <View style={styles.rosterNameRow}>
-                      <Text style={styles.rosterName}>{displayName}</Text>
-                      <View style={[styles.rosterRoleBadge, { backgroundColor: ROLE_BG[m.role] }]}>
-                        {m.role === 'Admin' && (
-                          <Feather name="award" size={12} color="#D97706" style={{ marginRight: 3 }} />
-                        )}
-                        <Text style={[styles.rosterRoleText, { color: ROLE_TEXT_COLOR[m.role] }]}>
-                          {m.role}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                  <Feather name="chevron-right" size={18} color="#94A3B8" />
-                </View>
-              );
-            })}
-          </View>
-        )}
+        {activeSubTab === 'members' && <FamilyMembersPanel finance={finance} />}
 
         {/* ── Expenses Panel ── */}
-        {activeSubTab === 'expenses' && (
-          <View>
-            <TouchableOpacity style={styles.addExpenseBtn}>
-              <Text style={styles.addExpenseLabel}>+ Add Shared Expense</Text>
-            </TouchableOpacity>
+        {activeSubTab === 'expenses' && <FamilyExpensesPanel finance={finance} />}
 
-            <View style={styles.panelEmptyCard}>
-              <Ionicons name="receipt-outline" size={32} color="#94A3B8" />
-              <Text style={styles.panelEmptyTitle}>No shared expenses yet</Text>
-              <Text style={styles.panelEmptyText}>
-                Shared family expenses will appear here once added.
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* ── Goals Panel ── */}
-        {activeSubTab === 'goals' && (
-          <View style={styles.panelEmptyCard}>
-            <Ionicons name="flag-outline" size={32} color="#94A3B8" />
-            <Text style={styles.panelEmptyTitle}>No family goals yet</Text>
-            <Text style={styles.panelEmptyText}>
-              Create shared family goals to save together toward what matters most.
-            </Text>
-          </View>
-        )}
+        {/* ── Transactions Panel ── */}
+        {activeSubTab === 'transactions' && <FamilyTransactionsPanel finance={finance} />}
       </ScrollView>
 
       <InviteFamilyModal
@@ -477,108 +431,42 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
   },
-
-  // ── Members: Roster ──
-  rosterCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  rosterRow: {
+  feedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 10,
   },
-  rosterRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  rosterAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  feedAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#0FB384',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rosterAvatarText: {
-    fontSize: 16,
+  feedAvatarText: {
+    fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  rosterInfo: {
+  feedInfo: {
     flex: 1,
-    marginLeft: 12,
   },
-  rosterNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  rosterName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#091E15',
-  },
-  rosterRoleBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  rosterRoleText: {
-    fontSize: 11,
+  feedTitle: {
+    fontSize: 14,
     fontWeight: '500',
-  },
-
-  // ── Expenses ──
-  addExpenseBtn: {
-    backgroundColor: '#ECFDF5',
-    borderStyle: 'dashed',
-    borderWidth: 1.5,
-    borderColor: '#0FB384',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  addExpenseLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0FB384',
-  },
-
-  // ── Empty states ──
-  panelEmptyCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingVertical: 40,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 16,
-  },
-  panelEmptyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
     color: '#091E15',
-    marginTop: 4,
   },
-  panelEmptyText: {
-    fontSize: 13,
-    lineHeight: 18,
+  feedSubtitle: {
+    fontSize: 12,
     fontWeight: '400',
     color: '#6B7280',
-    textAlign: 'center',
+    marginTop: 1,
+  },
+  feedAmount: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0FB384',
   },
 });
