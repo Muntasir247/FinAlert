@@ -16,6 +16,9 @@ interface TransactionsContextType {
   updateTransaction: (txId: string, input: NewTransaction) => Promise<{ error: any }>;
   deleteTransaction: (txId: string) => Promise<{ error: any }>;
   refreshTransactions: () => Promise<void>;
+  transactionsTabRequested: boolean;
+  requestTransactionsTab: () => void;
+  clearTransactionsTabRequest: () => void;
 }
 
 const TransactionsContext = createContext<TransactionsContextType | undefined>(undefined);
@@ -118,6 +121,10 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     [user]
   );
 
+  const [transactionsTabRequested, setTransactionsTabRequested] = useState(false);
+  const requestTransactionsTab = useCallback(() => setTransactionsTabRequested(true), []);
+  const clearTransactionsTabRequest = useCallback(() => setTransactionsTabRequested(false), []);
+
   return (
     <TransactionsContext.Provider
       value={{
@@ -128,6 +135,9 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         updateTransaction,
         deleteTransaction,
         refreshTransactions,
+        transactionsTabRequested,
+        requestTransactionsTab,
+        clearTransactionsTabRequest,
       }}
     >
       {children}

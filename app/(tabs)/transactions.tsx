@@ -41,7 +41,8 @@ function groupByDate(txs: Transaction[]) {
 }
 
 export default function TransactionsScreen() {
-  const { transactions, deleteTransaction } = useTransactions();
+  const { transactions, deleteTransaction, transactionsTabRequested, clearTransactionsTabRequest } =
+    useTransactions();
   const { budget, categoryBudgets, monthlySpent, openBudgetModal, budgetTabRequested, clearBudgetTabRequest } =
     useBudgets();
   const [activeTab, setActiveTab] = useState<'transactions' | 'budget'>('transactions');
@@ -56,6 +57,13 @@ export default function TransactionsScreen() {
       clearBudgetTabRequest();
     }
   }, [budgetTabRequested, clearBudgetTabRequest]);
+
+  useEffect(() => {
+    if (transactionsTabRequested) {
+      setActiveTab('transactions');
+      clearTransactionsTabRequest();
+    }
+  }, [transactionsTabRequested, clearTransactionsTabRequest]);
 
   const filtered =
     activeFilter === 'Income'

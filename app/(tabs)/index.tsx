@@ -70,7 +70,7 @@ function SavingsGoalCard({ goal }: { goal: SavingsGoal }) {
 
 export default function HomeScreen() {
   const { profile } = useAuth();
-  const { transactions } = useTransactions();
+  const { transactions, requestTransactionsTab } = useTransactions();
   const { budget, categoryBudgets, openBudgetModal, requestBudgetTab } = useBudgets();
   const { unreadCount } = useNotifications();
   const { goals: savingsGoals } = useSavingsGoals();
@@ -170,6 +170,11 @@ export default function HomeScreen() {
 
   const handleSeeAllBudgets = () => {
     requestBudgetTab();
+    router.navigate('/(tabs)/transactions');
+  };
+
+  const handleSeeAllTransactions = () => {
+    requestTransactionsTab();
     router.navigate('/(tabs)/transactions');
   };
 
@@ -352,7 +357,11 @@ export default function HomeScreen() {
         {/* ── Recent Transactions Feed ── */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Transactions</Text>
-          <TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleSeeAllTransactions}
+            accessibilityRole="button"
+            accessibilityLabel="See all transactions"
+          >
             <Text style={styles.seeAllText}>See all &gt;</Text>
           </TouchableOpacity>
         </View>
