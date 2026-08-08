@@ -14,14 +14,21 @@
       "backgroundColor": "#02C78E"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "FinAlert uses speech recognition to turn your voice into transactions.",
+        "NSMicrophoneUsageDescription": "FinAlert uses your microphone to capture voice entries."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/FinAlert_app_icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["android.permission.RECORD_AUDIO"],
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
+      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.adormuntasir.finalert"
@@ -39,7 +46,9 @@
         {
           "microphonePermission": "FinAlert uses your microphone to capture voice entries.",
           "speechRecognitionPermission": "FinAlert uses speech recognition to turn your voice into transactions.",
-          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
         }
       ],
       [
@@ -59,8 +68,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "1083735b-aafd-4b61-9e1d-0eef6345b2bb"
+        "projectId": "939b0940-115c-417e-87a3-cd979e1c922a"
       }
-    }
+    },
+    "owner": "sabid1234"
   }
 }
