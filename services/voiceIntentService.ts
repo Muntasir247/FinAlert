@@ -134,6 +134,11 @@ export async function parseVoiceIntent(
     if (!response.ok) {
       const body = await response.text();
       console.error('Gemini error:', response.status, body);
+      if (response.status === 429) {
+        throw new VoiceIntentError(
+          'Voice AI limit reached. Please try again later or check your API quota.'
+        );
+      }
       throw new VoiceIntentError('The voice assistant could not reach its AI backend.');
     }
 
