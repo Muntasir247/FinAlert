@@ -36,19 +36,23 @@ export default function AddExpenseModal({ visible, finances, onClose, onSubmit }
     onClose();
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit) return;
-    onSubmit({
-      category,
-      total,
-      assignments: finances
-        .map((m) => ({
-          memberId: m.memberId,
-          amount: Number.parseFloat(assignments[m.memberId]) || 0,
-        }))
-        .filter((a) => a.amount > 0),
-    });
-    handleClose();
+    try {
+      await onSubmit({
+        category,
+        total,
+        assignments: finances
+          .map((m) => ({
+            memberId: m.memberId,
+            amount: Number.parseFloat(assignments[m.memberId]) || 0,
+          }))
+          .filter((a) => a.amount > 0),
+      });
+      handleClose();
+    } catch (error) {
+      console.error('Failed to add expense:', error);
+    }
   };
 
   return (

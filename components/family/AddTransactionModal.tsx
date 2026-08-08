@@ -37,16 +37,20 @@ export default function AddTransactionModal({ visible, finance, onClose }: AddTr
     onClose();
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSubmit || !finance.me) return;
-    finance.recordTransaction({
-      type,
-      expenseId: expenseId!,
-      memberId: finance.me.memberId,
-      amount,
-      note: note.trim(),
-    });
-    handleClose();
+    try {
+      await finance.recordTransaction({
+        type,
+        expenseId: expenseId!,
+        memberId: finance.me.memberId,
+        amount,
+        note: note.trim(),
+      });
+      handleClose();
+    } catch (error) {
+      console.error('Failed to record transaction:', error);
+    }
   };
 
   return (

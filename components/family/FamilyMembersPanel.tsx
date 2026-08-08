@@ -17,9 +17,13 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
 
   const { finances, me, isAdmin } = finance;
 
-  const handleRemove = (memberId: string) => {
-    finance.removeMember(memberId);
+  const handleRemove = async (memberId: string) => {
     setConfirmRemoveId(null);
+    try {
+      await finance.removeMember(memberId);
+    } catch (error) {
+      console.error('Failed to remove member:', error);
+    }
   };
 
   return (
@@ -136,11 +140,15 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
         visible={roleMember !== null}
         member={roleMember}
         onClose={() => setRoleMember(null)}
-        onSave={(role, limit) => {
+        onSave={async (role, limit) => {
           if (roleMember) {
-            finance.changeRole(roleMember.memberId, role, limit);
+            setRoleMember(null);
+            try {
+              await finance.changeRole(roleMember.memberId, role, limit);
+            } catch (error) {
+              console.error('Failed to change role:', error);
+            }
           }
-          setRoleMember(null);
         }}
       />
       <MemberDetailModal

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 import { useFamily } from '../../context/FamilyContext';
 import { useAuth } from '../../context/AuthContext';
 import InviteFamilyModal from '../../components/InviteFamilyModal';
@@ -29,9 +30,17 @@ const SUB_TABS: { label: string; key: 'overview' | 'members' | 'expenses' | 'tra
 export default function FamilyScreen() {
   const { family, members, isLoading } = useFamily();
   const { user } = useAuth();
-  const finance = useFamilyFinance(members, user?.id);
+  const finance = useFamilyFinance(family?.id ?? null, user?.id);
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'members' | 'expenses' | 'transactions'>('overview');
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
+
+  // Re-fetch finance data every time the screen gains focus so changes made by
+  // other members (expenses, transactions, roles) show up without an app relaunch.
+  useFocusEffect(
+    useCallback(() => {
+      finance.reload();
+    }, [finance.reload])
+  );
 
   if (isLoading) {
     return (

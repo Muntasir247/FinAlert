@@ -72,6 +72,7 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
               {expense.contributors.map((c) => {
                 const member = finances.find((m) => m.memberId === c.memberId);
                 const name = member?.name ?? 'Member';
+                const extra = c.paidAmount - c.amount;
                 return (
                   <View key={c.memberId} style={styles.contributorRow}>
                     <View style={styles.contributorAvatar}>
@@ -80,7 +81,12 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
                     <Text style={styles.contributorName} numberOfLines={1}>
                       {name}
                     </Text>
-                    <Text style={styles.contributorAmount}>{formatMoney(c.amount)}</Text>
+                    <View style={styles.contributorAmountWrap}>
+                      {extra > 0.01 && (
+                        <Text style={styles.contributorExtra}>+{formatMoney(extra)}</Text>
+                      )}
+                      <Text style={styles.contributorAmount}>{formatMoney(c.paidAmount)}</Text>
+                    </View>
                     {c.paid ? (
                       <Ionicons name="checkmark-circle" size={20} color="#0FB384" />
                     ) : (
@@ -254,9 +260,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#091E15',
   },
+  contributorAmountWrap: {
+    alignItems: 'flex-end',
+  },
   contributorAmount: {
     fontSize: 14,
     fontWeight: '600',
     color: '#091E15',
+  },
+  contributorExtra: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#3B82F6',
+    marginBottom: 1,
   },
 });
