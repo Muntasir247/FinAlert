@@ -15,3 +15,10 @@ export const TRANSACTION_CATEGORIES: TransactionCategory[] = [
   { label: 'Grocery', emoji: '🛒', bg: '#D1FAE5', fg: '#059669' },
   { label: 'Other', emoji: '📦', bg: '#F1F5F9', fg: '#64748B' },
 ];
+
+export const INCOME_CATEGORIES: TransactionCategory[] = [
+  { label: 'Salary', emoji: '💼', bg: '#DBEAFE', fg: '#2563EB' },
+  { label: 'Business', emoji: '🏢', bg: '#EDE9FE', fg: '#7C3AED' },
+  { label: 'Freelance', emoji: '💻', bg: '#E0F2FE', fg: '#0284C7' },
+  { label: 'Other', emoji: '📦', bg: '#F1F5F9', fg: '#64748B' },
+];

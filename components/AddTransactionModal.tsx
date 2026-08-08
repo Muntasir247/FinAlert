@@ -18,7 +18,7 @@ import DateTimePicker, {
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTransactions } from '../context/TransactionsContext';
-import { TRANSACTION_CATEGORIES } from '../lib/transactionCategories';
+import { TRANSACTION_CATEGORIES, INCOME_CATEGORIES } from '../lib/transactionCategories';
 import type { Transaction, TransactionType } from '../lib/transactions';
 
 const SHEET_MAX_HEIGHT = 620;
@@ -118,6 +118,14 @@ export default function AddTransactionModal({
 
   const numericAmount = Number.parseFloat(amount);
   const isValid = numericAmount > 0 && category !== null;
+
+  const categoryOptions = type === 'expense' ? TRANSACTION_CATEGORIES : INCOME_CATEGORIES;
+
+  const handleTypeChange = (nextType: TransactionType) => {
+    if (nextType === type) return;
+    setType(nextType);
+    setCategory(nextType === 'expense' ? TRANSACTION_CATEGORIES[0].label : INCOME_CATEGORIES[0].label);
+  };
 
   const formatDisplayDate = (d: Date) => {
     const dd = String(d.getDate()).padStart(2, '0');
@@ -234,7 +242,7 @@ export default function AddTransactionModal({
                           : styles.typeChipIncomeActive
                         : styles.typeChipInactive,
                     ]}
-                    onPress={() => setType(t)}
+                    onPress={() => handleTypeChange(t)}
                     disabled={submitting}
                     accessibilityRole="button"
                     accessibilityState={{ selected: isActive }}
@@ -275,7 +283,7 @@ export default function AddTransactionModal({
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Category</Text>
               <View style={styles.categoryGrid}>
-                {TRANSACTION_CATEGORIES.map((cat) => {
+                {categoryOptions.map((cat) => {
                   const isSelected = category === cat.label;
                   return (
                     <TouchableOpacity
