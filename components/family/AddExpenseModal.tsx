@@ -24,8 +24,8 @@ export default function AddExpenseModal({ visible, finances, onClose, onSubmit }
   );
   const balance = total - assignedTotal;
   const counterColor =
-    Math.abs(balance) < 0.01 ? '#0FB384' : balance > 0 ? '#D97706' : '#EF4444';
-  const canSubmit = total > 0 && assignedTotal > 0 && Math.abs(balance) < 0.01;
+    balance < -0.01 ? '#EF4444' : Math.abs(balance) < 0.01 ? '#0FB384' : '#D97706';
+  const canSubmit = total > 0 && assignedTotal > 0;
 
   const handleClose = () => {
     if (visible) {
@@ -149,8 +149,8 @@ export default function AddExpenseModal({ visible, finances, onClose, onSubmit }
           {formatMoney(assignedTotal)} / {formatMoney(total)}
         </Text>
       </View>
-      {total > 0 && assignedTotal > 0 && balance > 0.01 && (
-        <Text style={styles.counterHint}>Assign the full {formatMoney(total)} to add this expense.</Text>
+      {balance > 0.01 && (
+        <Text style={styles.counterHint}>Unassigned: {formatMoney(balance)}</Text>
       )}
       {balance < -0.01 && (
         <Text style={styles.counterError}>Assigned amount exceeds the total.</Text>

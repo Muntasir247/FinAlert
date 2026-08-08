@@ -64,6 +64,7 @@ export default function FamilyScreen() {
   const totalBudget = finance.finances.reduce((sum, m) => sum + m.limit, 0);
   const totalExpense = finance.expenses.reduce((sum, e) => sum + e.total, 0);
   const totalPaid = finance.expenses.reduce((sum, e) => sum + finance.expensePaid(e), 0);
+  const budgetPct = totalBudget > 0 ? Math.min((totalExpense / totalBudget) * 100, 100) : 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -168,31 +169,61 @@ export default function FamilyScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Contributions Feed */}
+            {/* Budget Usage */}
+            <View style={styles.budgetCard}>
+              <Text style={styles.budgetTitle}>Budget Usage</Text>
+              <View style={styles.budgetTrack}>
+                <View style={[styles.budgetFill, { width: `${budgetPct}%` }]} />
+              </View>
+              <View style={styles.budgetFooter}>
+                <Text style={styles.budgetSpent}>{formatMoney(totalExpense)} spent</Text>
+                <Text style={styles.budgetTotal}>{formatMoney(totalBudget)} budget</Text>
+              </View>
+            </View>
+
+            {/* Contributions */}
             <View style={styles.contributionsCard}>
               <Text style={styles.contributionsTitle}>Contributions</Text>
-              {finance.transactions.length === 0 ? (
+              {finance.finances.length === 0 ? (
                 <View style={styles.feedEmpty}>
-                  <Ionicons name="stats-chart-outline" size={28} color="#94A3B8" />
-                  <Text style={styles.feedEmptyText}>No contributions yet.</Text>
+                  <Ionicons name="people-outline" size={28} color="#94A3B8" />
+                  <Text style={styles.feedEmptyText}>No members yet.</Text>
                 </View>
               ) : (
-                finance.transactions.slice(0, 4).map((tx) => (
-                  <View key={tx.id} style={styles.feedRow}>
-                    <View style={styles.feedAvatar}>
-                      <Text style={styles.feedAvatarText}>{initialsOf(tx.memberName)}</Text>
+                finance.finances.map((m) => {
+                  const paid = finance.memberPaid(m.memberId);
+                  const pct = m.limit > 0 ? Math.min((paid / m.limit) * 100, 100) : 0;
+                  return (
+                    <View key={m.memberId} style={styles.contribRow}>
+                      <View style={styles.contribHeader}>
+                        <View style={styles.contribAvatar}>
+                          <Text style={styles.contribAvatarText}>{initialsOf(m.name)}</Text>
+                        </View>
+                        <View style={styles.contribInfo}>
+                          <View style={styles.contribNameRow}>
+                            <Text style={styles.contribName} numberOfLines={1}>
+                              {m.name}
+                            </Text>
+                            {m.extra > 0.01 && (
+                              <View style={styles.extraPill}>
+                                <Text style={styles.extraPillText}>+৳{Math.round(m.extra)}</Text>
+                              </View>
+                            )}
+                            {m.unable > 0.01 && (
+                              <View style={styles.unablePill}>
+                                <Text style={styles.unablePillText}>-৳{Math.round(m.unable)}</Text>
+                              </View>
+                            )}
+                          </View>
+                          <View style={styles.contribTrack}>
+                            <View style={[styles.contribFill, { width: `${pct}%` }]} />
+                          </View>
+                        </View>
+                        <Text style={styles.contribTarget}>{formatMoney(m.limit)}</Text>
+                      </View>
                     </View>
-                    <View style={styles.feedInfo}>
-                      <Text style={styles.feedTitle} numberOfLines={1}>
-                        {tx.memberName} · {tx.note || tx.expenseCategory}
-                      </Text>
-                      <Text style={styles.feedSubtitle}>{tx.expenseCategory}</Text>
-                    </View>
-                    <Text style={styles.feedAmount}>
-                      {tx.type === 'extra' ? '+' : ''}৳{tx.amount.toFixed(0)}
-                    </Text>
-                  </View>
-                ))
+                  );
+                })
               )}
             </View>
           </>
@@ -309,7 +340,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 18,
     fontWeight: '700',
-    color: '#0068FF',
+    color: '#02C78E',
   },
 
   // ── Sub-Tab Bar ──
@@ -462,13 +493,66 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
   },
-  feedRow: {
+
+  // ── Overview: Budget Usage ──
+  budgetCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  budgetTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#091E15',
+    marginBottom: 14,
+  },
+  budgetTrack: {
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#F1F5F9',
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  budgetFill: {
+    height: '100%',
+    borderRadius: 5,
+    backgroundColor: '#02C78E',
+  },
+  budgetFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  budgetSpent: {
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '400',
+    color: '#6B7280',
+  },
+  budgetTotal: {
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: '#091E15',
+  },
+
+  // ── Overview: Contributions ──
+  contribRow: {
+    marginBottom: 4,
+  },
+  contribHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
     paddingVertical: 10,
-    gap: 10,
   },
-  feedAvatar: {
+  contribAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -476,28 +560,63 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  feedAvatarText: {
+  contribAvatarText: {
     fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  feedInfo: {
+  contribInfo: {
     flex: 1,
   },
-  feedTitle: {
+  contribNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 6,
+  },
+  contribName: {
     fontSize: 14,
     fontWeight: '500',
     color: '#091E15',
+    flexShrink: 1,
   },
-  feedSubtitle: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: '#6B7280',
-    marginTop: 1,
+  extraPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: '#DCFCE7',
   },
-  feedAmount: {
+  extraPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#16A34A',
+  },
+  unablePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: '#FEE2E2',
+  },
+  unablePillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#EF4444',
+  },
+  contribTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#F1F5F9',
+    overflow: 'hidden',
+  },
+  contribFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: '#02C78E',
+  },
+  contribTarget: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0FB384',
+    color: '#091E15',
   },
 });
