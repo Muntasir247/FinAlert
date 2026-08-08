@@ -41,6 +41,19 @@
           "speechRecognitionPermission": "FinAlert uses speech recognition to turn your voice into transactions.",
           "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "FinAlert uses your camera to scan receipts and add expenses.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FinAlert accesses your photos so you can import a receipt to scan."
+        }
       ]
     ],
     "extra": {
