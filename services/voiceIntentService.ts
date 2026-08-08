@@ -1,4 +1,5 @@
 import { TRANSACTION_CATEGORIES } from '../lib/transactionCategories';
+import { generateGeminiContent, GeminiAllRateLimitedError } from './geminiClient';
 
 export type VoiceIntentAction =
   | 'ADD_EXPENSE'
@@ -17,8 +18,18 @@ export interface VoiceIntent {
   target_amount?: number;
 }
 
-const GEMINI_ENDPOINT =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent';
+/**
+ * Models tried in order. Flash-Lite offers higher free-tier rate limits, so it
+ * is preferred; if it is rate limited (429) the next model is tried
+ * automatically.
+ */
+const GEMINI_MODELS = [
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-3-flash',
+  'gemini-3.6-flash',
+];
 
 const MAX_AMOUNT = 1_000_000_000;
 
@@ -91,7 +102,7 @@ const toNumber = (value: unknown): number | undefined => {
 };
 
 /**
- * Sends the transcribed text to Gemini 3.5 Flash and returns a structured
+ * Sends the transcribed text to Gemini Flash-Lite and returns a structured
  * VoiceIntent. Throws VoiceIntentError with a user-friendly message when the
  * key is missing, the network fails, or the model output cannot be parsed.
  */
@@ -106,15 +117,12 @@ export async function parseVoiceIntent(
     );
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
   try {
-    const response = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
+    const { response } = await generateGeminiContent({
+      apiKey,
+      models: GEMINI_MODELS,
+      timeoutMs,
+      body: {
         contents: [
           {
             role: 'user',
@@ -128,17 +136,12 @@ export async function parseVoiceIntent(
           response_mime_type: 'application/json',
           responseSchema: RESPONSE_SCHEMA,
         },
-      }),
+      },
     });
 
     if (!response.ok) {
       const body = await response.text();
       console.error('Gemini error:', response.status, body);
-      if (response.status === 429) {
-        throw new VoiceIntentError(
-          'Voice AI limit reached. Please try again later or check your API quota.'
-        );
-      }
       throw new VoiceIntentError('The voice assistant could not reach its AI backend.');
     }
 
@@ -168,12 +171,15 @@ export async function parseVoiceIntent(
     };
   } catch (error) {
     if (error instanceof VoiceIntentError) throw error;
+    if (error instanceof GeminiAllRateLimitedError) {
+      throw new VoiceIntentError(
+        'Voice AI limit reached. Please try again later or check your API quota.'
+      );
+    }
     if (error instanceof Error && error.name === 'AbortError') {
       throw new VoiceIntentError('The voice assistant took too long. Please try again.');
     }
     console.error('parseVoiceIntent failed:', error);
     throw new VoiceIntentError('Could not process that request. Please try again.');
-  } finally {
-    clearTimeout(timer);
   }
 }
