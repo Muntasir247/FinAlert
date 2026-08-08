@@ -81,7 +81,12 @@ export default function AddExpenseModal({
       handleClose();
     } catch (error) {
       console.error('Failed to save expense:', error);
-      setErrorMsg('Failed to save expense. Please try again.');
+      const msg = error instanceof Error ? error.message : String(error);
+      setErrorMsg(
+        msg.includes('TOTAL_BELOW_PAID')
+          ? "The new total can't be lower than what members have already paid."
+          : 'Failed to save expense. Please try again.'
+      );
     }
   };
 
@@ -197,7 +202,7 @@ export default function AddExpenseModal({
         onPress={handleSubmit}
         disabled={!canSubmit}
         accessibilityRole="button"
-        accessibilityLabel="Add Expense"
+        accessibilityLabel={editing ? 'Save Changes' : 'Add Expense'}
       >
         <Ionicons name={editing ? 'checkmark' : 'add'} size={18} color="#FFFFFF" />
         <Text style={styles.submitBtnText}>{editing ? 'Save Changes' : 'Add Expense'}</Text>

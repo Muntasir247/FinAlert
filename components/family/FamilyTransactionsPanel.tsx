@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import AddTransactionModal from './AddTransactionModal';
 import { expenseCategoryMeta, formatDateLabel, formatMoney, initialsOf } from './familyConstants';
@@ -32,17 +32,20 @@ export default function FamilyTransactionsPanel({ finance }: FamilyTransactionsP
   const [modalVisible, setModalVisible] = useState(false);
   const [confirmTx, setConfirmTx] = useState<FamilyTransaction | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const groups = groupByDate(finance.transactions);
   const myMemberId = finance.me?.memberId;
 
   const handleDeleteTx = async () => {
     if (!confirmTx || busy) return;
     setBusy(true);
+    setDeleteError(null);
     try {
       await finance.deleteTransaction(confirmTx.id);
       setConfirmTx(null);
     } catch (error) {
       console.error('Failed to delete transaction:', error);
+      setDeleteError('Failed to delete the transaction. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -99,6 +102,7 @@ export default function FamilyTransactionsPanel({ finance }: FamilyTransactionsP
                       <TouchableOpacity
                         style={styles.deleteBtn}
                         onPress={() => setConfirmTx(tx)}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         accessibilityRole="button"
                         accessibilityLabel={`Delete ${meta.label} transaction`}
                       >
@@ -115,7 +119,12 @@ export default function FamilyTransactionsPanel({ finance }: FamilyTransactionsP
 
       <AddTransactionModal visible={modalVisible} finance={finance} onClose={() => setModalVisible(false)} />
 
-      {confirmTx && (
+      <Modal
+        visible={!!confirmTx}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmTx(null)}
+      >
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmCard}>
             <View style={styles.confirmIconWrap}>
@@ -123,9 +132,13 @@ export default function FamilyTransactionsPanel({ finance }: FamilyTransactionsP
             </View>
             <Text style={styles.confirmTitle}>Delete this transaction?</Text>
             <Text style={styles.confirmText}>
-              {confirmTx.type === 'payment' ? 'Payment' : confirmTx.type === 'extra' ? 'Extra' : 'Unable'}{' '}
-              of {formatMoney(confirmTx.amount)} will be removed from {confirmTx.expenseCategory}.
+              {confirmTx?.type === 'payment' ? 'Payment' : confirmTx?.type === 'extra' ? 'Extra' : 'Unable'}{' '}
+              of {formatMoney(confirmTx?.amount ?? 0)} will be removed from{' '}
+              {confirmTx?.expenseCategory}.
             </Text>
+            {deleteError && (
+              <Text style={styles.confirmErrorText}>{deleteError}</Text>
+            )}
             <View style={styles.confirmActions}>
               <TouchableOpacity
                 style={[styles.confirmBtn, styles.cancelBtn]}
@@ -146,7 +159,7 @@ export default function FamilyTransactionsPanel({ finance }: FamilyTransactionsP
             </View>
           </View>
         </View>
-      )}
+      </Modal>
     </View>
   );
 }
@@ -270,24 +283,19 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   deleteBtn: {
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FEF2F2',
   },
   confirmOverlay: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
+    flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 28,
-    zIndex: 50,
   },
   confirmCard: {
     width: '100%',
@@ -347,5 +355,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  confirmErrorText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400',
+    color: '#DC2626',
+    textAlign: 'center',
+    marginBottom: 14,
   },
 });

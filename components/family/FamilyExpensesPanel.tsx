@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import AddExpenseModal from './AddExpenseModal';
 import { expenseCategoryMeta, formatMoney, initialsOf } from './familyConstants';
@@ -14,16 +14,19 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
   const [editingExpense, setEditingExpense] = useState<SharedExpense | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SharedExpense | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const { expenses, finances, isAdmin } = finance;
 
   const handleDelete = async () => {
     if (!confirmDelete || busy) return;
     setBusy(true);
+    setDeleteError(null);
     try {
       await finance.deleteExpense(confirmDelete.id);
       setConfirmDelete(null);
     } catch (error) {
       console.error('Failed to delete expense:', error);
+      setDeleteError('Failed to delete the expense. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -77,6 +80,7 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
                       <TouchableOpacity
                         style={styles.actionBtn}
                         onPress={() => setEditingExpense(expense)}
+                        hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                         accessibilityRole="button"
                         accessibilityLabel={`Edit ${expense.category}`}
                       >
@@ -85,6 +89,7 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
                       <TouchableOpacity
                         style={styles.actionBtn}
                         onPress={() => setConfirmDelete(expense)}
+                        hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                         accessibilityRole="button"
                         accessibilityLabel={`Delete ${expense.category}`}
                       >
@@ -154,7 +159,12 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
         }}
       />
 
-      {confirmDelete && (
+      <Modal
+        visible={!!confirmDelete}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmDelete(null)}
+      >
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmCard}>
             <View style={styles.confirmIconWrap}>
@@ -162,9 +172,12 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
             </View>
             <Text style={styles.confirmTitle}>Delete shared expense?</Text>
             <Text style={styles.confirmText}>
-              This will remove "{confirmDelete.category}" (৳
-              {Math.round(confirmDelete.total).toLocaleString()}) and all its payment records.
+              This will remove "{confirmDelete?.category}" ({formatMoney(confirmDelete?.total ?? 0)}) and
+              all its payment records.
             </Text>
+            {deleteError && (
+              <Text style={styles.confirmErrorText}>{deleteError}</Text>
+            )}
             <View style={styles.confirmActions}>
               <TouchableOpacity
                 style={[styles.confirmBtn, styles.cancelBtn]}
@@ -185,7 +198,7 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
             </View>
           </View>
         </View>
-      )}
+      </Modal>
     </View>
   );
 }
@@ -371,16 +384,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   confirmOverlay: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
+    flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 28,
-    zIndex: 50,
   },
   confirmCard: {
     width: '100%',
@@ -440,5 +448,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  confirmErrorText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '400',
+    color: '#DC2626',
+    textAlign: 'center',
+    marginBottom: 14,
   },
 });
