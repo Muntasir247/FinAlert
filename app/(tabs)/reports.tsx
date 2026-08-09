@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,54 +6,217 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, G } from 'react-native-svg';
+import { useTransactions } from '../../context/TransactionsContext';
+import type { Transaction } from '../../lib/transactions';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Data for Income vs Expense Bar Chart
-const MONTHLY_CHART_DATA = [
-  { label: 'Jan', income: 45000, expense: 32000 },
-  { label: 'Feb', income: 48000, expense: 35000 },
-  { label: 'Mar', income: 50000, expense: 29000 },
-  { label: 'Apr', income: 47000, expense: 38000 },
-  { label: 'May', income: 52000, expense: 31000 },
-  { label: 'Jun', income: 53000, expense: 17000 },
-];
+const DONUT_COLORS = ['#0FB384', '#F59E0B', '#3B82F6', '#EF4444', '#8B5CF6', '#64748B'];
 
-const WEEKLY_CHART_DATA = [
-  { label: 'W1', income: 12000, expense: 4500 },
-  { label: 'W2', income: 13000, expense: 4200 },
-  { label: 'W3', income: 14000, expense: 3800 },
-  { label: 'W4', income: 14000, expense: 4500 },
-];
+const parseDate = (dateStr: string): Date => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1);
+};
 
-// Data for Expense by Category
-const CATEGORY_DATA = [
-  { name: 'Food & Dining', value: '৳1,650', percentage: 11, color: '#10B981', pctValue: 0.11 },
-  { name: 'Bills & Utilities', value: '৳9,200', percentage: 63, color: '#046A38', pctValue: 0.63 },
-  { name: 'Transport', value: '৳650', percentage: 4, color: '#8B5CF6', pctValue: 0.04 },
-  { name: 'Shopping', value: '৳1,500', percentage: 10, color: '#F59E0B', pctValue: 0.10 },
-  { name: 'Health', value: '৳900', percentage: 6, color: '#EF4444', pctValue: 0.06 },
-  { name: 'Other', value: '৳700', percentage: 5, color: '#64748B', pctValue: 0.05 },
-];
+const niceCeil = (v: number): number => {
+  if (v <= 0) return 0;
+  const pow = Math.pow(10, Math.floor(Math.log10(v)));
+  const scaled = v / pow;
+  const nice = scaled <= 1 ? 1 : scaled <= 2 ? 2 : scaled <= 5 ? 5 : 10;
+  return nice * pow;
+};
+
+const formatMoney = (n: number) => `৳${Math.round(n).toLocaleString()}`;
+
+const formatTick = (v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : `${Math.round(v)}`);
+
+interface ChartDatum {
+  label: string;
+  income: number;
+  expense: number;
+}
+
+interface CatDatum {
+  name: string;
+  value: number;
+  percentage: number;
+  color: string;
+  pctValue: number;
+}
 
 export default function ReportsScreen() {
+  const { transactions, isLoading } = useTransactions();
   const [reportType, setReportType] = useState<'monthly' | 'weekly'>('monthly');
 
-  const chartData = reportType === 'monthly' ? MONTHLY_CHART_DATA : WEEKLY_CHART_DATA;
+  const report = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const monthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
 
-  // Donut chart parameters
+    // Current calendar week (Monday → Sunday).
+    const dayOfWeek = now.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const weekStart = new Date(currentYear, currentMonth, now.getDate() + mondayOffset);
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    const inPeriod = (tx: Transaction) => {
+      if (reportType === 'monthly') return tx.date.startsWith(monthKey);
+      const d = parseDate(tx.date);
+      return d >= weekStart && d <= weekEnd;
+    };
+
+    const periodTxs = transactions.filter(inPeriod);
+
+    // Period totals
+    let income = 0;
+    let expense = 0;
+    for (const tx of periodTxs) {
+      if (tx.type === 'income') income += tx.amount;
+      else expense += tx.amount;
+    }
+    const savings = income - expense;
+    const savingsRate = income > 0 ? (savings / income) * 100 : 0;
+
+    // Bar chart data
+    let chartData: ChartDatum[];
+    if (reportType === 'monthly') {
+      chartData = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(currentYear, currentMonth - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        let inc = 0;
+        let exp = 0;
+        for (const tx of transactions) {
+          if (!tx.date.startsWith(key)) continue;
+          if (tx.type === 'income') inc += tx.amount;
+          else exp += tx.amount;
+        }
+        chartData.push({
+          label: d.toLocaleString('en-US', { month: 'short' }),
+          income: inc,
+          expense: exp,
+        });
+      }
+    } else {
+      chartData = [];
+      const currentWeek = Math.floor((now.getDate() - 1) / 7) + 1;
+      for (let w = 1; w <= currentWeek; w++) {
+        const startDay = (w - 1) * 7 + 1;
+        const endDay = Math.min(w * 7, now.getDate());
+        let inc = 0;
+        let exp = 0;
+        for (const tx of transactions) {
+          if (!tx.date.startsWith(monthKey)) continue;
+          const day = parseDate(tx.date).getDate();
+          if (day >= startDay && day <= endDay) {
+            if (tx.type === 'income') inc += tx.amount;
+            else exp += tx.amount;
+          }
+        }
+        chartData.push({ label: `W${w}`, income: inc, expense: exp });
+      }
+    }
+
+    // Expense by category for the selected period
+    const catMap = new Map<string, number>();
+    for (const tx of periodTxs) {
+      if (tx.type !== 'expense') continue;
+      const cat = (tx.category ?? '').trim() || 'Other';
+      catMap.set(cat, (catMap.get(cat) ?? 0) + tx.amount);
+    }
+    let categoryData: CatDatum[] = [...catMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value], i) => ({
+        name,
+        value,
+        pctValue: expense > 0 ? value / expense : 0,
+        percentage: expense > 0 ? (value / expense) * 100 : 0,
+        color: DONUT_COLORS[i % DONUT_COLORS.length],
+      }));
+    if (categoryData.length > 5) {
+      const top = categoryData.slice(0, 5);
+      const restValue = categoryData.slice(5).reduce((sum, c) => sum + c.value, 0);
+      categoryData = [
+        ...top,
+        {
+          name: 'Other',
+          value: restValue,
+          pctValue: expense > 0 ? restValue / expense : 0,
+          percentage: expense > 0 ? (restValue / expense) * 100 : 0,
+          color: DONUT_COLORS[5],
+        },
+      ];
+    }
+
+    // Chart scale: round the max up to a "nice" number so axis labels look clean.
+    const rawMax = Math.max(...chartData.flatMap((d) => [d.income, d.expense]), 0);
+    const niceMax = niceCeil(rawMax);
+    const barScale = niceMax > 0 ? niceMax : 1;
+
+    // Insight (handles 0 values)
+    const periodLabel = reportType === 'monthly' ? 'month' : 'week';
+    let insightText: string;
+    if (income === 0 && expense === 0) {
+      insightText = `Add transactions this ${periodLabel} to see personalized insights.`;
+    } else if (savings < 0) {
+      insightText = `You spent ${formatMoney(-savings)} more than you earned this ${periodLabel}. Consider trimming non-essential expenses.`;
+    } else if (savingsRate >= 20) {
+      insightText = `Great job! You saved ${formatMoney(savings)} (${Math.round(savingsRate)}%) this ${periodLabel}. Keep it up!`;
+    } else if (savingsRate > 0) {
+      insightText = `You saved ${formatMoney(savings)} (${Math.round(savingsRate)}%) this ${periodLabel}. Aim for a 20% savings rate.`;
+    } else {
+      insightText = `You saved 0% of your income this ${periodLabel}. Setting a budget can help you save more.`;
+    }
+
+    // Pre-compute donut slice offsets.
+    const slices = (() => {
+      let acc = 0;
+      return categoryData.map((item) => {
+        const offset = acc;
+        acc += item.pctValue;
+        return { ...item, offset };
+      });
+    })();
+
+    return {
+      income,
+      expense,
+      savings,
+      savingsRate,
+      chartData,
+      categoryData,
+      slices,
+      ticks: [0, 0.25, 0.5, 0.75, 1].map((f) => formatTick(niceMax * f)),
+      barScale,
+      insightText,
+      periodLabel,
+    };
+  }, [transactions, reportType]);
+
   const radius = 70;
   const strokeWidth = 24;
   const circumference = 2 * Math.PI * radius;
   const svgSize = 180;
   const center = svgSize / 2;
 
-  // Calculate cumulative offsets for donut slices
-  let accumulatedPercentage = 0;
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0FB384" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -109,14 +272,14 @@ export default function ReportsScreen() {
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Total Income</Text>
               <Text style={[styles.metricValue, styles.incomeText]}>
-                ৳{reportType === 'monthly' ? '53,000' : '53,000'}
+                {formatMoney(report.income)}
               </Text>
             </View>
             {/* Total Expense */}
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Total Expense</Text>
               <Text style={[styles.metricValue, styles.expenseText]}>
-                ৳{reportType === 'monthly' ? '17,000' : '17,000'}
+                {formatMoney(report.expense)}
               </Text>
             </View>
           </View>
@@ -124,14 +287,16 @@ export default function ReportsScreen() {
             {/* Savings */}
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Savings</Text>
-              <Text style={[styles.metricValue, styles.incomeText]}>
-                ৳{reportType === 'monthly' ? '36,000' : '36,000'}
+              <Text style={[styles.metricValue, report.savings >= 0 ? styles.incomeText : styles.expenseText]}>
+                {formatMoney(report.savings)}
               </Text>
             </View>
             {/* Savings Rate */}
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Savings Rate</Text>
-              <Text style={[styles.metricValue, styles.savingsRateText]}>68%</Text>
+              <Text style={[styles.metricValue, styles.savingsRateText]}>
+                {Math.round(report.savingsRate)}%
+              </Text>
             </View>
           </View>
         </View>
@@ -142,47 +307,49 @@ export default function ReportsScreen() {
           <View style={styles.chartWrapper}>
             {/* Y-Axis Labels */}
             <View style={styles.yAxisContainer}>
-              <Text style={styles.yAxisText}>60k</Text>
-              <Text style={styles.yAxisText}>45k</Text>
-              <Text style={styles.yAxisText}>30k</Text>
-              <Text style={styles.yAxisText}>15k</Text>
-              <Text style={styles.yAxisText}>0k</Text>
+              {report.ticks
+                .slice()
+                .reverse()
+                .map((tick, i) => (
+                  <Text key={i} style={styles.yAxisText}>
+                    {tick}
+                  </Text>
+                ))}
             </View>
 
             {/* Bar Content */}
             <View style={styles.barChartContainer}>
               {/* Grid Lines */}
               <View style={styles.gridLinesContainer}>
-                <View style={styles.gridLine} />
-                <View style={styles.gridLine} />
-                <View style={styles.gridLine} />
-                <View style={styles.gridLine} />
-                <View style={styles.gridLine} />
+                {report.ticks.map((_, i) => (
+                  <View key={i} style={styles.gridLine} />
+                ))}
               </View>
 
               <View style={styles.barsRowContainer}>
-                {chartData.map((data, index) => {
-                  const maxVal = 60000;
-                  const incomeHeight = (data.income / maxVal) * 100;
-                  const expenseHeight = (data.expense / maxVal) * 100;
+                {report.chartData.map((data, index) => {
+                  const incomeHeight = (data.income / report.barScale) * 100;
+                  const expenseHeight = (data.expense / report.barScale) * 100;
 
                   return (
                     <View key={index} style={styles.barGroup}>
                       <View style={styles.barsPair}>
-                        {/* Income Bar (Green) */}
-                        <View
-                          style={[
-                            styles.bar,
-                            { height: `${incomeHeight}%`, backgroundColor: '#0FB384' },
-                          ]}
-                        />
-                        {/* Expense Bar (Red) */}
-                        <View
-                          style={[
-                            styles.bar,
-                            { height: `${expenseHeight}%`, backgroundColor: '#EF4444' },
-                          ]}
-                        />
+                        {data.income > 0 && (
+                          <View
+                            style={[
+                              styles.bar,
+                              { height: `${incomeHeight}%`, backgroundColor: '#0FB384' },
+                            ]}
+                          />
+                        )}
+                        {data.expense > 0 && (
+                          <View
+                            style={[
+                              styles.bar,
+                              { height: `${expenseHeight}%`, backgroundColor: '#EF4444' },
+                            ]}
+                          />
+                        )}
                       </View>
                       <Text style={styles.xAxisText}>{data.label}</Text>
                     </View>
@@ -211,49 +378,62 @@ export default function ReportsScreen() {
 
           {/* Donut Chart */}
           <View style={styles.donutWrapper}>
-            <Svg width={svgSize} height={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`}>
-              <G rotation="-90" origin={`${center}, ${center}`}>
-                {CATEGORY_DATA.map((item, index) => {
-                  const strokeLength = item.pctValue * circumference;
-                  // Add a tiny gap (2 units) if it's not a single 100% slice
-                  const dashLength = strokeLength > 4 ? strokeLength - 2 : strokeLength;
-                  const gapLength = circumference - dashLength;
-                  const offset = circumference - (accumulatedPercentage * circumference);
-                  accumulatedPercentage += item.pctValue;
+            {report.expense > 0 ? (
+              <Svg width={svgSize} height={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`}>
+                <G rotation="-90" origin={`${center}, ${center}`}>
+                  {report.slices.map((item, index) => {
+                    const strokeLength = item.pctValue * circumference;
+                    const dashLength = strokeLength > 4 ? strokeLength - 2 : strokeLength;
+                    const gapLength = circumference - dashLength;
+                    const offset = circumference - item.offset * circumference;
 
-                  return (
-                    <Circle
-                      key={index}
-                      cx={center}
-                      cy={center}
-                      r={radius}
-                      stroke={item.color}
-                      strokeWidth={strokeWidth}
-                      strokeDasharray={`${dashLength} ${gapLength}`}
-                      strokeDashoffset={offset}
-                      fill="transparent"
-                      strokeLinecap="butt"
-                    />
-                  );
-                })}
-              </G>
-            </Svg>
+                    return (
+                      <Circle
+                        key={index}
+                        cx={center}
+                        cy={center}
+                        r={radius}
+                        stroke={item.color}
+                        strokeWidth={strokeWidth}
+                        strokeDasharray={`${dashLength} ${gapLength}`}
+                        strokeDashoffset={offset}
+                        fill="transparent"
+                        strokeLinecap="butt"
+                      />
+                    );
+                  })}
+                </G>
+              </Svg>
+            ) : (
+              <View style={styles.donutEmpty}>
+                <Ionicons name="receipt-outline" size={28} color="#94A3B8" />
+                <Text style={styles.donutEmptyText}>
+                  No expenses this {report.periodLabel}.
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Category Legend Breakdown */}
           <View style={styles.categoryList}>
-            {CATEGORY_DATA.map((item, index) => (
-              <View key={index} style={styles.categoryRow}>
-                <View style={styles.categoryLeft}>
-                  <View style={[styles.categoryDot, { backgroundColor: item.color }]} />
-                  <Text style={styles.categoryName}>{item.name}</Text>
+            {report.categoryData.length === 0 ? (
+              <Text style={styles.noCategoriesText}>No expense categories yet.</Text>
+            ) : (
+              report.categoryData.map((item, index) => (
+                <View key={index} style={styles.categoryRow}>
+                  <View style={styles.categoryLeft}>
+                    <View style={[styles.categoryDot, { backgroundColor: item.color }]} />
+                    <Text style={styles.categoryName}>{item.name}</Text>
+                  </View>
+                  <View style={styles.categoryRight}>
+                    <Text style={styles.categoryValue}>{formatMoney(item.value)}</Text>
+                    <Text style={styles.categoryPercentage}>
+                      {item.percentage >= 100 ? 100 : item.percentage.toFixed(0)}%
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.categoryRight}>
-                  <Text style={styles.categoryValue}>{item.value}</Text>
-                  <Text style={styles.categoryPercentage}>{item.percentage}%</Text>
-                </View>
-              </View>
-            ))}
+              ))
+            )}
           </View>
         </View>
 
@@ -263,9 +443,7 @@ export default function ReportsScreen() {
             <Ionicons name="sparkles" size={16} color="#7C3AED" style={styles.insightIcon} />
             <Text style={styles.insightTitle}>AI Financial Insight</Text>
           </View>
-          <Text style={styles.insightSubtext}>
-            Reduce dining out by 30% to save ৳2,000 more.
-          </Text>
+          <Text style={styles.insightSubtext}>{report.insightText}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -276,6 +454,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerRow: {
     flexDirection: 'row',
@@ -452,7 +635,6 @@ const styles = StyleSheet.create({
     width: 8,
     borderTopLeftRadius: 4,
     borderTopRightRadius: 4,
-    minHeight: 2,
   },
   xAxisText: {
     fontSize: 13,
@@ -485,9 +667,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginVertical: 12,
   },
+  donutEmpty: {
+    height: 180,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  donutEmptyText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#94A3B8',
+  },
   categoryList: {
     marginTop: 16,
     gap: 12,
+  },
+  noCategoriesText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#94A3B8',
+    textAlign: 'center',
   },
   categoryRow: {
     flexDirection: 'row',
