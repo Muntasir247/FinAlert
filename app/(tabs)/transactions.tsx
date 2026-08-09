@@ -47,6 +47,7 @@ export default function TransactionsScreen() {
     useBudgets();
   const [activeTab, setActiveTab] = useState<'transactions' | 'budget'>('transactions');
   const [activeFilter, setActiveFilter] = useState<string>('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
@@ -65,12 +66,16 @@ export default function TransactionsScreen() {
     }
   }, [transactionsTabRequested, clearTransactionsTabRequest]);
 
-  const filtered =
-    activeFilter === 'Income'
-      ? transactions.filter((t) => t.type === 'income')
-      : activeFilter === 'Expense'
-        ? transactions.filter((t) => t.type === 'expense')
-        : transactions;
+  const query = searchQuery.trim().toLowerCase();
+  const filtered = transactions.filter((t) => {
+    if (activeFilter === 'Income' && t.type !== 'income') return false;
+    if (activeFilter === 'Expense' && t.type !== 'expense') return false;
+    if (query) {
+      const haystack = `${t.description ?? ''} ${t.category}`.toLowerCase();
+      if (!haystack.includes(query)) return false;
+    }
+    return true;
+  });
 
   const grouped = groupByDate(filtered);
 
@@ -217,9 +222,23 @@ export default function TransactionsScreen() {
                 style={styles.searchInput}
                 placeholder="Search transactions..."
                 placeholderTextColor="#94A3B8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
                 autoCapitalize="none"
                 autoCorrect={false}
+                returnKeyType="search"
+                accessibilityLabel="Search transactions"
               />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setSearchQuery('')}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear search"
+                >
+                  <Feather name="x" size={16} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* ── Filter Pills ── */}
@@ -251,7 +270,11 @@ export default function TransactionsScreen() {
             {/* ── Grouped Transaction List ── */}
             {grouped.length === 0 ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyStateText}>No transactions yet.</Text>
+                <Text style={styles.emptyStateText}>
+                  {activeFilter !== 'All' || query
+                    ? 'No transactions match your search.'
+                    : 'No transactions yet.'}
+                </Text>
               </View>
             ) : (
               grouped.map((group) => (
