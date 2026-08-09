@@ -1,4 +1,4 @@
-import { TRANSACTION_CATEGORIES } from '../lib/transactionCategories';
+import { TRANSACTION_CATEGORIES, INCOME_CATEGORIES } from '../lib/transactionCategories';
 import { generateGeminiContent, GeminiAllRateLimitedError } from './geminiClient';
 
 export type VoiceIntentAction =
@@ -34,6 +34,7 @@ const GEMINI_MODELS = [
 const MAX_AMOUNT = 1_000_000_000;
 
 const EXPENSE_CATEGORIES = TRANSACTION_CATEGORIES.map((c) => c.label).join(', ');
+const INCOME_CATEGORY_LIST = INCOME_CATEGORIES.map((c) => c.label).join(', ');
 
 const SYSTEM_INSTRUCTION = `You are the voice parser for a personal finance app used in Bangladesh (currency BDT/taka).
 
@@ -41,7 +42,7 @@ Convert the user's spoken request into ONE structured action. The user may speak
 
 Rules:
 - If money was spent, action is ADD_EXPENSE. Choose the closest expense category from this exact list: ${EXPENSE_CATEGORIES}.
-- If money was received/income (salary, wages, earnings, etc.), action is ADD_INCOME with category "Salary" (or a fitting income category).
+- If money was received/income (salary, wages, earnings, etc.), action is ADD_INCOME. Choose the closest income category from this exact list: ${INCOME_CATEGORY_LIST}.
 - If a new savings goal is mentioned (saving for something, want to save, target), action is CREATE_SAVINGS_GOAL. Capture the goal_name (e.g. "Trip to Cox's Bazar") and target_amount if stated.
 - If adding money to an existing savings goal (add/save X to goal), action is ADD_SAVINGS_CONTRIBUTION. Capture goal_name and amount.
 - If setting/updating a monthly budget limit, action is SET_BUDGET_LIMIT. Capture amount.
@@ -101,6 +102,20 @@ const toNumber = (value: unknown): number | undefined => {
   return Math.round(n * 100) / 100;
 };
 
+const INCOME_CATEGORY_LABELS = INCOME_CATEGORIES.map((c) => c.label);
+const EXPENSE_CATEGORY_LABELS = TRANSACTION_CATEGORIES.map((c) => c.label);
+
+// Coerce the parsed category to the app's exact list for the action's type so a
+// prefilled transaction always matches a real category tile. Falls back to
+// "Other", which exists in both expense and income lists.
+const sanitizeCategory = (value: unknown, action: VoiceIntentAction): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const list = action === 'ADD_INCOME' ? INCOME_CATEGORY_LABELS : EXPENSE_CATEGORY_LABELS;
+  return list.includes(trimmed) ? trimmed : 'Other';
+};
+
 /**
  * Sends the transcribed text to Gemini Flash-Lite and returns a structured
  * VoiceIntent. Throws VoiceIntentError with a user-friendly message when the
@@ -157,8 +172,7 @@ export async function parseVoiceIntent(
     return {
       action: parsed.action,
       amount: toNumber(parsed.amount),
-      category:
-        typeof parsed.category === 'string' && parsed.category.trim() ? parsed.category.trim() : undefined,
+      category: sanitizeCategory(parsed.category, parsed.action),
       goal_name:
         typeof parsed.goal_name === 'string' && parsed.goal_name.trim()
           ? parsed.goal_name.trim()
