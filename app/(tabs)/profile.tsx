@@ -10,13 +10,36 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { useTransactions } from '../../context/TransactionsContext';
+
+const formatCompact = (n: number) => {
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(Math.round(n));
+  if (abs >= 10000) return `${sign}৳${Math.round(abs / 1000)}k`;
+  if (abs >= 1000) return `${sign}৳${(abs / 1000).toFixed(1)}k`;
+  return `${sign}৳${abs}`;
+};
 
 export default function ProfileScreen() {
   const { profile, signOut } = useAuth();
+  const { transactions } = useTransactions();
 
   // Local state for preferences toggles
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  let totalCount = 0;
+  let monthIncome = 0;
+  let monthExpense = 0;
+  for (const tx of transactions) {
+    totalCount += 1;
+    if (!tx.date.startsWith(monthKey)) continue;
+    if (tx.type === 'income') monthIncome += tx.amount;
+    else monthExpense += tx.amount;
+  }
+  const monthSavings = monthIncome - monthExpense;
 
   const handleLogout = async () => {
     try {
@@ -52,15 +75,15 @@ export default function ProfileScreen() {
         {/* ── Summary Activity Stats Cards ── */}
         <View style={styles.statsContainer}>
           <View style={styles.statsCard}>
-            <Text style={styles.statsValue}>12</Text>
+            <Text style={styles.statsValue}>{totalCount}</Text>
             <Text style={styles.statsLabel}>Transactions</Text>
           </View>
           <View style={styles.statsCard}>
-            <Text style={styles.statsValue}>৳17k</Text>
+            <Text style={styles.statsValue}>{formatCompact(monthExpense)}</Text>
             <Text style={styles.statsLabel}>This Month</Text>
           </View>
           <View style={styles.statsCard}>
-            <Text style={styles.statsValue}>৳5k</Text>
+            <Text style={styles.statsValue}>{formatCompact(monthSavings)}</Text>
             <Text style={styles.statsLabel}>Saved</Text>
           </View>
         </View>
