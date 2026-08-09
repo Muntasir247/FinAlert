@@ -113,7 +113,10 @@ const sanitizeCategory = (value: unknown, action: VoiceIntentAction): string | u
   const trimmed = value.trim();
   if (!trimmed) return undefined;
   const list = action === 'ADD_INCOME' ? INCOME_CATEGORY_LABELS : EXPENSE_CATEGORY_LABELS;
-  return list.includes(trimmed) ? trimmed : 'Other';
+  // Case-insensitive match so the prefilled category always lands on a real
+  // category tile (and therefore the right budget limit), even if the AI
+  // returns a differently-cased label.
+  return list.find((label) => label.toLowerCase() === trimmed.toLowerCase()) ?? 'Other';
 };
 
 /**

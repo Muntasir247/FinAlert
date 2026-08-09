@@ -3,6 +3,7 @@ import {
   Modal,
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
@@ -33,6 +34,29 @@ const todayIso = () => {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${mm}-${dd}`;
+};
+
+// Validates a YYYY-MM-DD date and clamps any future date to today. A future
+// (or otherwise invalid) date would silently place the expense outside the
+// current month's budget and "available" calculation, so scanner expenses
+// always land in a real, current-or-past month.
+const resolveDate = (value: string): string => {
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return todayIso();
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const dt = new Date(year, month - 1, day);
+  if (
+    dt.getFullYear() !== year ||
+    dt.getMonth() !== month - 1 ||
+    dt.getDate() !== day ||
+    year < 1900
+  ) {
+    return todayIso();
+  }
+  const iso = `${match[1]}-${match[2]}-${match[3]}`;
+  return iso > todayIso() ? todayIso() : iso;
 };
 
 function CornerBracket({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) {
@@ -73,6 +97,7 @@ export default function ScanInvoiceModal({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [selected, setSelected] = useState<boolean[]>([]);
+  const [dateText, setDateText] = useState(todayIso());
   const [adding, setAdding] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
 
@@ -88,6 +113,7 @@ export default function ScanInvoiceModal({
       setErrorMsg(null);
       setReceipt(null);
       setSelected([]);
+      setDateText(todayIso());
       setAdding(false);
       setAddedCount(0);
     }
@@ -100,6 +126,7 @@ export default function ScanInvoiceModal({
       const parsed = await parseReceiptFromImage(base64, mimeType);
       setReceipt(parsed);
       setSelected(parsed.items.map(() => true));
+      setDateText(parsed.date ?? todayIso());
       setStatus('review');
     } catch (err) {
       setStatus('camera');
@@ -166,6 +193,7 @@ export default function ScanInvoiceModal({
     setStatus('camera');
     setReceipt(null);
     setSelected([]);
+    setDateText(todayIso());
     setErrorMsg(null);
   };
 
@@ -178,7 +206,7 @@ export default function ScanInvoiceModal({
 
     setAdding(true);
     setErrorMsg(null);
-    const date = receipt.date ?? todayIso();
+    const date = resolveDate(dateText);
     let failures = 0;
 
     for (const { item } of chosen) {
@@ -347,7 +375,7 @@ export default function ScanInvoiceModal({
             <Text style={styles.reviewTitle}>Review Expenses</Text>
             <Text style={styles.reviewSubtitle} numberOfLines={1}>
               {receipt.merchant || 'Receipt'}
-              {receipt.date ? ` · ${receipt.date}` : ''}
+              {dateText ? ` · ${dateText}` : ''}
             </Text>
           </View>
           <TouchableOpacity
@@ -369,6 +397,43 @@ export default function ScanInvoiceModal({
             <Text style={styles.reviewSummaryLabel}>Total</Text>
             <Text style={styles.reviewSummaryTotal}>৳{receipt.total.toLocaleString()}</Text>
           </View>
+
+          {/* Editable date — lets the user correct an AI-extracted date so the
+              expenses are counted in the right budget month. */}
+          <View style={styles.dateRow}>
+            <View style={styles.dateIconWrap}>
+              <Ionicons name="calendar-outline" size={16} color={CORNER_GREEN} />
+            </View>
+            <Text style={styles.dateLabel}>Date</Text>
+            <TextInput
+              style={styles.dateInput}
+              value={dateText}
+              onChangeText={(text) => {
+                setDateText(text);
+                setErrorMsg(null);
+              }}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor="#94A3B8"
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={10}
+              editable={!adding}
+              accessibilityLabel="Expense date"
+            />
+            <TouchableOpacity
+              style={styles.todayBtn}
+              onPress={() => {
+                setDateText(todayIso());
+                setErrorMsg(null);
+              }}
+              disabled={adding}
+              accessibilityRole="button"
+              accessibilityLabel="Set date to today"
+            >
+              <Text style={styles.todayBtnText}>Today</Text>
+            </TouchableOpacity>
+          </View>
+
           {receipt.items.map((item, index) => {
             const isSelected = selected[index] ?? false;
             return (
@@ -739,6 +804,50 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#091E15',
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+    gap: 8,
+  },
+  dateIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#E8F7F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#091E15',
+  },
+  dateInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#091E15',
+    padding: 0,
+    textAlign: 'right',
+  },
+  todayBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#E8F7F1',
+  },
+  todayBtnText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: CORNER_GREEN,
   },
   itemRow: {
     flexDirection: 'row',

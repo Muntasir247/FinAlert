@@ -91,7 +91,12 @@ const toAmount = (value: unknown): number | undefined => {
 const sanitizeCategory = (value: unknown): string => {
   if (typeof value !== 'string') return 'Other';
   const trimmed = value.trim();
-  return CATEGORY_LABELS.includes(trimmed) ? trimmed : 'Other';
+  if (!trimmed) return 'Other';
+  const lower = trimmed.toLowerCase();
+  // Case-insensitive match so an AI label like "shopping" or "SHOPPING" still
+  // lands in the app's exact "Shopping" category and counts toward that
+  // budget limit (strict matching silently rerouted these to "Other").
+  return CATEGORY_LABELS.find((label) => label.toLowerCase() === lower) ?? 'Other';
 };
 
 const sanitizeDate = (value: unknown): string | undefined => {
