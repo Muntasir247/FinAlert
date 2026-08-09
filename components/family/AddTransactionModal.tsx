@@ -23,12 +23,13 @@ export default function AddTransactionModal({ visible, finance, onClose }: AddTr
   const [amountText, setAmountText] = useState('');
   const [note, setNote] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const amount = Number.parseFloat(amountText) || 0;
   const selectedExpense = finance.expenses.find((e) => e.id === expenseId) ?? null;
   const remaining = selectedExpense ? Math.max(selectedExpense.total - finance.expensePaid(selectedExpense), 0) : 0;
   const overpaying = type !== 'unable' && selectedExpense !== null && amount > remaining + 0.01;
-  const canSubmit = expenseId !== null && amount > 0 && !overpaying;
+  const canSubmit = expenseId !== null && amount > 0 && !overpaying && !saving;
 
   const handleClose = () => {
     if (visible) {
@@ -37,12 +38,15 @@ export default function AddTransactionModal({ visible, finance, onClose }: AddTr
       setAmountText('');
       setNote('');
       setErrorMsg(null);
+      setSaving(false);
     }
     onClose();
   };
 
   const handleSubmit = async () => {
-    if (!canSubmit || !finance.me) return;
+    if (!canSubmit || saving || !finance.me) return;
+    setSaving(true);
+    setErrorMsg(null);
     try {
       await finance.recordTransaction({
         type,
@@ -59,6 +63,8 @@ export default function AddTransactionModal({ visible, finance, onClose }: AddTr
           ? 'This payment exceeds the remaining amount for the expense.'
           : 'Failed to record transaction. Please try again.'
       );
+    } finally {
+      setSaving(false);
     }
   };
 

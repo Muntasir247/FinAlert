@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import ChangeRoleModal from './ChangeRoleModal';
 import ContributionModal from './ContributionModal';
@@ -16,15 +16,23 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
   const [roleMember, setRoleMember] = useState<MemberFinance | null>(null);
   const [contribMember, setContribMember] = useState<MemberFinance | null>(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   const { finances, me, isAdmin } = finance;
 
   const handleRemove = async (memberId: string) => {
+    if (removingId) return;
     setConfirmRemoveId(null);
+    setRemoveError(null);
+    setRemovingId(memberId);
     try {
       await finance.removeMember(memberId);
     } catch (error) {
       console.error('Failed to remove member:', error);
+      setRemoveError('Failed to remove member. Please try again.');
+    } finally {
+      setRemovingId(null);
     }
   };
 
@@ -132,7 +140,10 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.actionBtn, styles.removeBtn]}
-                      onPress={() => setConfirmRemoveId(m.memberId)}
+                      onPress={() => {
+                        setRemoveError(null);
+                        setConfirmRemoveId(m.memberId);
+                      }}
                       accessibilityRole="button"
                       accessibilityLabel={`Remove ${m.name}`}
                     >
@@ -145,25 +156,33 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
 
               {confirmRemove && (
                 <View style={styles.confirmRow}>
-                  <Text style={styles.confirmText}>Remove member?</Text>
-                  <View style={styles.confirmActions}>
-                    <TouchableOpacity
-                      style={styles.cancelBtn}
-                      onPress={() => setConfirmRemoveId(null)}
-                      accessibilityRole="button"
-                      accessibilityLabel="Cancel remove"
-                    >
-                      <Text style={styles.cancelBtnText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.confirmBtn}
-                      onPress={() => handleRemove(m.memberId)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Yes remove ${m.name}`}
-                    >
-                      <Text style={styles.confirmBtnText}>Yes, Remove</Text>
-                    </TouchableOpacity>
+                  <View style={styles.confirmRowTop}>
+                    <Text style={styles.confirmText}>Remove member?</Text>
+                    <View style={styles.confirmActions}>
+                      <TouchableOpacity
+                        style={styles.cancelBtn}
+                        onPress={() => setConfirmRemoveId(null)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Cancel remove"
+                      >
+                        <Text style={styles.cancelBtnText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.confirmBtn, removingId === m.memberId && styles.removeBtnDisabled]}
+                        onPress={() => handleRemove(m.memberId)}
+                        disabled={removingId !== null}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Yes remove ${m.name}`}
+                      >
+                        {removingId === m.memberId ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Text style={styles.confirmBtnText}>Yes, Remove</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
                   </View>
+                  {removeError && <Text style={styles.removeErrorText}>{removeError}</Text>}
                 </View>
               )}
             </View>
@@ -395,14 +414,26 @@ const styles = StyleSheet.create({
     color: '#EF4444',
   },
   confirmRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: '#FEF2F2',
     borderTopWidth: 1,
     borderTopColor: '#FECACA',
     paddingHorizontal: 14,
     paddingVertical: 12,
+    gap: 8,
+  },
+  confirmRowTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  removeErrorText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '400',
+    color: '#B91C1C',
+  },
+  removeBtnDisabled: {
+    opacity: 0.6,
   },
   confirmText: {
     fontSize: 14,

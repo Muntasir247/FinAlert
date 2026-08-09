@@ -50,9 +50,12 @@ export default function ChangeRoleModal({ visible, member, onClose, onSave }: Ch
     if (saving) return;
     setSaving(true);
     setErrorMsg(null);
-    const error = await onSave(role, role === 'Dependent' ? 0 : limit);
-    if (error) {
-      setErrorMsg(error);
+    try {
+      const error = await onSave(role, role === 'Dependent' ? 0 : limit);
+      if (error) {
+        setErrorMsg(error);
+      }
+    } finally {
       setSaving(false);
     }
   };

@@ -25,6 +25,7 @@ export default function AddExpenseModal({
   const [totalText, setTotalText] = useState('');
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const total = Number.parseFloat(totalText) || 0;
   const assignedTotal = finances.reduce(
@@ -34,7 +35,7 @@ export default function AddExpenseModal({
   const balance = total - assignedTotal;
   const counterColor =
     balance < -0.01 ? '#EF4444' : Math.abs(balance) < 0.01 ? '#0FB384' : '#D97706';
-  const canSubmit = total > 0 && balance >= -0.01;
+  const canSubmit = total > 0 && balance >= -0.01 && !saving;
 
   useEffect(() => {
     if (visible) {
@@ -60,6 +61,7 @@ export default function AddExpenseModal({
         setAssignments({});
       }
       setErrorMsg(null);
+      setSaving(false);
     }
   }, [visible, editing]);
 
@@ -70,12 +72,14 @@ export default function AddExpenseModal({
       setTotalText('');
       setAssignments({});
       setErrorMsg(null);
+      setSaving(false);
     }
     onClose();
   };
 
   const handleSubmit = async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || saving) return;
+    setSaving(true);
     setErrorMsg(null);
     try {
       const effectiveCategory =
@@ -99,6 +103,8 @@ export default function AddExpenseModal({
           ? "The new total can't be lower than what members have already paid."
           : 'Failed to save expense. Please try again.'
       );
+    } finally {
+      setSaving(false);
     }
   };
 

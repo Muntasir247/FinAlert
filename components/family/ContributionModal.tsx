@@ -42,9 +42,12 @@ export default function ContributionModal({ visible, member, onClose, onSave }: 
     if (saving) return;
     setSaving(true);
     setErrorMsg(null);
-    const error = await onSave(saveAmount);
-    if (error) {
-      setErrorMsg(error);
+    try {
+      const error = await onSave(saveAmount);
+      if (error) {
+        setErrorMsg(error);
+      }
+    } finally {
       setSaving(false);
     }
   };

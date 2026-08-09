@@ -27,10 +27,13 @@ export default function FamilyJoinScreen() {
     }
     setSubmitting(true);
     setErrorMsg(null);
-    const { error } = await joinFamily(trimmed);
-    setSubmitting(false);
-    if (error) {
-      setErrorMsg(error.message);
+    try {
+      const { error } = await joinFamily(trimmed);
+      if (error) {
+        setErrorMsg(error.message);
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -42,10 +45,13 @@ export default function FamilyJoinScreen() {
     }
     setSubmitting(true);
     setErrorMsg(null);
-    const { error } = await createFamily(trimmed);
-    setSubmitting(false);
-    if (error) {
-      setErrorMsg(error.message);
+    try {
+      const { error } = await createFamily(trimmed);
+      if (error) {
+        setErrorMsg(error.message);
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
