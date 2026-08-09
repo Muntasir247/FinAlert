@@ -21,6 +21,7 @@ export default function AddExpenseModal({
   editing = null,
 }: AddExpenseModalProps) {
   const [category, setCategory] = useState(EXPENSE_CATEGORIES[0].label);
+  const [customCategory, setCustomCategory] = useState('');
   const [totalText, setTotalText] = useState('');
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -33,12 +34,19 @@ export default function AddExpenseModal({
   const balance = total - assignedTotal;
   const counterColor =
     balance < -0.01 ? '#EF4444' : Math.abs(balance) < 0.01 ? '#0FB384' : '#D97706';
-  const canSubmit = total > 0 && assignedTotal > 0 && balance >= -0.01;
+  const canSubmit = total > 0 && balance >= -0.01;
 
   useEffect(() => {
     if (visible) {
       if (editing) {
-        setCategory(EXPENSE_CATEGORIES.find((c) => c.label === editing.category)?.label ?? EXPENSE_CATEGORIES[0].label);
+        const known = EXPENSE_CATEGORIES.find((c) => c.label === editing.category);
+        if (known) {
+          setCategory(editing.category);
+          setCustomCategory('');
+        } else {
+          setCategory('Others');
+          setCustomCategory(editing.category);
+        }
         setTotalText(String(editing.total));
         setAssignments(
           Object.fromEntries(
@@ -47,6 +55,7 @@ export default function AddExpenseModal({
         );
       } else {
         setCategory(EXPENSE_CATEGORIES[0].label);
+        setCustomCategory('');
         setTotalText('');
         setAssignments({});
       }
@@ -57,6 +66,7 @@ export default function AddExpenseModal({
   const handleClose = () => {
     if (visible) {
       setCategory(EXPENSE_CATEGORIES[0].label);
+      setCustomCategory('');
       setTotalText('');
       setAssignments({});
       setErrorMsg(null);
@@ -68,8 +78,10 @@ export default function AddExpenseModal({
     if (!canSubmit) return;
     setErrorMsg(null);
     try {
+      const effectiveCategory =
+        category === 'Others' && customCategory.trim() ? customCategory.trim() : category;
       await onSubmit({
-        category,
+        category: effectiveCategory,
         total,
         assignments: finances
           .map((m) => ({
@@ -114,6 +126,25 @@ export default function AddExpenseModal({
           );
         })}
       </View>
+
+      {/* Custom name when Others is selected */}
+      {category === 'Others' && (
+        <>
+          <Text style={styles.label}>What is this expense for?</Text>
+          <View style={styles.amountWrap}>
+            <Ionicons name="pricetag-outline" size={18} color="#8B5CF6" style={styles.customIcon} />
+            <TextInput
+              style={styles.amountInput}
+              value={customCategory}
+              onChangeText={setCustomCategory}
+              placeholder="e.g. School fees"
+              placeholderTextColor="#A0ADB6"
+              maxLength={40}
+              accessibilityLabel="Expense description"
+            />
+          </View>
+        </>
+      )}
 
       {/* Total amount */}
       <Text style={styles.label}>Total Amount</Text>
@@ -263,6 +294,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#091E15',
+    marginRight: 8,
+  },
+  customIcon: {
     marginRight: 8,
   },
   amountInput: {

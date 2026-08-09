@@ -100,8 +100,8 @@ export function useFamilyFinance(familyId: string | null, currentUserId?: string
       (sum, e) =>
         sum +
         e.contributors
-          .filter((c) => c.memberId === memberId && c.paid)
-          .reduce((s, c) => s + c.amount, 0),
+          .filter((c) => c.memberId === memberId)
+          .reduce((s, c) => s + c.paidAmount, 0),
       0
     );
 
