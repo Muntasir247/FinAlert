@@ -101,8 +101,8 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <TransactionsProvider>
-        <BudgetsProvider>
-          <NotificationsProvider>
+        <NotificationsProvider>
+          <BudgetsProvider>
             <SavingsGoalsProvider>
               <FamilyProvider>
                 <SafeAreaProvider>
@@ -112,8 +112,8 @@ export default function RootLayout() {
                 </SafeAreaProvider>
               </FamilyProvider>
             </SavingsGoalsProvider>
-          </NotificationsProvider>
-        </BudgetsProvider>
+          </BudgetsProvider>
+        </NotificationsProvider>
       </TransactionsProvider>
     </AuthProvider>
   );

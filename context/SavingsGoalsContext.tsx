@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
+import { useNotifications } from './NotificationsContext';
 import {
   fetchSavingsGoals,
   insertSavingsGoal,
@@ -21,6 +22,7 @@ const SavingsGoalsContext = createContext<SavingsGoalsContextType | undefined>(u
 
 export const SavingsGoalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const { notify } = useNotifications();
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -76,13 +78,40 @@ export const SavingsGoalsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       try {
         const updated = await addSavingsContribution(goalId, amount);
         setGoals((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
+
+        const previous = goals.find((g) => g.id === goalId);
+        const target = updated.target_amount;
+        const oldPct = previous && target > 0 ? (previous.current_amount / target) * 100 : 0;
+        const newPct = target > 0 ? (updated.current_amount / target) * 100 : 0;
+
+        // Alert on every 20% milestone crossed by this contribution.
+        for (const milestone of [20, 40, 60, 80, 100]) {
+          if (oldPct < milestone && newPct >= milestone) {
+            notify({
+              category: 'savings',
+              title: `Savings goal ${milestone}% reached!`,
+              message:
+                milestone === 100
+                  ? `You reached your ${updated.name} goal of ৳${Math.round(
+                      target
+                    ).toLocaleString()}. Great job!`
+                  : `You're ${milestone}% of the way to your ${updated.name} goal (৳${Math.round(
+                      updated.current_amount
+                    ).toLocaleString()} of ৳${Math.round(target).toLocaleString()}).`,
+              progress: milestone / 100,
+              accent_color: milestone === 100 ? 'green' : 'blue',
+              action_type: 'view_goal',
+            });
+          }
+        }
+
         return { error: null };
       } catch (error) {
         console.error('Error adding contribution:', error);
         return { error };
       }
     },
-    [user]
+    [user, goals, notify]
   );
 
   const createGoal = useCallback(

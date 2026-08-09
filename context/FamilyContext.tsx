@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { useNotifications } from './NotificationsContext';
 import {
   fetchUserFamily,
   createFamily as createFamilyDb,
@@ -35,6 +36,7 @@ function mapFamilyError(err: any): string {
 
 export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const { notify } = useNotifications();
   const [family, setFamily] = useState<Family | null>(null);
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -84,13 +86,21 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       try {
         const fam = await createFamilyDb(name);
         await loadFamily(user.id);
+        notify({
+          category: 'family',
+          title: 'Family group created',
+          message: `You created ${fam.name}. Share code ${fam.invite_code} to invite members.`,
+          progress: null,
+          accent_color: 'blue',
+          action_type: 'view_family',
+        });
         return { error: null, family: fam };
       } catch (error) {
         console.error('Error creating family:', error);
         return { error: { message: mapFamilyError(error) } };
       }
     },
-    [user, loadFamily]
+    [user, loadFamily, notify]
   );
 
   const joinFamily = useCallback(
@@ -101,13 +111,21 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       try {
         const fam = await joinFamilyByCodeDb(code);
         await loadFamily(user.id);
+        notify({
+          category: 'family',
+          title: 'You joined a family',
+          message: `You joined ${fam.name}.`,
+          progress: null,
+          accent_color: 'blue',
+          action_type: 'view_family',
+        });
         return { error: null, family: fam };
       } catch (error) {
         console.error('Error joining family:', error);
         return { error: { message: mapFamilyError(error) } };
       }
     },
-    [user, loadFamily]
+    [user, loadFamily, notify]
   );
 
   return (

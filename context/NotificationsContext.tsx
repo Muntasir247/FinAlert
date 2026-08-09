@@ -1,12 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import {
   fetchNotifications,
+  insertNotification,
   markAllNotificationsRead,
   deleteNotification,
-  seedDemoNotificationsIfEmpty,
 } from '../lib/notifications';
-import type { AppNotification } from '../lib/notifications';
+import type { AppNotification, NewNotification } from '../lib/notifications';
 
 interface NotificationsContextType {
   notifications: AppNotification[];
@@ -16,6 +16,7 @@ interface NotificationsContextType {
   markAllRead: () => Promise<{ error: any }>;
   dismissNotification: (notifId: string) => Promise<{ error: any }>;
   refreshNotifications: () => Promise<void>;
+  notify: (notif: NewNotification) => Promise<{ error: any }>;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
@@ -25,20 +26,10 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const seededRef = useRef(false);
 
   const loadNotifications = useCallback(async (userId: string) => {
     setIsLoading(true);
     try {
-      // Seed demo rows for a brand-new user exactly once per session.
-      if (!seededRef.current) {
-        seededRef.current = true;
-        try {
-          await seedDemoNotificationsIfEmpty(userId);
-        } catch (e) {
-          console.error('Failed to seed demo notifications:', e);
-        }
-      }
       const data = await fetchNotifications(userId);
       setNotifications(data);
       setHasLoaded(true);
@@ -105,6 +96,25 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     [user]
   );
 
+  // Create a real notification for an event (budget overrun, goal reached, etc.)
+  // and prepend it to the in-memory list so the Alerts screen updates instantly.
+  const notify = useCallback(
+    async (notif: NewNotification): Promise<{ error: any }> => {
+      if (!user) {
+        return { error: { message: 'You must be signed in to be notified.' } };
+      }
+      try {
+        const created = await insertNotification(user.id, notif);
+        setNotifications((prev) => [created, ...prev]);
+        return { error: null };
+      } catch (error) {
+        console.error('Error inserting notification:', error);
+        return { error };
+      }
+    },
+    [user]
+  );
+
   return (
     <NotificationsContext.Provider
       value={{
@@ -115,6 +125,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         markAllRead,
         dismissNotification,
         refreshNotifications,
+        notify,
       }}
     >
       {children}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNotifications } from '../../context/NotificationsContext';
 import type { FamilyRole } from './familyConstants';
 import {
   fetchFamilyFinance,
@@ -59,6 +60,7 @@ export interface FamilyFinanceApi {
  * expenses, transactions, roles and limits.
  */
 export function useFamilyFinance(familyId: string | null, currentUserId?: string): FamilyFinanceApi {
+  const { notify } = useNotifications();
   const [finances, setFinances] = useState<MemberFinance[]>([]);
   const [expenses, setExpenses] = useState<SharedExpense[]>([]);
   const [transactions, setTransactions] = useState<FamilyTransaction[]>([]);
@@ -118,6 +120,16 @@ export function useFamilyFinance(familyId: string | null, currentUserId?: string
     if (!familyId) return;
     await addFamilyExpense(familyId, input);
     await reload();
+    notify({
+      category: 'family',
+      title: 'Family expense added',
+      message: `You added a ${input.category} expense of ৳${Math.round(
+        input.total
+      ).toLocaleString()}.`,
+      progress: null,
+      accent_color: 'blue',
+      action_type: 'view_family',
+    });
   };
 
   const editExpense = async (expenseId: string, input: UpdateExpenseInput) => {
@@ -133,6 +145,16 @@ export function useFamilyFinance(familyId: string | null, currentUserId?: string
   const recordTx = async (input: AddTransactionInput) => {
     await recordFamilyTransaction(input);
     await reload();
+    notify({
+      category: 'family',
+      title: 'Family payment recorded',
+      message: `You recorded a ${input.type} of ৳${Math.round(input.amount).toLocaleString()}${
+        input.note ? ` (${input.note})` : ''
+      }.`,
+      progress: null,
+      accent_color: 'blue',
+      action_type: 'view_family',
+    });
   };
 
   const removeTx = async (txId: string) => {
