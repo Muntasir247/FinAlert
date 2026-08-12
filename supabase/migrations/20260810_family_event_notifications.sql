@@ -78,7 +78,7 @@ begin
   for v_target in
     select user_id
       from public.family_members
-     where family_id = new.family_id and user_id <> new.user_id
+     where family_id = new.family_id and user_id <> new.created_by
   loop
     begin
       insert into public.notifications
