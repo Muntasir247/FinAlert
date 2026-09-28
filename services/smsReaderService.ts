@@ -7,6 +7,9 @@ export interface BKashTransaction {
   amount: number;
   type: TransactionType;
   counterparty: string;
+  reference?: string;
+  fee?: number;
+  balance?: number;
   date: string; // YYYY-MM-DD
   rawTimestamp?: string;
   category: string;
@@ -210,12 +213,33 @@ function todayIso(): string {
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
+const MONTH_NAMES: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+};
+
 /**
  * Extracts and sanitizes the date from bKash SMS text.
- * bKash typically sends dates like: "at 25/09/2026 14:30" or "at 24/09/26 18:22".
+ * bKash typically sends dates like: "at 25/09/2026 14:30", "at 24/09/26 18:22", or "24-Sep-2026".
  */
 export function parseSmsDate(text: string, fallbackTimestamp?: number | Date): string {
-  // Regex looks for "at DD/MM/YYYY" or "at DD/MM/YY" or standalone DD/MM/YYYY
+  // 1. Text month dates (e.g. "24-Sep-2026" or "at 24 Sep 2026")
+  const textMonthMatch = text.match(/(?:at|on|date:?)\s*(\d{1,2})[-/\s]([A-Za-z]{3,9})[-/\s](\d{2,4})/i);
+  if (textMonthMatch) {
+    const day = parseInt(textMonthMatch[1], 10);
+    const mStr = textMonthMatch[2].slice(0, 3).toLowerCase();
+    const month = MONTH_NAMES[mStr];
+    let year = parseInt(textMonthMatch[3], 10);
+    if (year < 100) year += 2000;
+    if (month && day >= 1 && day <= 31 && year >= 2020 && year <= 2035) {
+      const mm = String(month).padStart(2, '0');
+      const dd = String(day).padStart(2, '0');
+      const iso = `${year}-${mm}-${dd}`;
+      return iso > todayIso() ? todayIso() : iso;
+    }
+  }
+
+  // 2. Numeric dates "at DD/MM/YYYY" or "at DD/MM/YY" or standalone DD/MM/YYYY or DD-MM-YYYY
   const match = text.match(/(?:at|on|date:?)\s*(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/i)
     || text.match(/\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b/);
 
@@ -274,7 +298,7 @@ export function guessCategory(
   if (/uber|pathao|shohoz|fuel|cng|petrol|filling|railway|train|bus|biman|airline|ride/i.test(content)) {
     return 'Transport';
   }
-  if (/desco|dpdc|wasa|titas|nesco|breb|electricity|water|gas|internet|link3|carnival|amberit|bill|utility/i.test(content)) {
+  if (/desco|dpdc|wasa|titas|nesco|breb|electricity|water|gas|internet|link3|carnival|amberit|bill|utility|recharge|airtime|flexiload|grameenphone|banglalink|robi|airtel|teletalk/i.test(content)) {
     return 'Bills & Utilities';
   }
   if (/pharma|hospital|labaid|square|ibn sina|doctor|diagnostic|clinic|medicine|drug|pharmacy/i.test(content)) {
@@ -292,6 +316,7 @@ export function guessCategory(
 
 /**
  * Parses bKash SMS and extracts structured transaction data using strict regex rules.
+ * Handles Send Money, Merchant Payments, Cash Out, Cash In, Deposits, Mobile Recharge, and Bill Payments.
  */
 export function parseBkashSms(
   body: string,
@@ -302,27 +327,61 @@ export function parseBkashSms(
 
   const normalized = body.replace(/[\r\n]+/g, ' ').trim();
 
-  // 1. TrxID Extraction (e.g. TrxID 9K47DHD829, TxnID BL7A29QW4, Trx Id: 8BL30XP1)
-  const trxMatch = normalized.match(/(?:TrxID|TxnID|Trx\s*Id|Txn\s*Id)\s*[:]?\s*([A-Za-z0-9]+)/i);
+  // 1. TrxID Extraction (supports TrxID, TxnID, Transaction ID, Trans ID, Trx Id, Txn Id)
+  const trxMatch = normalized.match(
+    /(?:Trx\s*ID|Txn\s*ID|Transaction\s*ID|Trans\s*ID|Trx\s*Id|Txn\s*Id)\s*[:.]?\s*([A-Za-z0-9]+)/i
+  );
   if (!trxMatch || !trxMatch[1]) {
     return null;
   }
   const trxId = trxMatch[1].trim();
 
-  // 2. Amount Extraction (e.g. Tk 150.00, Tk. 1,500.00, BDT 450)
-  const amountMatch = normalized.match(/(?:Tk|BDT|Tk\.)\s*([\d,]+(?:\.\d{1,2})?)/i);
-  if (!amountMatch || !amountMatch[1]) {
-    return null;
+  // 2. Amount Extraction (supports Tk, BDT, ৳, Taka with or without decimals, avoids Fee/Balance)
+  let amount: number | null = null;
+
+  // 2a. Priority: Amount directly linked to transaction action verb
+  const actionAmountMatch = normalized.match(
+    /(?:Payment|sent|Cash\s*Out|Cash\s*In|received|Recharge|Mobile\s*Recharge|Pay\s*Bill|Deposit|Transfer(?:red)?)\s+(?:of\s+)?(?:Tk|BDT|Tk\.|\u09F3|৳|Taka)?\.?\s*([\d,]+(?:\.\d{1,2})?)/i
+  );
+  if (actionAmountMatch && actionAmountMatch[1]) {
+    const val = parseFloat(actionAmountMatch[1].replace(/,/g, ''));
+    if (!isNaN(val) && val > 0) amount = val;
   }
-  const rawAmountStr = amountMatch[1].replace(/,/g, '');
-  const amount = parseFloat(rawAmountStr);
-  if (isNaN(amount) || amount <= 0) {
+
+  // 2b. Priority: Amount followed by to/from
+  if (amount === null) {
+    const toFromAmountMatch = normalized.match(
+      /(?:Tk|BDT|Tk\.|\u09F3|৳|Taka)\.?\s*([\d,]+(?:\.\d{1,2})?)\s+(?:to|from)/i
+    );
+    if (toFromAmountMatch && toFromAmountMatch[1]) {
+      const val = parseFloat(toFromAmountMatch[1].replace(/,/g, ''));
+      if (!isNaN(val) && val > 0) amount = val;
+    }
+  }
+
+  // 2c. Fallback: match any Tk / BDT / ৳ / Taka amount that is NOT preceded by Fee or Balance
+  if (amount === null) {
+    const generalMatches = normalized.matchAll(
+      /(?<!Fee\s+|Balance\s+)(?:Tk|BDT|Tk\.|\u09F3|৳|Taka)\.?\s*([\d,]+(?:\.\d{1,2})?)/gi
+    );
+    for (const m of generalMatches) {
+      if (m[1]) {
+        const val = parseFloat(m[1].replace(/,/g, ''));
+        if (!isNaN(val) && val > 0) {
+          amount = val;
+          break;
+        }
+      }
+    }
+  }
+
+  if (amount === null || isNaN(amount) || amount <= 0) {
     return null;
   }
 
   // 3. Type Extraction:
-  // "expense" for Send Money / Payment / Cash Out
-  // "income" for Cash In / Receive Money / Deposit
+  // "expense" for Send Money / Payment / Cash Out / Mobile Recharge / Pay Bill
+  // "income" for Cash In / Receive Money / Deposit / Add Money
   const lower = normalized.toLowerCase();
   let type: TransactionType = 'expense';
 
@@ -340,24 +399,28 @@ export function parseBkashSms(
     lower.includes('send money') ||
     lower.includes('cash out') ||
     lower.includes('fee') ||
-    lower.includes('paid')
+    lower.includes('paid') ||
+    lower.includes('recharge') ||
+    lower.includes('pay bill')
   ) {
     type = 'expense';
   }
 
-  // 4. Counterparty Extraction (Merchant, agent, or phone number)
+  // 4. Counterparty Extraction (supports branch names in parentheses, dashes, and ampersands)
   let counterparty = '';
-  if (type === 'expense') {
-    // "to 01711000000 successful" or "to Shwapno successful" or "to 01700000000"
-    const toMatch = normalized.match(/(?:to|from)\s+([A-Za-z0-9\s.&'/-]+?)(?=\s+successful|\s+Ref:|\s+Fee|\.|\sat\s|\n|;|$)/i);
-    if (toMatch && toMatch[1]) {
-      counterparty = toMatch[1].trim().replace(/^[:\s-]+|[:\s-]+$/g, '');
-    }
-  } else {
-    // "from 01712345678" or "from City Bank"
-    const fromMatch = normalized.match(/(?:from)\s+([A-Za-z0-9\s.&'/-]+?)(?=\s+successful|\s+Ref:|\s+Fee|\.|\sat\s|\n|;|$)/i);
-    if (fromMatch && fromMatch[1]) {
-      counterparty = fromMatch[1].trim().replace(/^[:\s-]+|[:\s-]+$/g, '');
+  const actionCounterpartyMatch = normalized.match(
+    /(?:(?:Tk|BDT|Tk\.|\u09F3|৳|Taka)?\.?\s*[\d,]+(?:\.\d{1,2})?\s+)?(?:to|from)\s+([A-Za-z0-9\s.&'/()_-]+?)(?=\s+successful|\s+Ref:|\s+Fee|\.|\sat\s|\n|;|$|\s+Balance)/i
+  );
+  if (actionCounterpartyMatch && actionCounterpartyMatch[1]) {
+    counterparty = actionCounterpartyMatch[1].trim().replace(/^[:\s-]+|[:\s-]+$/g, '');
+  }
+
+  if (!counterparty) {
+    const fallbackMatch = normalized.match(
+      /(?:to|from)\s+([A-Za-z0-9\s.&'/()_-]+?)(?=\s+successful|\s+Ref:|\s+Fee|\.|\sat\s|\n|;|$|\s+Balance)/i
+    );
+    if (fallbackMatch && fallbackMatch[1]) {
+      counterparty = fallbackMatch[1].trim().replace(/^[:\s-]+|[:\s-]+$/g, '');
     }
   }
 
@@ -371,10 +434,36 @@ export function parseBkashSms(
     }
   }
 
-  // 5. Date Extraction
+  // 5. Reference Extraction (e.g. Ref: GROCERY or Ref: Freelance)
+  let reference: string | undefined;
+  const refMatch = normalized.match(/Ref:\s*([A-Za-z0-9\s._-]+?)(?=\s+Fee|\s+Balance|\.|\sat\s|\n|;|$)/i);
+  if (refMatch && refMatch[1]) {
+    const cleanRef = refMatch[1].trim();
+    if (cleanRef && cleanRef.toLowerCase() !== 'n/a') {
+      reference = cleanRef;
+    }
+  }
+
+  // 6. Fee Extraction
+  let fee: number | undefined;
+  const feeMatch = normalized.match(/Fee\s+(?:Tk|BDT|Tk\.|\u09F3|৳|Taka)?\.?\s*([\d,]+(?:\.\d{1,2})?)/i);
+  if (feeMatch && feeMatch[1]) {
+    const f = parseFloat(feeMatch[1].replace(/,/g, ''));
+    if (!isNaN(f)) fee = f;
+  }
+
+  // 7. Balance Extraction
+  let balance: number | undefined;
+  const balMatch = normalized.match(/Balance\s+(?:Tk|BDT|Tk\.|\u09F3|৳|Taka)?\.?\s*([\d,]+(?:\.\d{1,2})?)/i);
+  if (balMatch && balMatch[1]) {
+    const b = parseFloat(balMatch[1].replace(/,/g, ''));
+    if (!isNaN(b)) balance = b;
+  }
+
+  // 8. Date Extraction
   const date = parseSmsDate(normalized, timestamp);
 
-  // 6. Guessed Category
+  // 9. Guessed Category
   const category = guessCategory(type, counterparty, normalized);
 
   // Extract raw timestamp string if present
@@ -386,6 +475,9 @@ export function parseBkashSms(
     amount: Math.round(amount * 100) / 100,
     type,
     counterparty,
+    reference,
+    fee,
+    balance,
     date,
     rawTimestamp,
     category,
@@ -427,6 +519,18 @@ export const SAMPLE_BKASH_MESSAGES = [
     label: 'Cash In / Received Money',
     sender: 'bKash',
     body: 'You have received Tk 1,500.00 from 01719999999. Ref: Freelance. Balance Tk 1,758.00. TrxID 9LM34K89 at 26/09/2026 10:00',
+  },
+  {
+    id: 'sample-6',
+    label: 'Mobile Recharge (Airtime)',
+    sender: 'bKash',
+    body: 'Mobile Recharge Tk 100.00 to 01711223344 successful. Balance Tk 1,658.00. TrxID MR11223344 at 26/09/2026 11:30',
+  },
+  {
+    id: 'sample-7',
+    label: 'Pay Bill (DESCO Electricity)',
+    sender: 'bKash',
+    body: 'Pay Bill Tk 2,540.00 to DESCO successful. Ref: Electricity. Fee Tk 0.00. Balance Tk 6,200.00. TrxID PB12345678 at 24/09/2026 14:15',
   },
 ];
 

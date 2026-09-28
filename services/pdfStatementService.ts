@@ -145,15 +145,33 @@ const todayIso = () => {
 const sanitizeDate = (val: unknown): string => {
   if (typeof val !== 'string') return todayIso();
   const trimmed = val.trim();
-  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return todayIso();
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  if (year < 2000 || year > 2035 || month < 1 || month > 12 || day < 1 || day > 31) {
-    return todayIso();
+
+  // 1. Check YYYY-MM-DD or YYYY/MM/DD
+  let match = trimmed.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (year >= 2000 && year <= 2035 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return iso > todayIso() ? todayIso() : iso;
+    }
   }
-  return trimmed > todayIso() ? todayIso() : trimmed;
+
+  // 2. Check DD/MM/YYYY or DD-MM-YYYY
+  match = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (match) {
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    let year = Number(match[3]);
+    if (year < 100) year += 2000;
+    if (year >= 2000 && year <= 2035 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return iso > todayIso() ? todayIso() : iso;
+    }
+  }
+
+  return todayIso();
 };
 
 const sanitizeCategory = (cat: unknown, type: TransactionType): string => {
@@ -178,11 +196,16 @@ const sanitizeAmount = (val: unknown): number => {
   return 0;
 };
 
+const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
 /**
- * Converts a base64 string into a Uint8Array.
+ * Converts a base64 string into a Uint8Array across all JS runtimes without external dependencies.
  */
 export function base64ToUint8Array(base64: string): Uint8Array {
-  const clean = base64.replace(/^data:application\/pdf;base64,/, '').replace(/\s/g, '');
+  const clean = base64.replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
+  if (typeof Buffer !== 'undefined') {
+    return new Uint8Array(Buffer.from(clean, 'base64'));
+  }
   if (typeof atob === 'function') {
     const binary = atob(clean);
     const len = binary.length;
@@ -192,30 +215,64 @@ export function base64ToUint8Array(base64: string): Uint8Array {
     }
     return bytes;
   }
-  if (typeof Buffer !== 'undefined') {
-    return new Uint8Array(Buffer.from(clean, 'base64'));
+
+  // Pure JavaScript lookup fallback
+  const lookup = new Uint8Array(256);
+  for (let i = 0; i < B64_CHARS.length; i++) lookup[B64_CHARS.charCodeAt(i)] = i;
+
+  const len = clean.length;
+  let placeHolders = 0;
+  if (clean[len - 1] === '=') placeHolders++;
+  if (clean[len - 2] === '=') placeHolders++;
+
+  const bytesLen = (len * 3) / 4 - placeHolders;
+  const bytes = new Uint8Array(bytesLen);
+  let cur = 0;
+
+  for (let i = 0; i < len; i += 4) {
+    const enc1 = lookup[clean.charCodeAt(i)];
+    const enc2 = lookup[clean.charCodeAt(i + 1)];
+    const enc3 = lookup[clean.charCodeAt(i + 2)];
+    const enc4 = lookup[clean.charCodeAt(i + 3)];
+
+    bytes[cur++] = (enc1 << 2) | (enc2 >> 4);
+    if (cur < bytesLen) bytes[cur++] = ((enc2 & 15) << 4) | (enc3 >> 2);
+    if (cur < bytesLen) bytes[cur++] = ((enc3 & 3) << 6) | (enc4 & 63);
   }
-  throw new Error('No base64 decoder available');
+  return bytes;
 }
 
 /**
- * Converts a Uint8Array into a base64 string.
+ * Converts a Uint8Array into a base64 string across all JS runtimes.
  */
 export function uint8ArrayToBase64(bytes: Uint8Array): string {
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(bytes).toString('base64');
+  }
   if (typeof btoa === 'function') {
     let binary = '';
     const len = bytes.byteLength;
     const chunkSize = 8192;
     for (let i = 0; i < len; i += chunkSize) {
       const chunk = bytes.subarray(i, Math.min(i + chunkSize, len));
-      binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
     }
     return btoa(binary);
   }
-  if (typeof Buffer !== 'undefined') {
-    return Buffer.from(bytes).toString('base64');
+
+  // Pure JavaScript lookup fallback
+  let result = '';
+  const len = bytes.length;
+  for (let i = 0; i < len; i += 3) {
+    const b0 = bytes[i];
+    const b1 = i + 1 < len ? bytes[i + 1] : 0;
+    const b2 = i + 2 < len ? bytes[i + 2] : 0;
+    result += B64_CHARS[b0 >> 2];
+    result += B64_CHARS[((b0 & 3) << 4) | (b1 >> 4)];
+    result += i + 1 < len ? B64_CHARS[((b1 & 15) << 2) | (b2 >> 6)] : '=';
+    result += i + 2 < len ? B64_CHARS[b2 & 63] : '=';
   }
-  throw new Error('No base64 encoder available');
+  return result;
 }
 
 /**
@@ -227,9 +284,13 @@ export async function isPdfEncrypted(base64: string): Promise<boolean> {
     const bytes = base64ToUint8Array(base64);
 
     // 1. Check with @pdfsmaller/pdf-decrypt
-    const checkResult = await isEncrypted(bytes);
-    if (checkResult && checkResult.encrypted) {
-      return true;
+    try {
+      const checkResult = await isEncrypted(bytes);
+      if (checkResult && checkResult.encrypted) {
+        return true;
+      }
+    } catch {
+      // Proceed to secondary check if first check encounters an unhandled trailer structure
     }
 
     // 2. Secondary check with pdf-lib
@@ -239,7 +300,7 @@ export async function isPdfEncrypted(base64: string): Promise<boolean> {
     } catch (e: unknown) {
       const err = e as { message?: string };
       const msg = (err?.message || '').toLowerCase();
-      if (msg.includes('encrypt')) {
+      if (msg.includes('encrypt') || msg.includes('password')) {
         return true;
       }
     }
@@ -359,7 +420,13 @@ export async function parseBankStatementPdf(
 
     let parsedJson: Record<string, unknown>;
     try {
-      parsedJson = JSON.parse(rawText);
+      let cleaned = rawText.trim();
+      cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleaned = jsonMatch[0];
+      }
+      parsedJson = JSON.parse(cleaned);
     } catch {
       console.error('[pdfStatementService] Failed to parse JSON response:', rawText);
       throw new PdfStatementError('The AI returned an invalid response structure.');

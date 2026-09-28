@@ -90,7 +90,7 @@ export default function BKashBatchReviewModal({
       type: tx.type,
       amount: tx.amount,
       category: tx.category,
-      description: `${tx.type === 'expense' ? 'Payment to' : 'Received from'} ${tx.counterparty} (TrxID: ${tx.trxId})`,
+      description: `${tx.type === 'expense' ? 'Payment to' : 'Received from'} ${tx.counterparty}${tx.reference ? ` - ${tx.reference}` : ''} (TrxID: ${tx.trxId})`,
       date: tx.date,
     }));
 
@@ -222,6 +222,9 @@ export default function BKashBatchReviewModal({
 
                     <View style={styles.bottomRow}>
                       <Text style={styles.trxPill}>TrxID: {tx.trxId}</Text>
+                      {tx.reference && (
+                        <Text style={styles.refPill}>Ref: {tx.reference}</Text>
+                      )}
                       <Text style={styles.dateText}>{tx.date}</Text>
 
                       {/* Category tag */}
@@ -446,6 +449,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
+  },
+  refPill: {
+    fontSize: 11,
+    color: '#4338CA',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    fontWeight: '500',
   },
   dateText: {
     fontSize: 11,

@@ -93,6 +93,11 @@ export default function BKashDetectedBanner({
                 <View style={styles.trxPill}>
                   <Text style={styles.trxPillText}>TrxID: {primaryTx.trxId}</Text>
                 </View>
+                {primaryTx.reference ? (
+                  <View style={styles.refPill}>
+                    <Text style={styles.refPillText}>Ref: {primaryTx.reference}</Text>
+                  </View>
+                ) : null}
                 <View style={styles.catPill}>
                   <Text style={styles.catPillText}>{primaryTx.category}</Text>
                 </View>
@@ -219,6 +224,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'monospace',
     color: '#4B5563',
+    fontWeight: '600',
+  },
+  refPill: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  refPillText: {
+    fontSize: 11,
+    color: '#4338CA',
     fontWeight: '600',
   },
   catPill: {

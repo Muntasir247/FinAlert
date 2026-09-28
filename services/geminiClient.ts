@@ -52,11 +52,11 @@ export async function generateGeminiContent({
       // Read the body to release the connection before retrying.
       await response.text();
 
-      if (response.status !== 429) {
+      if (response.status !== 429 && response.status !== 404) {
         return { response, model };
       }
 
-      console.warn(`[Gemini] ${model} rate limited (429), trying next model...`);
+      console.warn(`[Gemini] ${model} returned status ${response.status}, trying next model...`);
     }
 
     throw new GeminiAllRateLimitedError();

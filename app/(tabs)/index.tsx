@@ -138,7 +138,7 @@ export default function HomeScreen() {
       type: tx.type,
       amount: tx.amount,
       category: tx.category,
-      description: `${tx.type === 'expense' ? 'Payment to' : 'Received from'} ${tx.counterparty} (TrxID: ${tx.trxId})`,
+      description: `${tx.type === 'expense' ? 'Payment to' : 'Received from'} ${tx.counterparty}${tx.reference ? ` - ${tx.reference}` : ''} (TrxID: ${tx.trxId})`,
       date: tx.date,
       source: 'bkash',
       trxId: tx.trxId,
