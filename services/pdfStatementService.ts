@@ -34,11 +34,13 @@ export class PdfInvalidPasswordError extends PdfStatementError {}
  * if rate limited (429).
  */
 const GEMINI_STATEMENT_MODELS = [
-  'gemini-1.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash-8b',
-  'gemini-2.5-flash',
+  'gemini-3.6-flash',
+  'gemini-flash-latest',
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
   'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
 ];
 
 const EXPENSE_CATEGORIES_LIST = TRANSACTION_CATEGORIES.map((c) => c.label).join(', ');
@@ -498,13 +500,14 @@ export async function parseBankStatementPdf(
     if (error instanceof PdfStatementError) throw error;
     if (error instanceof GeminiAllRateLimitedError) {
       throw new PdfStatementError(
-        'Gemini API quota exhausted or rate limit reached. Please try again in a few moments.'
+        'Gemini AI servers are currently busy or rate-limited. Please try again in a few moments.'
       );
     }
     if (error instanceof Error && error.name === 'AbortError') {
       throw new PdfStatementError('Statement parsing timed out. Please try a smaller PDF.');
     }
+    const message = error instanceof Error ? error.message : String(error);
     console.error('[pdfStatementService] Unexpected error:', error);
-    throw new PdfStatementError('Failed to parse bank statement PDF. Please try again.');
+    throw new PdfStatementError(`Failed to parse bank statement: ${message || 'Please try again.'}`);
   }
 }

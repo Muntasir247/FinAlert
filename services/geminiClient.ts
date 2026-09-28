@@ -34,32 +34,53 @@ export async function generateGeminiContent({
 }): Promise<GeminiContentResponse> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let lastError = '';
 
   try {
     for (const model of models) {
       const endpoint = `${GEMINI_BASE_URL}/${model}:generateContent?key=${apiKey}`;
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify(body),
-      });
+      let response: Response;
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify(body),
+        });
+      } catch (networkErr: unknown) {
+        lastError = (networkErr as Error)?.message || 'Network request failed';
+        console.warn(`[Gemini] ${model} network error: ${lastError}, trying next model...`);
+        continue;
+      }
 
       if (response.ok) {
         return { response, model };
       }
 
-      // Read the body to release the connection before retrying.
-      await response.text();
+      const errText = await response.text().catch(() => '');
+      lastError = `Status ${response.status}: ${errText.slice(0, 120)}`;
 
-      if (response.status !== 429 && response.status !== 404) {
-        return { response, model };
+      // Retry on rate limits (429), model retirement/not found (404), high demand / overload (503), or server errors (500, 502, 504)
+      const isRetryable =
+        response.status === 429 ||
+        response.status === 404 ||
+        response.status === 503 ||
+        response.status === 500 ||
+        response.status === 502 ||
+        response.status === 504;
+
+      if (isRetryable) {
+        console.warn(`[Gemini] ${model} returned ${response.status} (${lastError}), falling back to next model...`);
+        continue;
       }
 
-      console.warn(`[Gemini] ${model} returned status ${response.status}, trying next model...`);
+      // For non-retryable errors (e.g. 400 Bad Request), throw clear error with details
+      throw new Error(`Gemini API error (${model} returned ${response.status}): ${errText || 'Bad Request'}`);
     }
 
-    throw new GeminiAllRateLimitedError();
+    throw new GeminiAllRateLimitedError(
+      `All Gemini AI models were temporarily unavailable or rate-limited. Last error: ${lastError}`
+    );
   } finally {
     clearTimeout(timer);
   }
