@@ -16,8 +16,6 @@ import {
   checkSmsPermissions,
   isSmsReadingSupported,
   syncRecentSms,
-  processIncomingSms,
-  SAMPLE_BKASH_MESSAGES,
 } from '../services/smsReaderService';
 
 interface BKashSimulatorModalProps {
@@ -158,36 +156,21 @@ export default function BKashSimulatorModal({ visible, onClose }: BKashSimulator
               </View>
             </View>
 
-            {/* Instant Test Simulator */}
-            <View style={styles.simCard}>
-              <View style={styles.simHeader}>
-                <Ionicons name="flask-outline" size={18} color="#BE185D" />
-                <Text style={styles.simTitle}>Simulate Incoming SMS</Text>
-              </View>
-              <Text style={styles.simSubtitle}>
-                Tap any sample SMS below to test real-time detection on this device:
-              </Text>
-              {SAMPLE_BKASH_MESSAGES.slice(0, 4).map((sample) => (
-                <TouchableOpacity
-                  key={sample.id}
-                  style={styles.simSampleItem}
-                  onPress={async () => {
-                    await processIncomingSms(sample.body, sample.sender);
-                    onClose();
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Simulate ${sample.label}`}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.simSampleLabel}>{sample.label}</Text>
-                    <Text style={styles.simSampleBody} numberOfLines={1}>
-                      {sample.body}
-                    </Text>
-                  </View>
-                  <Feather name="arrow-right" size={16} color="#BE185D" />
-                </TouchableOpacity>
-              ))}
-            </View>
+            {/* Scan Recent SMS Button */}
+            {isGranted && (
+              <TouchableOpacity
+                style={styles.syncBtn}
+                onPress={async () => {
+                  await syncRecentSms();
+                  onClose();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Scan SMS inbox now"
+              >
+                <Ionicons name="refresh-outline" size={18} color="#BE185D" />
+                <Text style={styles.syncBtnText}>Scan SMS Inbox Now</Text>
+              </TouchableOpacity>
+            )}
 
             {/* Done Action Button */}
             <TouchableOpacity
@@ -341,48 +324,22 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: '#4B5563',
   },
-  simCard: {
+  syncBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: '#FDF2F8',
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#FCE7F3',
-    padding: 16,
-    gap: 10,
+    height: 48,
+    marginTop: 4,
   },
-  simHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  simTitle: {
+  syncBtnText: {
+    color: '#BE185D',
     fontSize: 14,
     fontWeight: '700',
-    color: '#9D174D',
-  },
-  simSubtitle: {
-    fontSize: 12,
-    color: '#6B7280',
-    lineHeight: 16,
-  },
-  simSampleItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#FBCFE8',
-    padding: 10,
-    gap: 8,
-  },
-  simSampleLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 2,
-  },
-  simSampleBody: {
-    fontSize: 11,
-    color: '#9CA3AF',
   },
   doneBtn: {
     backgroundColor: '#091E15',

@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
-import { isEncrypted, decryptPDF } from '@pdfsmaller/pdf-decrypt';
+import { isPdfEncryptedBytes, decryptPdfBytes } from './pdfDecryptor';
 import { PDFDocument } from 'pdf-lib';
 import { TRANSACTION_CATEGORIES, INCOME_CATEGORIES } from '../lib/transactionCategories';
 import type { TransactionType } from '../lib/transactions';
@@ -283,9 +283,9 @@ export async function isPdfEncrypted(base64: string): Promise<boolean> {
   try {
     const bytes = base64ToUint8Array(base64);
 
-    // 1. Check with @pdfsmaller/pdf-decrypt
+    // 1. Check with pdfDecryptor
     try {
-      const checkResult = await isEncrypted(bytes);
+      const checkResult = await isPdfEncryptedBytes(bytes);
       if (checkResult && checkResult.encrypted) {
         return true;
       }
@@ -314,6 +314,7 @@ export async function isPdfEncrypted(base64: string): Promise<boolean> {
 
 /**
  * Decrypts a password-protected PDF in base64 format and returns the decrypted base64.
+ * Seamlessly unlocks AES-128 (V=4, R=4), AES-256 (V=5, R=6), and RC4 bank statements.
  */
 export async function decryptPdfBase64(base64: string, password: string): Promise<string> {
   if (!password || !password.trim()) {
@@ -322,12 +323,13 @@ export async function decryptPdfBase64(base64: string, password: string): Promis
 
   try {
     const bytes = base64ToUint8Array(base64);
-    const decryptedBytes = await decryptPDF(bytes, password.trim());
+    const decryptedBytes = await decryptPdfBytes(bytes, password.trim());
     return uint8ArrayToBase64(decryptedBytes);
   } catch (err: unknown) {
     const errorObj = err as { message?: string };
     const msg = errorObj?.message || '';
     if (
+      msg.includes('INCORRECT_PASSWORD') ||
       msg.includes('Incorrect password') ||
       msg.includes('does not match') ||
       msg.includes('password')
