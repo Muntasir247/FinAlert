@@ -1,0 +1,23 @@
+diff --git a/node_modules/@react-native-community/datetimepicker/android/build.gradle b/node_modules/@react-native-community/datetimepicker/android/build.gradle
+index af810e8..c710e0c 100644
+--- a/node_modules/@react-native-community/datetimepicker/android/build.gradle
++++ b/node_modules/@react-native-community/datetimepicker/android/build.gradle
+@@ -6,7 +6,17 @@ buildscript {
+ }
+ 
+ def getExtOrIntegerDefault(name) {
+-    return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties['ReactNativeDateTimePicker_' + name]).toInteger()
++    if (rootProject.ext.has(name)) {
++        return rootProject.ext.get(name)
++    }
++    def shortName = name.replace("SdkVersion", "Sdk")
++    if (rootProject.ext.has(shortName)) {
++        return rootProject.ext.get(shortName)
++    }
++    if (project.hasProperty('ReactNativeDateTimePicker_' + name)) {
++        return (project.properties['ReactNativeDateTimePicker_' + name]).toInteger()
++    }
++    return name.contains('min') ? 24 : 35
+ }
+ 
+ def isNewArchitectureEnabled() {
