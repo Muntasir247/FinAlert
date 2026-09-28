@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 import {
   fetchTransactions,
   insertTransaction,
+  insertTransactions,
   updateTransaction as updateTransactionDb,
   deleteTransaction as deleteTransactionDb,
 } from '../lib/transactions';
@@ -13,6 +14,7 @@ interface TransactionsContextType {
   isLoading: boolean;
   hasLoaded: boolean;
   addTransaction: (input: NewTransaction) => Promise<{ error: any }>;
+  addTransactions: (inputs: NewTransaction[]) => Promise<{ error: any; data?: Transaction[] }>;
   updateTransaction: (txId: string, input: NewTransaction) => Promise<{ error: any }>;
   deleteTransaction: (txId: string) => Promise<{ error: any }>;
   refreshTransactions: () => Promise<void>;
@@ -85,6 +87,26 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     [user]
   );
 
+  const addTransactions = useCallback(
+    async (inputs: NewTransaction[]): Promise<{ error: any; data?: Transaction[] }> => {
+      if (!user) {
+        return { error: { message: 'You must be signed in to add transactions.' } };
+      }
+      if (inputs.length === 0) {
+        return { error: null, data: [] };
+      }
+      try {
+        const created = await insertTransactions(user.id, inputs);
+        setTransactions((prev) => [...created, ...prev]);
+        return { error: null, data: created };
+      } catch (error) {
+        console.error('Error batch inserting transactions:', error);
+        return { error };
+      }
+    },
+    [user]
+  );
+
   const updateTransaction = useCallback(
     async (txId: string, input: NewTransaction): Promise<{ error: any }> => {
       if (!user) {
@@ -132,6 +154,7 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         isLoading,
         hasLoaded,
         addTransaction,
+        addTransactions,
         updateTransaction,
         deleteTransaction,
         refreshTransactions,

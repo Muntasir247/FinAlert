@@ -36,6 +36,28 @@ export async function fetchTransactions(userId: string): Promise<Transaction[]> 
   return (data ?? []) as Transaction[];
 }
 
+export async function fetchHistoricalTransactions(
+  userId: string,
+  days = 90
+): Promise<Transaction[]> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffIso = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .gte('date', cutoffIso)
+    .order('date', { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as Transaction[];
+}
+
 export async function insertTransaction(
   userId: string,
   tx: NewTransaction
@@ -59,6 +81,33 @@ export async function insertTransaction(
 
   return data as Transaction;
 }
+
+export async function insertTransactions(
+  userId: string,
+  txs: NewTransaction[]
+): Promise<Transaction[]> {
+  if (txs.length === 0) return [];
+  const { data, error } = await supabase
+    .from('transactions')
+    .insert(
+      txs.map((tx) => ({
+        user_id: userId,
+        type: tx.type,
+        amount: tx.amount,
+        category: tx.category,
+        description: tx.description,
+        date: tx.date,
+      }))
+    )
+    .select();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as Transaction[];
+}
+
 
 export async function updateTransaction(
   txId: string,

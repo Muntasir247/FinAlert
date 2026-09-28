@@ -27,7 +27,9 @@
       },
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.READ_SMS",
+        "android.permission.RECEIVE_SMS"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,

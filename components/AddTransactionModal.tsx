@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTransactions } from '../context/TransactionsContext';
 import { TRANSACTION_CATEGORIES, INCOME_CATEGORIES } from '../lib/transactionCategories';
 import type { Transaction, TransactionType } from '../lib/transactions';
+import { markTrxIdProcessed, removePendingTransaction } from '../services/smsReaderService';
 
 const SHEET_MAX_HEIGHT = 620;
 
@@ -28,6 +29,9 @@ export interface AddTransactionPrefill {
   amount?: number;
   category?: string;
   description?: string;
+  date?: string | Date;
+  source?: 'bkash' | 'statement' | 'voice' | 'receipt' | string;
+  trxId?: string;
 }
 
 export default function AddTransactionModal({
@@ -70,7 +74,20 @@ export default function AddTransactionModal({
         setAmount(prefill.amount != null ? String(prefill.amount) : '');
         setCategory(prefill.category ?? null);
         setDescription(prefill.description ?? '');
-        setDate(new Date());
+        if (prefill.date) {
+          if (typeof prefill.date === 'string') {
+            const parts = prefill.date.split('-').map(Number);
+            if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+              setDate(new Date(parts[0], parts[1] - 1, parts[2]));
+            } else {
+              setDate(new Date());
+            }
+          } else {
+            setDate(prefill.date);
+          }
+        } else {
+          setDate(new Date());
+        }
       } else {
         setType('expense');
         setAmount('');
@@ -174,6 +191,11 @@ export default function AddTransactionModal({
       return;
     }
 
+    if (prefill?.trxId) {
+      await markTrxIdProcessed(prefill.trxId);
+      removePendingTransaction(prefill.trxId);
+    }
+
     handleClose();
   };
 
@@ -227,6 +249,20 @@ export default function AddTransactionModal({
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.scrollContent}
           >
+            {prefill?.source === 'bkash' && (
+              <View style={styles.bkashNoticeBox}>
+                <View style={styles.bkashNoticeIcon}>
+                  <Ionicons name="phone-portrait-outline" size={16} color="#E2136E" />
+                </View>
+                <View style={styles.bkashNoticeContent}>
+                  <Text style={styles.bkashNoticeTitle}>bKash Transaction Detected</Text>
+                  <Text style={styles.bkashNoticeDesc}>
+                    Pre-filled from SMS. Please review details before confirming.
+                  </Text>
+                </View>
+              </View>
+            )}
+
             {/* Type toggle */}
             <View style={styles.typeToggle}>
               {(['expense', 'income'] as const).map((t) => {
@@ -364,7 +400,13 @@ export default function AddTransactionModal({
               onPress={handleSubmit}
               disabled={!isValid || submitting}
               accessibilityRole="button"
-              accessibilityLabel="Add Transaction"
+              accessibilityLabel={
+                editing
+                  ? 'Save Changes'
+                  : prefill?.source === 'bkash'
+                  ? 'Confirm & Add Transaction'
+                  : 'Add Transaction'
+              }
             >
               {submitting ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
@@ -375,7 +417,11 @@ export default function AddTransactionModal({
                     !isValid && styles.submitButtonTextDisabled,
                   ]}
                 >
-                  {editing ? 'Save Changes' : 'Add Transaction'}
+                  {editing
+                    ? 'Save Changes'
+                    : prefill?.source === 'bkash'
+                    ? 'Confirm & Add Transaction'
+                    : 'Add Transaction'}
                 </Text>
               )}
             </TouchableOpacity>
@@ -591,5 +637,39 @@ const styles = StyleSheet.create({
   },
   submitButtonTextDisabled: {
     color: '#9CA3AF',
+  },
+  bkashNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FDF2F8',
+    borderColor: '#FBCFE8',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    gap: 10,
+  },
+  bkashNoticeIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FCE7F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bkashNoticeContent: {
+    flex: 1,
+  },
+  bkashNoticeTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#BE185D',
+    marginBottom: 2,
+  },
+  bkashNoticeDesc: {
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '400',
+    color: '#9D174D',
   },
 });

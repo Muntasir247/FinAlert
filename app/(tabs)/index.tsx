@@ -1,10 +1,12 @@
-import React, { ComponentProps, useState } from 'react';
+import React, { ComponentProps, useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  AppState,
+  type AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -19,6 +21,19 @@ import CircularProgress from '../../components/CircularProgress';
 import SavingsGoalsManager from '../../components/SavingsGoalsManager';
 import VoiceEntryModal from '../../components/VoiceEntryModal';
 import ScanInvoiceModal from '../../components/ScanInvoiceModal';
+import BKashDetectedBanner from '../../components/BKashDetectedBanner';
+import BKashSimulatorModal from '../../components/BKashSimulatorModal';
+import BKashBatchReviewModal from '../../components/BKashBatchReviewModal';
+import BankStatementReviewModal from '../../components/BankStatementReviewModal';
+import {
+  subscribeToBkashTransactions,
+  subscribeToPendingTransactions,
+  clearPendingTransactions,
+  removePendingTransaction,
+  markTrxIdProcessed,
+  syncRecentSms,
+} from '../../services/smsReaderService';
+import type { BKashTransaction } from '../../services/smsReaderService';
 import type { AddTransactionPrefill } from '../../components/AddTransactionModal';
 import type { SavingsGoalsPrefill } from '../../components/SavingsGoalsManager';
 import type { VoiceIntent } from '../../services/voiceIntentService';
@@ -80,8 +95,56 @@ export default function HomeScreen() {
   const [savingsSheetView, setSavingsSheetView] = useState<SavingsSheetView>('list');
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [isBkashSimModalOpen, setIsBkashSimModalOpen] = useState(false);
+  const [detectedBkashTx, setDetectedBkashTx] = useState<BKashTransaction | null>(null);
+  const [pendingBkashTxs, setPendingBkashTxs] = useState<BKashTransaction[]>([]);
+  const [isBkashBatchModalOpen, setIsBkashBatchModalOpen] = useState(false);
   const [txPrefill, setTxPrefill] = useState<AddTransactionPrefill | null>(null);
   const [savingsPrefill, setSavingsPrefill] = useState<SavingsGoalsPrefill | null>(null);
+
+  useEffect(() => {
+    const unsub = subscribeToPendingTransactions((txs) => {
+      setPendingBkashTxs(txs);
+      if (txs.length === 1) {
+        setDetectedBkashTx(txs[0]);
+      } else if (txs.length === 0) {
+        setDetectedBkashTx(null);
+      }
+    });
+
+    // Automatically scan recent SMS inbox on mount
+    syncRecentSms();
+
+    // Automatically scan recent SMS whenever user returns to the app from background/sleep
+    const appStateSub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        syncRecentSms();
+      }
+    });
+
+    return () => {
+      unsub();
+      appStateSub.remove();
+    };
+  }, []);
+
+  const handleReviewBkashTx = (tx: BKashTransaction) => {
+    markTrxIdProcessed(tx.trxId);
+    removePendingTransaction(tx.trxId);
+    setDetectedBkashTx(null);
+    setPendingBkashTxs((prev) => prev.filter((t) => t.trxId !== tx.trxId));
+    setTxPrefill({
+      type: tx.type,
+      amount: tx.amount,
+      category: tx.category,
+      description: `${tx.type === 'expense' ? 'Payment to' : 'Received from'} ${tx.counterparty} (TrxID: ${tx.trxId})`,
+      date: tx.date,
+      source: 'bkash',
+      trxId: tx.trxId,
+    });
+    setModalVisible(true);
+  };
 
   const openSavingsSheet = (view: SavingsSheetView) => {
     setSavingsPrefill(null);
@@ -225,6 +288,23 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* ── bKash SMS Detection Prompt Banner (Human-in-the-loop) ── */}
+        <BKashDetectedBanner
+          transaction={detectedBkashTx}
+          transactions={pendingBkashTxs}
+          onReview={handleReviewBkashTx}
+          onReviewBatch={() => setIsBkashBatchModalOpen(true)}
+          onDismiss={() => {
+            if (detectedBkashTx) {
+              markTrxIdProcessed(detectedBkashTx.trxId);
+              removePendingTransaction(detectedBkashTx.trxId);
+            }
+            clearPendingTransactions();
+            setDetectedBkashTx(null);
+            setPendingBkashTxs([]);
+          }}
+        />
+
         {/* ── Available Balance Card ── */}
         <View style={styles.card}>
           <View style={styles.cardRow}>
@@ -240,6 +320,41 @@ export default function HomeScreen() {
               <Ionicons name="add" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* ── Quick Actions ── */}
+        <View style={styles.ingestionBar}>
+          <TouchableOpacity
+            style={styles.ingestionCardBkash}
+            onPress={() => setIsBkashSimModalOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="bKash SMS Detection"
+          >
+            <View style={styles.ingestionIconBkash}>
+              <Ionicons name="phone-portrait-outline" size={18} color="#BE185D" />
+            </View>
+            <View style={styles.ingestionTextCol}>
+              <Text style={styles.ingestionTitleBkash}>bKash Detection</Text>
+              <Text style={styles.ingestionSubtitle}>Auto SMS reader</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color="#BE185D" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.ingestionCardPdf}
+            onPress={() => setIsPdfModalOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Bank Statement PDF Import"
+          >
+            <View style={styles.ingestionIconPdf}>
+              <Ionicons name="document-text-outline" size={18} color="#059669" />
+            </View>
+            <View style={styles.ingestionTextCol}>
+              <Text style={styles.ingestionTitlePdf}>Bank Statement</Text>
+              <Text style={styles.ingestionSubtitle}>PDF statement parser</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color="#059669" />
+          </TouchableOpacity>
         </View>
 
         {/* ── Budgets Section ── */}
@@ -426,6 +541,24 @@ export default function HomeScreen() {
         visible={isScanModalOpen}
         onClose={() => setIsScanModalOpen(false)}
       />
+      <BKashSimulatorModal
+        visible={isBkashSimModalOpen}
+        onClose={() => setIsBkashSimModalOpen(false)}
+      />
+      <BKashBatchReviewModal
+        visible={isBkashBatchModalOpen}
+        transactions={pendingBkashTxs}
+        onClose={() => setIsBkashBatchModalOpen(false)}
+        onSuccess={() => {
+          clearPendingTransactions();
+          setDetectedBkashTx(null);
+          setPendingBkashTxs([]);
+        }}
+      />
+      <BankStatementReviewModal
+        visible={isPdfModalOpen}
+        onClose={() => setIsPdfModalOpen(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -549,6 +682,73 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 4,
+  },
+
+  // Automated Ingestion Quick Actions
+  ingestionBar: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  ingestionCardBkash: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FCE7F3',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    minHeight: 56,
+  },
+  ingestionIconBkash: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#FCE7F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  ingestionTitleBkash: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#BE185D',
+  },
+  ingestionCardPdf: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    minHeight: 56,
+  },
+  ingestionIconPdf: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#E8F7F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  ingestionTitlePdf: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  ingestionTextCol: {
+    flex: 1,
+  },
+  ingestionSubtitle: {
+    fontSize: 10,
+    color: '#6B7280',
+    marginTop: 1,
   },
 
   // Progress Bar

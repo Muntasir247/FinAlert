@@ -1,0 +1,6 @@
+{
+  "name": "sms-reader",
+  "version": "1.0.0",
+  "description": "Expo native module for reading device SMS inbox on Android",
+  "main": "index.ts"
+}

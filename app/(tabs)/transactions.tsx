@@ -7,6 +7,8 @@ import {
   TextInput,
   Alert,
   StyleSheet,
+  AppState,
+  type AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -16,6 +18,20 @@ import { TRANSACTION_CATEGORIES } from '../../lib/transactionCategories';
 import type { Transaction } from '../../lib/transactions';
 import AddTransactionModal from '../../components/AddTransactionModal';
 import CircularProgress from '../../components/CircularProgress';
+import BKashDetectedBanner from '../../components/BKashDetectedBanner';
+import BKashSimulatorModal from '../../components/BKashSimulatorModal';
+import BKashBatchReviewModal from '../../components/BKashBatchReviewModal';
+import BankStatementReviewModal from '../../components/BankStatementReviewModal';
+import {
+  subscribeToBkashTransactions,
+  subscribeToPendingTransactions,
+  clearPendingTransactions,
+  removePendingTransaction,
+  markTrxIdProcessed,
+  syncRecentSms,
+} from '../../services/smsReaderService';
+import type { BKashTransaction } from '../../services/smsReaderService';
+import type { AddTransactionPrefill } from '../../components/AddTransactionModal';
 
 const FILTERS = ['All', 'Income', 'Expense'] as const;
 
@@ -51,6 +67,54 @@ export default function TransactionsScreen() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [isBkashSimModalOpen, setIsBkashSimModalOpen] = useState(false);
+  const [detectedBkashTx, setDetectedBkashTx] = useState<BKashTransaction | null>(null);
+  const [pendingBkashTxs, setPendingBkashTxs] = useState<BKashTransaction[]>([]);
+  const [isBkashBatchModalOpen, setIsBkashBatchModalOpen] = useState(false);
+  const [txPrefill, setTxPrefill] = useState<AddTransactionPrefill | null>(null);
+
+  useEffect(() => {
+    const unsub = subscribeToPendingTransactions((txs) => {
+      setPendingBkashTxs(txs);
+      if (txs.length === 1) {
+        setDetectedBkashTx(txs[0]);
+      } else if (txs.length === 0) {
+        setDetectedBkashTx(null);
+      }
+    });
+
+    syncRecentSms();
+
+    const appStateSub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        syncRecentSms();
+      }
+    });
+
+    return () => {
+      unsub();
+      appStateSub.remove();
+    };
+  }, []);
+
+  const handleReviewBkashTx = (tx: BKashTransaction) => {
+    markTrxIdProcessed(tx.trxId);
+    removePendingTransaction(tx.trxId);
+    setDetectedBkashTx(null);
+    setPendingBkashTxs((prev) => prev.filter((t) => t.trxId !== tx.trxId));
+    setTxPrefill({
+      type: tx.type,
+      amount: tx.amount,
+      category: tx.category,
+      description: `${tx.type === 'expense' ? 'Payment to' : 'Received from'} ${tx.counterparty} (TrxID: ${tx.trxId})`,
+      date: tx.date,
+      source: 'bkash',
+      trxId: tx.trxId,
+    });
+    setEditingTx(null);
+    setModalVisible(true);
+  };
 
   useEffect(() => {
     if (budgetTabRequested) {
@@ -131,6 +195,7 @@ export default function TransactionsScreen() {
   const handleModalClose = () => {
     setModalVisible(false);
     setEditingTx(null);
+    setTxPrefill(null);
   };
 
   return (
@@ -145,16 +210,33 @@ export default function TransactionsScreen() {
           <View style={styles.headerActions}>
             <TouchableOpacity
               style={styles.headerBtn}
+              onPress={() => setIsPdfModalOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Bank statement PDF import"
+            >
+              <Feather name="file-text" size={18} color="#059669" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerBtn}
+              onPress={() => setIsBkashSimModalOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="bKash SMS Detection"
+            >
+              <Ionicons name="phone-portrait-outline" size={18} color="#BE185D" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerBtn}
               onPress={openBudgetModal}
               accessibilityRole="button"
               accessibilityLabel="Set up or edit budget limits"
             >
-              <Feather name="sliders" size={20} color="#091E15" />
+              <Feather name="sliders" size={18} color="#091E15" />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.headerBtn, styles.headerBtnPrimary]}
               onPress={() => {
                 setEditingTx(null);
+                setTxPrefill(null);
                 setModalVisible(true);
               }}
               accessibilityRole="button"
@@ -164,6 +246,23 @@ export default function TransactionsScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* ── bKash SMS Detection Prompt Banner ── */}
+        <BKashDetectedBanner
+          transaction={detectedBkashTx}
+          transactions={pendingBkashTxs}
+          onReview={handleReviewBkashTx}
+          onReviewBatch={() => setIsBkashBatchModalOpen(true)}
+          onDismiss={() => {
+            if (detectedBkashTx) {
+              markTrxIdProcessed(detectedBkashTx.trxId);
+              removePendingTransaction(detectedBkashTx.trxId);
+            }
+            clearPendingTransactions();
+            setDetectedBkashTx(null);
+            setPendingBkashTxs([]);
+          }}
+        />
 
         {/* ── Stats Overview ── */}
         <View style={styles.statsRow}>
@@ -451,6 +550,25 @@ export default function TransactionsScreen() {
         visible={modalVisible}
         onClose={handleModalClose}
         editing={editingTx}
+        prefill={txPrefill}
+      />
+      <BKashSimulatorModal
+        visible={isBkashSimModalOpen}
+        onClose={() => setIsBkashSimModalOpen(false)}
+      />
+      <BKashBatchReviewModal
+        visible={isBkashBatchModalOpen}
+        transactions={pendingBkashTxs}
+        onClose={() => setIsBkashBatchModalOpen(false)}
+        onSuccess={() => {
+          clearPendingTransactions();
+          setDetectedBkashTx(null);
+          setPendingBkashTxs([]);
+        }}
+      />
+      <BankStatementReviewModal
+        visible={isPdfModalOpen}
+        onClose={() => setIsPdfModalOpen(false)}
       />
     </SafeAreaView>
   );
