@@ -4,7 +4,12 @@ import { isPdfEncryptedBytes, decryptPdfBytes } from './pdfDecryptor';
 import { PDFDocument } from 'pdf-lib';
 import { TRANSACTION_CATEGORIES, INCOME_CATEGORIES } from '../lib/transactionCategories';
 import type { TransactionType } from '../lib/transactions';
-import { generateGeminiContent, GeminiAllRateLimitedError } from './geminiClient';
+import {
+  generateGeminiContent,
+  GeminiAllRateLimitedError,
+  testGeminiModel,
+  ModelAttemptLog,
+} from './geminiClient';
 
 export interface ExtractedStatementTransaction {
   id: string;
@@ -15,6 +20,8 @@ export interface ExtractedStatementTransaction {
   category: string;
   selected: boolean;
   originalType: 'debit' | 'credit';
+  alreadyExists?: boolean;
+  existingMatchId?: string;
 }
 
 export interface StatementExtractionResult {
@@ -25,22 +32,29 @@ export interface StatementExtractionResult {
   totalCredit: number;
 }
 
-export class PdfStatementError extends Error {}
+export class PdfStatementError extends Error {
+  public debugReport?: string;
+  constructor(message: string, debugReport?: string) {
+    super(message);
+    this.name = 'PdfStatementError';
+    this.debugReport = debugReport;
+  }
+}
 export class PdfPasswordRequiredError extends PdfStatementError {}
 export class PdfInvalidPasswordError extends PdfStatementError {}
 
 /**
- * Primary model is Gemini 1.5 Flash as requested, followed by fallback models
- * if rate limited (429).
+ * Models tried in order. Prioritizes healthy, high-quota models with PDF support,
+ * falling back automatically if rate-limited or busy.
  */
-const GEMINI_STATEMENT_MODELS = [
+export const GEMINI_STATEMENT_MODELS = [
   'gemini-3.6-flash',
-  'gemini-flash-latest',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
   'gemini-3.8-flash',
   'gemini-3.7-flash',
   'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
-  'gemini-3.1-flash-lite',
+  'gemini-flash-latest',
 ];
 
 const EXPENSE_CATEGORIES_LIST = TRANSACTION_CATEGORIES.map((c) => c.label).join(', ');
@@ -383,6 +397,7 @@ export async function parseBankStatementPdf(
       apiKey,
       models: GEMINI_STATEMENT_MODELS,
       timeoutMs,
+      perModelTimeoutMs: 25000,
       body: {
         contents: [
           {
@@ -498,16 +513,146 @@ export async function parseBankStatementPdf(
     };
   } catch (error) {
     if (error instanceof PdfStatementError) throw error;
+
+    const approxKb = Math.round((preparedPdfBase64.length * 0.75) / 1024);
+    const baseReport = [
+      `=== FinAlert Bank Statement AI Debug Report ===`,
+      `Timestamp: ${new Date().toISOString()}`,
+      `File Size: ~${approxKb} KB (${preparedPdfBase64.length} base64 chars)`,
+      `Password Encrypted: ${encrypted ? 'Yes (Decrypted successfully)' : 'No'}`,
+    ];
+
     if (error instanceof GeminiAllRateLimitedError) {
+      const attemptsBreakdown =
+        error.attempts && error.attempts.length > 0
+          ? error.attempts
+              .map(
+                (a) =>
+                  `  • ${a.model}: ${a.status ? `HTTP ${a.status} (${a.statusText || ''})` : 'Network/Timeout'} [${
+                    a.durationMs
+                  }ms]${a.errorSnippet ? `\n      ${a.errorSnippet}` : ''}`
+              )
+              .join('\n')
+          : '  (No attempt logs recorded)';
+
+      const fullReport = [
+        ...baseReport,
+        `Result: All attempted models failed or were rate-limited.`,
+        `Attempts Breakdown:`,
+        attemptsBreakdown,
+        `Last Error: ${error.lastError || error.message}`,
+      ].join('\n');
+
+      console.warn('[pdfStatementService] All models rate-limited/failed:\n', fullReport);
       throw new PdfStatementError(
-        'Gemini AI servers are currently busy or rate-limited. Please try again in a few moments.'
+        'Gemini AI servers are currently busy or rate-limited. Please try again in a few moments.',
+        fullReport
       );
     }
+
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new PdfStatementError('Statement parsing timed out. Please try a smaller PDF.');
+      const fullReport = [
+        ...baseReport,
+        `Result: Global parsing timeout (${Math.round(timeoutMs / 1000)}s exceeded).`,
+      ].join('\n');
+      throw new PdfStatementError('Statement parsing timed out. Please try a smaller PDF.', fullReport);
     }
+
     const message = error instanceof Error ? error.message : String(error);
-    console.error('[pdfStatementService] Unexpected error:', error);
-    throw new PdfStatementError(`Failed to parse bank statement: ${message || 'Please try again.'}`);
+    const fullReport = [
+      ...baseReport,
+      `Error Type: ${error instanceof Error ? error.constructor.name : typeof error}`,
+      `Error Message: ${message}`,
+      ...(error instanceof Error && error.stack ? [`Stack: ${error.stack.slice(0, 300)}`] : []),
+    ].join('\n');
+
+    console.error('[pdfStatementService] Unexpected error:\n', fullReport);
+    throw new PdfStatementError(`Failed to parse bank statement: ${message || 'Please try again.'}`, fullReport);
   }
+}
+
+export interface DiagnosticModelResult {
+  model: string;
+  status: number | 'network_error';
+  statusText: string;
+  durationMs: number;
+  errorSnippet?: string;
+  ok: boolean;
+}
+
+export interface StatementDiagnosticReport {
+  timestamp: string;
+  apiKeyConfigured: boolean;
+  maskedApiKey: string;
+  models: DiagnosticModelResult[];
+  formattedText: string;
+}
+
+export async function runGeminiStatementDiagnostics(): Promise<StatementDiagnosticReport> {
+  const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
+  const maskedApiKey = apiKey
+    ? apiKey.length > 8
+      ? `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}`
+      : 'Present'
+    : 'MISSING';
+
+  if (!apiKey) {
+    const reportText = [
+      `=== FinAlert Gemini Diagnostics ===`,
+      `Timestamp: ${new Date().toISOString()}`,
+      `API Key: ❌ NOT CONFIGURED (Add EXPO_PUBLIC_GEMINI_API_KEY in .env)`,
+    ].join('\n');
+
+    return {
+      timestamp: new Date().toISOString(),
+      apiKeyConfigured: false,
+      maskedApiKey: 'MISSING',
+      models: [],
+      formattedText: reportText,
+    };
+  }
+
+  const results: DiagnosticModelResult[] = [];
+  for (const model of GEMINI_STATEMENT_MODELS) {
+    const res = await testGeminiModel(apiKey, model, 7000);
+    results.push(res);
+  }
+
+  const modelLines = results
+    .map((r) => {
+      const badge = r.ok
+        ? '🟢 200 OK'
+        : r.status === 503
+        ? '🟡 503 High Demand'
+        : r.status === 429
+        ? '🟠 429 Rate Limit'
+        : r.status === 404
+        ? '🔴 404 Not Found'
+        : `🔴 ${r.statusText || 'Error'}`;
+      return `• ${r.model}: ${badge} [${r.durationMs}ms]${r.errorSnippet ? `\n    ${r.errorSnippet}` : ''}`;
+    })
+    .join('\n');
+
+  const healthyCount = results.filter((r) => r.ok).length;
+  const summaryLine =
+    healthyCount > 0
+      ? `✅ ${healthyCount} of ${results.length} models are operational and responding.`
+      : `⚠️ 0 of ${results.length} models responded successfully. Check internet or API quota.`;
+
+  const formattedText = [
+    `=== FinAlert Gemini Diagnostics ===`,
+    `Timestamp: ${new Date().toISOString()}`,
+    `API Key: Configured (${maskedApiKey})`,
+    `\nModel Statuses:`,
+    modelLines,
+    `\nSummary: ${summaryLine}`,
+  ].join('\n');
+
+  return {
+    timestamp: new Date().toISOString(),
+    apiKeyConfigured: true,
+    maskedApiKey,
+    models: results,
+    formattedText,
+  };
 }

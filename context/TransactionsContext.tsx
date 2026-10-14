@@ -9,6 +9,8 @@ import {
 } from '../lib/transactions';
 import type { Transaction, NewTransaction } from '../lib/transactions';
 
+import { syncProcessedTrxIdsFromTransactions } from '../services/smsReaderService';
+
 interface TransactionsContextType {
   transactions: Transaction[];
   isLoading: boolean;
@@ -43,6 +45,8 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       });
       setTransactions(deduped);
       setHasLoaded(true);
+      // Auto-sync processed bKash TrxIDs from user's transaction history to prevent duplicate detection across reinstalls
+      syncProcessedTrxIdsFromTransactions(deduped);
     } catch (e) {
       console.error('Failed to load transactions:', e);
     } finally {
@@ -78,6 +82,7 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       try {
         const created = await insertTransaction(user.id, input);
         setTransactions((prev) => [created, ...prev]);
+        syncProcessedTrxIdsFromTransactions([created]);
         return { error: null };
       } catch (error) {
         console.error('Error inserting transaction:', error);
@@ -98,6 +103,7 @@ export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       try {
         const created = await insertTransactions(user.id, inputs);
         setTransactions((prev) => [...created, ...prev]);
+        syncProcessedTrxIdsFromTransactions(created);
         return { error: null, data: created };
       } catch (error) {
         console.error('Error batch inserting transactions:', error);

@@ -114,12 +114,12 @@ export default function HomeScreen() {
     });
 
     // Automatically scan recent SMS inbox on mount
-    syncRecentSms();
+    syncRecentSms(transactions);
 
     // Automatically scan recent SMS whenever user returns to the app from background/sleep
     const appStateSub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (nextState === 'active') {
-        syncRecentSms();
+        syncRecentSms(transactions);
       }
     });
 
@@ -127,7 +127,14 @@ export default function HomeScreen() {
       unsub();
       appStateSub.remove();
     };
-  }, []);
+  }, [transactions]);
+
+  // Keep processed TrxIDs in sync whenever user transactions load or update
+  useEffect(() => {
+    if (transactions && transactions.length > 0) {
+      syncRecentSms(transactions);
+    }
+  }, [transactions]);
 
   const handleReviewBkashTx = (tx: BKashTransaction) => {
     markTrxIdProcessed(tx.trxId);

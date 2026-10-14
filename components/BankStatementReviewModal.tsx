@@ -15,11 +15,13 @@ import {
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Clipboard from 'expo-clipboard';
 import { useTransactions } from '../context/TransactionsContext';
 import {
   parseBankStatementPdf,
   readPdfAsBase64,
   isPdfEncrypted,
+  runGeminiStatementDiagnostics,
   PdfStatementError,
   PdfPasswordRequiredError,
   PdfInvalidPasswordError,
@@ -45,7 +47,7 @@ export default function BankStatementReviewModal({
   onSuccess,
 }: BankStatementReviewModalProps) {
   const insets = useSafeAreaInsets();
-  const { addTransactions } = useTransactions();
+  const { addTransactions, transactions: existingTransactions } = useTransactions();
 
   const [stage, setStage] = useState<Stage>('pick');
   const [selectedFile, setSelectedFile] = useState<{
@@ -59,6 +61,37 @@ export default function BankStatementReviewModal({
   const [transactions, setTransactions] = useState<ExtractedStatementTransaction[]>([]);
   const [categoryPickerTxId, setCategoryPickerTxId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [debugReport, setDebugReport] = useState<string | null>(null);
+  const [showDebugModal, setShowDebugModal] = useState(false);
+  const [isRunningDiag, setIsRunningDiag] = useState(false);
+  const [copiedDebug, setCopiedDebug] = useState(false);
+
+  const handleCopyDebug = async () => {
+    if (!debugReport) return;
+    try {
+      await Clipboard.setStringAsync(debugReport);
+      setCopiedDebug(true);
+      setTimeout(() => setCopiedDebug(false), 2500);
+    } catch {
+      Alert.alert('Copy failed', 'Unable to copy text to clipboard.');
+    }
+  };
+
+  const handleRunDiagnostics = async () => {
+    setIsRunningDiag(true);
+    setCopiedDebug(false);
+    try {
+      const report = await runGeminiStatementDiagnostics();
+      setDebugReport(report.formattedText);
+      setShowDebugModal(true);
+    } catch (e: unknown) {
+      const errTxt = (e as Error)?.message || 'Diagnostics failed to run';
+      setDebugReport(`Diagnostics error: ${errTxt}`);
+      setShowDebugModal(true);
+    } finally {
+      setIsRunningDiag(false);
+    }
+  };
 
   // PDF Encryption & Password state
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
@@ -68,6 +101,7 @@ export default function BankStatementReviewModal({
 
   const handlePickDocument = async () => {
     setErrorMsg(null);
+    setDebugReport(null);
     setPassword('');
     setIsPasswordProtected(false);
     setShowPassword(false);
@@ -115,26 +149,82 @@ export default function BankStatementReviewModal({
     }
 
     setErrorMsg(null);
+    setDebugReport(null);
     setStage('parsing');
 
     try {
       const base64 = await readPdfAsBase64(selectedFile.uri, selectedFile.base64);
       const res = await parseBankStatementPdf(base64, password.trim() || undefined);
-      setExtractionResult(res);
-      setTransactions(res.transactions);
+
+      // Deduplication check: cross-reference against user's existing account transactions
+      const annotatedTransactions: ExtractedStatementTransaction[] = res.transactions.map((tx) => {
+        const match = existingTransactions.find((existing) => {
+          if (existing.type !== tx.type) return false;
+          if (Math.abs(existing.amount - tx.amount) >= 0.01) return false;
+
+          // Date match (exact or within +/- 1 day for settlement/clearing date variance)
+          const isExactDate = existing.date === tx.date;
+          let isCloseDate = isExactDate;
+          if (!isCloseDate) {
+            const t1 = new Date(existing.date).getTime();
+            const t2 = new Date(tx.date).getTime();
+            if (!isNaN(t1) && !isNaN(t2)) {
+              const diffDays = Math.abs(t1 - t2) / (1000 * 60 * 60 * 24);
+              isCloseDate = diffDays <= 1;
+            }
+          }
+
+          if (!isCloseDate) return false;
+
+          // If exact date and exact amount, it is almost certainly a duplicate
+          if (isExactDate) return true;
+
+          // If +/- 1 day, verify at least one keyword match in description
+          const desc1 = (existing.description || '').toLowerCase();
+          const desc2 = tx.description.toLowerCase();
+          const words2 = desc2.split(/\s+/).filter((w) => w.length >= 4);
+          return words2.some((w) => desc1.includes(w));
+        });
+
+        if (match) {
+          return {
+            ...tx,
+            alreadyExists: true,
+            existingMatchId: match.id,
+            selected: false, // Automatically unselected so user doesn't double-import!
+          };
+        }
+
+        return {
+          ...tx,
+          alreadyExists: false,
+          selected: true, // New transaction defaults to selected
+        };
+      });
+
+      setExtractionResult({
+        ...res,
+        transactions: annotatedTransactions,
+      });
+      setTransactions(annotatedTransactions);
       setStage('review');
     } catch (err: unknown) {
       setStage('pick');
       if (err instanceof PdfPasswordRequiredError) {
         setIsPasswordProtected(true);
         setErrorMsg(err.message);
+        if (err.debugReport) setDebugReport(err.debugReport);
       } else if (err instanceof PdfInvalidPasswordError) {
         setIsPasswordProtected(true);
         setErrorMsg(err.message);
+        if (err.debugReport) setDebugReport(err.debugReport);
       } else if (err instanceof PdfStatementError) {
         setErrorMsg(err.message);
+        if (err.debugReport) setDebugReport(err.debugReport);
       } else {
+        const fallback = (err as Error)?.message || 'Failed to process PDF.';
         setErrorMsg('Failed to process PDF. Please check your network and Gemini API key.');
+        setDebugReport(`Error details: ${fallback}`);
       }
     }
   };
@@ -228,6 +318,10 @@ export default function BankStatementReviewModal({
   const categoryOptions =
     activeTxForCategory?.type === 'income' ? INCOME_CATEGORIES : TRANSACTION_CATEGORIES;
 
+  // Duplicate detection summary metrics
+  const duplicateCount = transactions.filter((t) => t.alreadyExists).length;
+  const newCount = transactions.length - duplicateCount;
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleModalClose}>
       <KeyboardAvoidingView
@@ -249,7 +343,9 @@ export default function BankStatementReviewModal({
                 </Text>
                 <Text style={styles.headerSubtitle}>
                   {stage === 'review'
-                    ? `${selectedCount} of ${transactions.length} items selected`
+                    ? duplicateCount > 0
+                      ? `${selectedCount} selected • ${newCount} new, ${duplicateCount} already added`
+                      : `${selectedCount} of ${transactions.length} items selected`
                     : 'PDF statement parsing'}
                 </Text>
               </View>
@@ -375,9 +471,44 @@ export default function BankStatementReviewModal({
               )}
 
               {errorMsg && (
-                <View style={styles.errorBox}>
-                  <Ionicons name="alert-circle" size={18} color="#DC2626" />
-                  <Text style={styles.errorText}>{errorMsg}</Text>
+                <View style={styles.errorContainer}>
+                  <View style={styles.errorBox}>
+                    <Ionicons name="alert-circle" size={18} color="#DC2626" style={{ marginTop: 2 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.errorText}>{errorMsg}</Text>
+                    </View>
+                  </View>
+
+                  {debugReport && (
+                    <View style={styles.debugButtonsRow}>
+                      <TouchableOpacity
+                        style={styles.debugActionButton}
+                        onPress={() => setShowDebugModal(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel="View diagnostic details"
+                      >
+                        <Feather name="terminal" size={14} color="#1D4ED8" style={{ marginRight: 6 }} />
+                        <Text style={styles.debugActionButtonText}>View Diagnostics</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.debugCopyButton}
+                        onPress={handleCopyDebug}
+                        accessibilityRole="button"
+                        accessibilityLabel="Copy debug log"
+                      >
+                        <Feather
+                          name={copiedDebug ? 'check' : 'copy'}
+                          size={14}
+                          color="#047857"
+                          style={{ marginRight: 6 }}
+                        />
+                        <Text style={styles.debugCopyButtonText}>
+                          {copiedDebug ? 'Copied!' : 'Copy Debug Log'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -434,7 +565,7 @@ export default function BankStatementReviewModal({
             <View style={styles.reviewContainer}>
               {/* Statement Summary Banner */}
               <View style={styles.statementSummaryBanner}>
-                <View>
+                <View style={{ flex: 1, marginRight: 12 }}>
                   <Text style={styles.statementBankName}>{extractionResult?.bankName}</Text>
                   {extractionResult?.period && (
                     <Text style={styles.statementPeriod}>Period: {extractionResult.period}</Text>
@@ -449,6 +580,16 @@ export default function BankStatementReviewModal({
                   </Text>
                 </View>
               </View>
+
+              {/* Duplicate Notice Banner */}
+              {duplicateCount > 0 && (
+                <View style={styles.duplicateNoticeBanner}>
+                  <Ionicons name="information-circle" size={16} color="#B45309" style={{ marginTop: 1 }} />
+                  <Text style={styles.duplicateNoticeText}>
+                    {duplicateCount} {duplicateCount === 1 ? 'transaction was' : 'transactions were'} already found in your account and unselected to avoid duplicates.
+                  </Text>
+                </View>
+              )}
 
               {/* Bulk Toggle Bar */}
               <View style={styles.bulkActionBar}>
@@ -474,6 +615,21 @@ export default function BankStatementReviewModal({
                     {selectedCount === transactions.length ? 'Deselect All' : 'Select All'}
                   </Text>
                 </TouchableOpacity>
+
+                {duplicateCount > 0 && (
+                  <TouchableOpacity
+                    style={styles.selectNewOnlyBtn}
+                    onPress={() => {
+                      setTransactions((prev) =>
+                        prev.map((tx) => ({ ...tx, selected: !tx.alreadyExists }))
+                      );
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Select only new transactions"
+                  >
+                    <Text style={styles.selectNewOnlyBtnText}>Select New Only ({newCount})</Text>
+                  </TouchableOpacity>
+                )}
 
                 <Text style={styles.selectedCountBadge}>
                   {selectedCount} selected of {transactions.length}
@@ -543,6 +699,14 @@ export default function BankStatementReviewModal({
                             <Feather name="chevron-down" size={12} color="#059669" />
                           </TouchableOpacity>
 
+                          {/* Already Added Indicator */}
+                          {tx.alreadyExists && (
+                            <View style={styles.alreadyAddedBadge}>
+                              <Ionicons name="checkmark-done" size={12} color="#92400E" />
+                              <Text style={styles.alreadyAddedBadgeText}>Already Added</Text>
+                            </View>
+                          )}
+
                           {/* Remove Row Option */}
                           <TouchableOpacity
                             style={styles.deleteRowBtn}
@@ -609,6 +773,78 @@ export default function BankStatementReviewModal({
               </View>
             </Modal>
           )}
+
+          {/* Diagnostics & Debug Details Modal */}
+          <Modal
+            visible={showDebugModal}
+            animationType="fade"
+            transparent
+            onRequestClose={() => setShowDebugModal(false)}
+          >
+            <View style={styles.debugOverlay}>
+              <View style={styles.debugModalCard}>
+                <View style={styles.debugHeader}>
+                  <View style={styles.debugHeaderLeft}>
+                    <View style={styles.debugIconBubble}>
+                      <Ionicons name="bug" size={18} color="#2563EB" />
+                    </View>
+                    <View>
+                      <Text style={styles.debugHeaderTitle}>AI Diagnostic Report</Text>
+                      <Text style={styles.debugHeaderSub}>Gemini model responses & logs</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setShowDebugModal(false)}
+                    style={styles.debugCloseBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close diagnostics"
+                  >
+                    <Feather name="x" size={20} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.debugScrollBox} showsVerticalScrollIndicator={true}>
+                  <Text style={styles.debugCodeText} selectable>
+                    {debugReport || 'No diagnostic output available.'}
+                  </Text>
+                </ScrollView>
+
+                <View style={styles.debugModalFooter}>
+                  <TouchableOpacity
+                    style={styles.debugCopyFooterBtn}
+                    onPress={handleCopyDebug}
+                    accessibilityRole="button"
+                    accessibilityLabel="Copy full log"
+                  >
+                    <Feather
+                      name={copiedDebug ? 'check' : 'copy'}
+                      size={15}
+                      color="#FFFFFF"
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text style={styles.debugCopyFooterBtnText}>
+                      {copiedDebug ? 'Copied to Clipboard!' : 'Copy Full Report'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.debugRerunFooterBtn}
+                    onPress={handleRunDiagnostics}
+                    disabled={isRunningDiag}
+                    accessibilityRole="button"
+                    accessibilityLabel="Re-run diagnostic test"
+                  >
+                    {isRunningDiag ? (
+                      <ActivityIndicator size="small" color="#374151" />
+                    ) : (
+                      <Ionicons name="refresh" size={16} color="#374151" style={{ marginRight: 4 }} />
+                    )}
+                    <Text style={styles.debugRerunFooterBtnText}>Re-test</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -1079,5 +1315,204 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: '#1F2937',
+  },
+  errorContainer: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+  },
+  debugButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#FEE2E2',
+    paddingTop: 8,
+  },
+  debugActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    minHeight: 48,
+  },
+  debugActionButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1D4ED8',
+  },
+  debugCopyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    minHeight: 48,
+  },
+  debugCopyButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#047857',
+  },
+  duplicateNoticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FDE68A',
+    paddingHorizontal: 20,
+    paddingVertical: 9,
+    gap: 8,
+  },
+  duplicateNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#92400E',
+    fontWeight: '500',
+  },
+  selectNewOnlyBtn: {
+    backgroundColor: '#E8F7F1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectNewOnlyBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0FB384',
+  },
+  alreadyAddedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    gap: 3,
+  },
+  alreadyAddedBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#92400E',
+  },
+  debugOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  debugModalCard: {
+    width: '100%',
+    maxHeight: '85%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  debugHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  debugHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  debugIconBubble: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  debugHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  debugHeaderSub: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  debugCloseBtn: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  debugScrollBox: {
+    backgroundColor: '#0F172A',
+    borderRadius: 10,
+    marginVertical: 12,
+    padding: 12,
+    maxHeight: 380,
+  },
+  debugCodeText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#E2E8F0',
+  },
+  debugModalFooter: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingTop: 4,
+  },
+  debugCopyFooterBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0FB384',
+    paddingVertical: 12,
+    borderRadius: 10,
+    minHeight: 48,
+  },
+  debugCopyFooterBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  debugRerunFooterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    minHeight: 48,
+  },
+  debugRerunFooterBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
   },
 });

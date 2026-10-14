@@ -44,11 +44,121 @@ async function loadProcessedTrxIds(): Promise<void> {
 }
 
 /**
- * Checks whether a given TrxID has already been processed or dismissed.
+ * Extracts a bKash TrxID from a transaction description string.
+ * Example strings:
+ * - "Payment to Uber - Trips (TrxID: 9J38DH291)"
+ * - "Received from John Doe (TrxID: 8KL291823)"
+ * - "bKash recharge TrxID: 7X819203"
  */
-export async function hasProcessedTrxId(trxId: string): Promise<boolean> {
+export function extractTrxIdFromDescription(description: string | null | undefined): string | null {
+  if (!description || typeof description !== 'string') return null;
+  const match = description.match(
+    /(?:Trx\s*ID|Txn\s*ID|Transaction\s*ID|Trans\s*ID|TrxId)\s*[:.]?\s*([A-Za-z0-9]+)/i
+  );
+  return match && match[1] ? match[1].trim() : null;
+}
+
+/**
+ * Synchronizes processed bKash TrxIDs from the user's database transactions.
+ * When the app is uninstalled and reinstalled, local SecureStore is cleared.
+ * This function scans the user's loaded transactions from Supabase, extracts all
+ * previously added bKash TrxIDs, and re-populates the processed set so they are
+ * NEVER shown again as pending or detected.
+ */
+export async function syncProcessedTrxIdsFromTransactions(
+  transactions: Array<{
+    description?: string | null;
+    date?: string;
+    amount?: number;
+    type?: string;
+  }>
+): Promise<number> {
   await loadProcessedTrxIds();
-  return inMemoryProcessedTrxIds.has(trxId);
+  let newlyAdded = 0;
+
+  for (const tx of transactions) {
+    const trxId = extractTrxIdFromDescription(tx.description);
+    if (trxId && !inMemoryProcessedTrxIds.has(trxId)) {
+      inMemoryProcessedTrxIds.add(trxId);
+      newlyAdded++;
+    }
+  }
+
+  // Remove any currently pending transactions that match existing transactions
+  if (pendingTransactions.length > 0) {
+    const beforeCount = pendingTransactions.length;
+    pendingTransactions = pendingTransactions.filter((p) => {
+      // 1. Match by TrxID
+      if (inMemoryProcessedTrxIds.has(p.trxId)) return false;
+
+      // 2. Match by exact date + amount + type in existing transactions
+      const duplicateExists = transactions.some((existing) => {
+        if (!existing.amount || !existing.date) return false;
+        const sameAmount = Math.abs(existing.amount - p.amount) < 0.01;
+        const sameDate = existing.date === p.date;
+        const sameType = !existing.type || existing.type === p.type;
+        return sameAmount && sameDate && sameType;
+      });
+
+      if (duplicateExists) {
+        inMemoryProcessedTrxIds.add(p.trxId);
+        newlyAdded++;
+        return false;
+      }
+
+      return true;
+    });
+
+    if (pendingTransactions.length !== beforeCount) {
+      batchListeners.forEach((cb) => {
+        try {
+          cb([...pendingTransactions]);
+        } catch (e) {
+          console.error('[smsReaderService] Error notifying batch listeners:', e);
+        }
+      });
+    }
+  }
+
+  if (newlyAdded > 0) {
+    try {
+      const arr = Array.from(inMemoryProcessedTrxIds).slice(-300);
+      await SecureStore.setItemAsync(STORAGE_KEY_PROCESSED_TRX, JSON.stringify(arr));
+    } catch (e) {
+      console.warn('[smsReaderService] Failed to persist synced TrxIDs:', e);
+    }
+  }
+
+  return newlyAdded;
+}
+
+/**
+ * Checks whether a given TrxID has already been processed or exists in database.
+ */
+export async function hasProcessedTrxId(
+  trxId: string,
+  existingTransactions?: Array<{
+    description?: string | null;
+    date?: string;
+    amount?: number;
+    type?: string;
+  }>
+): Promise<boolean> {
+  await loadProcessedTrxIds();
+  if (inMemoryProcessedTrxIds.has(trxId)) return true;
+
+  if (existingTransactions && existingTransactions.length > 0) {
+    const found = existingTransactions.some((tx) => {
+      const existingTrxId = extractTrxIdFromDescription(tx.description);
+      return existingTrxId === trxId;
+    });
+    if (found) {
+      inMemoryProcessedTrxIds.add(trxId);
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -58,7 +168,7 @@ export async function markTrxIdProcessed(trxId: string): Promise<void> {
   await loadProcessedTrxIds();
   inMemoryProcessedTrxIds.add(trxId);
   try {
-    const arr = Array.from(inMemoryProcessedTrxIds).slice(-150); // Keep last 150
+    const arr = Array.from(inMemoryProcessedTrxIds).slice(-300); // Keep last 300
     await SecureStore.setItemAsync(STORAGE_KEY_PROCESSED_TRX, JSON.stringify(arr));
   } catch (e) {
     console.warn('[smsReaderService] Failed to persist processed TrxID:', e);
@@ -154,8 +264,20 @@ export async function requestSmsPermissions(): Promise<boolean> {
  * This runs when the app launches or returns from the background, ensuring
  * transactions that happened while the app was closed or sleeping are detected.
  */
-export async function syncRecentSms(): Promise<BKashTransaction[]> {
+export async function syncRecentSms(
+  existingTransactions?: Array<{
+    description?: string | null;
+    date?: string;
+    amount?: number;
+    type?: string;
+  }>
+): Promise<BKashTransaction[]> {
   if (Platform.OS !== 'android') return [];
+
+  // If existing transactions provided, sync TrxIDs first
+  if (existingTransactions && existingTransactions.length > 0) {
+    await syncProcessedTrxIdsFromTransactions(existingTransactions);
+  }
 
   const hasPerm = await checkSmsPermissions();
   if (!hasPerm) return [];
@@ -195,7 +317,8 @@ export async function syncRecentSms(): Promise<BKashTransaction[]> {
         body: m.body,
         sender: m.address,
         timestamp: m.date,
-      }))
+      })),
+      existingTransactions
     );
   } catch (err) {
     console.warn('[smsReaderService] Error syncing recent SMS:', err);
@@ -605,15 +728,36 @@ export function subscribeToBkashTransactions(callback: SmsListenerCallback): () 
 export async function processIncomingSms(
   body: string,
   sender: string = 'bKash',
-  timestamp?: number | Date
+  timestamp?: number | Date,
+  existingTransactions?: Array<{
+    description?: string | null;
+    date?: string;
+    amount?: number;
+    type?: string;
+  }>
 ): Promise<BKashTransaction | null> {
   const parsed = parseBkashSms(body, sender, timestamp);
   if (!parsed) return null;
 
-  // Check if TrxID was already handled
-  const alreadyProcessed = await hasProcessedTrxId(parsed.trxId);
+  // Check if TrxID was already handled or in database
+  const alreadyProcessed = await hasProcessedTrxId(parsed.trxId, existingTransactions);
   if (alreadyProcessed) {
     return null;
+  }
+
+  // Cross-check if matching date + amount + type exists in database
+  if (existingTransactions && existingTransactions.length > 0) {
+    const matchInDb = existingTransactions.some((existing) => {
+      if (!existing.amount || !existing.date) return false;
+      const sameAmount = Math.abs(existing.amount - parsed.amount) < 0.01;
+      const sameDate = existing.date === parsed.date;
+      const sameType = !existing.type || existing.type === parsed.type;
+      return sameAmount && sameDate && sameType;
+    });
+    if (matchInDb) {
+      await markTrxIdProcessed(parsed.trxId);
+      return null;
+    }
   }
 
   // Queue to pending transactions if not already in queue
@@ -642,10 +786,17 @@ export async function processIncomingSms(
 
 /**
  * Processes a batch of incoming/stored SMS messages received since last sync.
- * Deduplicates against SecureStore and adds new transactions to the pending queue.
+ * Deduplicates against SecureStore and existing database transactions,
+ * adding only genuinely new transactions to the pending queue.
  */
 export async function processMultipleIncomingSms(
-  messages: { body: string; sender?: string; timestamp?: number | Date }[]
+  messages: { body: string; sender?: string; timestamp?: number | Date }[],
+  existingTransactions?: Array<{
+    description?: string | null;
+    date?: string;
+    amount?: number;
+    type?: string;
+  }>
 ): Promise<BKashTransaction[]> {
   const newlyDetected: BKashTransaction[] = [];
 
@@ -653,8 +804,23 @@ export async function processMultipleIncomingSms(
     const parsed = parseBkashSms(m.body, m.sender ?? 'bKash', m.timestamp);
     if (!parsed) continue;
 
-    const alreadyProcessed = await hasProcessedTrxId(parsed.trxId);
+    const alreadyProcessed = await hasProcessedTrxId(parsed.trxId, existingTransactions);
     if (alreadyProcessed) continue;
+
+    // Cross-check if matching date + amount + type exists in database
+    if (existingTransactions && existingTransactions.length > 0) {
+      const matchInDb = existingTransactions.some((existing) => {
+        if (!existing.amount || !existing.date) return false;
+        const sameAmount = Math.abs(existing.amount - parsed.amount) < 0.01;
+        const sameDate = existing.date === parsed.date;
+        const sameType = !existing.type || existing.type === parsed.type;
+        return sameAmount && sameDate && sameType;
+      });
+      if (matchInDb) {
+        await markTrxIdProcessed(parsed.trxId);
+        continue;
+      }
+    }
 
     if (!pendingTransactions.some((t) => t.trxId === parsed.trxId)) {
       pendingTransactions.push(parsed);

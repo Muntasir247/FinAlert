@@ -84,11 +84,11 @@ export default function TransactionsScreen() {
       }
     });
 
-    syncRecentSms();
+    syncRecentSms(transactions);
 
     const appStateSub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (nextState === 'active') {
-        syncRecentSms();
+        syncRecentSms(transactions);
       }
     });
 
@@ -96,7 +96,14 @@ export default function TransactionsScreen() {
       unsub();
       appStateSub.remove();
     };
-  }, []);
+  }, [transactions]);
+
+  // Sync processed TrxIDs whenever transactions update
+  useEffect(() => {
+    if (transactions && transactions.length > 0) {
+      syncRecentSms(transactions);
+    }
+  }, [transactions]);
 
   const handleReviewBkashTx = (tx: BKashTransaction) => {
     markTrxIdProcessed(tx.trxId);
