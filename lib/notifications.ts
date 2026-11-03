@@ -44,10 +44,52 @@ export async function fetchNotifications(userId: string): Promise<AppNotificatio
   return (data ?? []) as AppNotification[];
 }
 
+/**
+ * Check whether an identical notification has already been created for this user recently.
+ * Prevents unnecessary duplicate notifications from flooding the user's alerts and phone panel.
+ */
+export async function isDuplicateRecentNotification(
+  userId: string,
+  category: NotificationCategory,
+  title: string,
+  withinHours = 12
+): Promise<boolean> {
+  const cutoff = new Date(Date.now() - withinHours * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('category', category)
+    .eq('title', title)
+    .gte('created_at', cutoff)
+    .limit(1);
+
+  if (error || !data) {
+    return false;
+  }
+
+  return data.length > 0;
+}
+
 export async function insertNotification(
   userId: string,
-  notif: NewNotification
-): Promise<AppNotification> {
+  notif: NewNotification,
+  options?: { skipDuplicateCheck?: boolean; dedupeHours?: number }
+): Promise<AppNotification | null> {
+  if (!options?.skipDuplicateCheck) {
+    const isDupe = await isDuplicateRecentNotification(
+      userId,
+      notif.category,
+      notif.title,
+      options?.dedupeHours ?? 12
+    );
+    if (isDupe) {
+      // Already sent recently, ignore to prevent spam
+      return null;
+    }
+  }
+
   const { data, error } = await supabase
     .from('notifications')
     .insert({
@@ -98,4 +140,51 @@ export async function deleteNotification(notifId: string): Promise<void> {
   if (error) {
     throw error;
   }
+}
+
+export async function deleteAllNotifications(userId: string): Promise<void> {
+  const { error } = await supabase.from('notifications').delete().eq('user_id', userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+/**
+ * Real-time subscription helper isolated behind the lib layer (per backend portability rules).
+ * Listens for new rows inserted into public.notifications for this user.
+ */
+export function subscribeToNotifications(
+  userId: string,
+  onInsert: (notif: AppNotification) => void,
+  onError?: (err: any) => void
+): () => void {
+  const channelName = `realtime:notifications:${userId}`;
+
+  const channel = supabase
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      },
+      (payload) => {
+        if (payload?.new && typeof payload.new === 'object') {
+          onInsert(payload.new as AppNotification);
+        }
+      }
+    )
+    .subscribe((status, err) => {
+      if (err) {
+        console.warn(`[Realtime notifications] channel ${channelName} error:`, err);
+        onError?.(err);
+      }
+    });
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }

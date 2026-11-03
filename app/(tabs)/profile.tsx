@@ -7,12 +7,14 @@ import {
   StyleSheet,
   Switch,
   Modal,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useTransactions } from '../../context/TransactionsContext';
+import { useNotifications } from '../../context/NotificationsContext';
 
 const formatCompact = (n: number) => {
   const sign = n < 0 ? '-' : '';
@@ -27,9 +29,19 @@ export default function ProfileScreen() {
   const { profile, signOut } = useAuth();
   const { transactions } = useTransactions();
 
-  // Local state for preferences toggles
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  // Notification preferences synced with system permissions and storage
+  const { notificationsEnabled, setNotificationsEnabled } = useNotifications();
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+
+  const handleToggleNotifications = async (value: boolean) => {
+    const success = await setNotificationsEnabled(value);
+    if (!success && value) {
+      Alert.alert(
+        'Permission Required',
+        'FinAlert needs notification permission to show alerts on your phone dashboard. Please enable notifications in your device Settings.'
+      );
+    }
+  };
 
   // Bottom sheet modal state ('security' | 'support' | null)
   const [activeModal, setActiveModal] = useState<'security' | 'support' | null>(null);
@@ -121,7 +133,7 @@ export default function ProfileScreen() {
                 trackColor={{ false: '#E2E8F0', true: '#A7F3D0' }}
                 thumbColor={notificationsEnabled ? '#0FB384' : '#F1F5F9'}
                 ios_backgroundColor="#E2E8F0"
-                onValueChange={setNotificationsEnabled}
+                onValueChange={handleToggleNotifications}
                 value={notificationsEnabled}
               />
             </View>

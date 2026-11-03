@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -155,10 +157,42 @@ function NotificationCard({
 // ── Alerts Screen ─────────────────────────────────────────────────────────
 
 export default function NotificationsScreen() {
-  const { notifications, unreadCount, markAllRead, dismissNotification } = useNotifications();
+  const {
+    notifications,
+    unreadCount,
+    markAllRead,
+    dismissNotification,
+    clearAllNotifications,
+    refreshNotifications,
+  } = useNotifications();
   const { requestBudgetTab } = useBudgets();
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refreshNotifications(true);
+    setRefreshing(false);
+  }, [refreshNotifications]);
+
+  const handleClearAll = useCallback(() => {
+    if (notifications.length === 0) return;
+    Alert.alert(
+      'Clear All Alerts',
+      'Are you sure you want to dismiss all notifications?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear All',
+          style: 'destructive',
+          onPress: async () => {
+            await clearAllNotifications();
+          },
+        },
+      ]
+    );
+  }, [notifications.length, clearAllNotifications]);
 
   const filtered = useMemo(
     () =>
@@ -300,6 +334,14 @@ export default function NotificationsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={['#0FB384']}
+            tintColor="#0FB384"
+          />
+        }
       >
         {filtered.length === 0 ? (
           <View style={styles.emptyState}>
@@ -313,6 +355,18 @@ export default function NotificationsScreen() {
           <>
             {renderSection('TODAY', grouped.today)}
             {renderSection('EARLIER', grouped.earlier)}
+            <View style={styles.clearAllSection}>
+              <TouchableOpacity
+                style={styles.clearAllBtn}
+                onPress={handleClearAll}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="Clear all alerts"
+              >
+                <Feather name="trash-2" size={14} color="#94A3B8" />
+                <Text style={styles.clearAllText}>Clear all alerts</Text>
+              </TouchableOpacity>
+            </View>
           </>
         )}
       </ScrollView>
@@ -556,5 +610,25 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#64748B',
     textAlign: 'center',
+  },
+  clearAllSection: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    marginTop: 8,
+  },
+  clearAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    minHeight: 48,
+  },
+  clearAllText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#64748B',
   },
 });

@@ -29,7 +29,8 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",
         "android.permission.READ_SMS",
-        "android.permission.RECEIVE_SMS"
+        "android.permission.RECEIVE_SMS",
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -58,6 +59,13 @@
         {
           "cameraPermission": "FinAlert uses your camera to scan receipts and add expenses.",
           "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/FinAlert_app_icon.png",
+          "color": "#0FB384"
         }
       ],
       [

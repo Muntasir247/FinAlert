@@ -7,6 +7,7 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
+import * as SecureStore from 'expo-secure-store';
 import { useAuth } from './AuthContext';
 import { useTransactions } from './TransactionsContext';
 import { useNotifications } from './NotificationsContext';
@@ -129,12 +130,14 @@ export const BudgetsProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [transactions]);
 
   // ── Budget notifications ─────────────────────────────────────────────────
-  // All alerts are derived from real data and fired at most once per key:
+  // All alerts are derived from real data and fired at most once per key.
+  // Keys are persisted in SecureStore so restarting the app never spams duplicate alerts:
   //   - Monthly budget 80% used / used up (total spending budget thresholds)
   //   - Per-category overrun (spent >= category limit)
   //   - "{Category} is higher than last month" (month-over-month comparison)
   //   - "You spent too much on {Category} today!" (daily spend vs daily pace)
   const budgetAlertedRef = useRef<Set<string>>(new Set());
+  const alertsLoadedMonthRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!user || !hasLoaded) return;
@@ -143,115 +146,162 @@ export const BudgetsProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const monthKey = now.getFullYear() * 100 + (now.getMonth() + 1);
     const lastMonthKey =
       monthKey % 100 === 1 ? (Math.floor(monthKey / 100) - 1) * 100 + 12 : monthKey - 1;
-    const todayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+      now.getDate()
+    ).padStart(2, '0')}`;
+    const storageKey = `finalert_budget_alerts_${user.id}_${monthKey}`;
     const fmt = (n: number) => `৳${Math.round(n).toLocaleString()}`;
 
-    const fire = (key: string, notif: NewNotification) => {
-      if (budgetAlertedRef.current.has(key)) return;
-      budgetAlertedRef.current.add(key);
-      notify(notif);
+    // Load persisted alerts for current month once per monthKey
+    const ensureAlertsLoaded = async () => {
+      if (alertsLoadedMonthRef.current !== monthKey) {
+        try {
+          const stored = await SecureStore.getItemAsync(storageKey);
+          if (stored) {
+            const arr = JSON.parse(stored);
+            if (Array.isArray(arr)) {
+              arr.forEach((k) => budgetAlertedRef.current.add(k));
+            }
+          }
+          alertsLoadedMonthRef.current = monthKey;
+        } catch {
+          // Non-fatal, use in-memory ref
+        }
+      }
     };
 
-    // Bucket real expenses by current month, last month, and today.
-    const thisMonthSpent: Record<string, number> = {};
-    const lastMonthSpent: Record<string, number> = {};
-    const todaySpent: Record<string, number> = {};
-    for (const tx of transactions) {
-      if (tx.type !== 'expense') continue;
-      const [y, m, d] = tx.date.split('-').map(Number);
-      const key = y * 100 + m;
-      if (key === monthKey) {
-        thisMonthSpent[tx.category] = (thisMonthSpent[tx.category] || 0) + tx.amount;
-        if (d === now.getDate()) {
-          todaySpent[tx.category] = (todaySpent[tx.category] || 0) + tx.amount;
-        }
-      } else if (key === lastMonthKey) {
-        lastMonthSpent[tx.category] = (lastMonthSpent[tx.category] || 0) + tx.amount;
-      }
-    }
+    const fire = async (key: string, notif: NewNotification) => {
+      if (budgetAlertedRef.current.has(key)) return;
+      budgetAlertedRef.current.add(key);
 
-    // Total budget thresholds (needs an active plan).
-    if (plan) {
-      const totalLimit = plan.budget.total_spending_budget;
-      if (totalLimit > 0) {
-        const pct = (monthlySpent / totalLimit) * 100;
-        if (pct >= 80 && pct < 100) {
-          fire(`total80:${monthKey}`, {
+      try {
+        await SecureStore.setItemAsync(
+          storageKey,
+          JSON.stringify(Array.from(budgetAlertedRef.current))
+        );
+      } catch {
+        // Fallback to in-memory set
+      }
+
+      await notify(notif, { dedupeHours: 24 });
+    };
+
+    ensureAlertsLoaded().then(() => {
+      // Bucket real expenses by current month, last month, and today.
+      const thisMonthSpent: Record<string, number> = {};
+      const lastMonthSpent: Record<string, number> = {};
+      const todaySpent: Record<string, number> = {};
+      for (const tx of transactions) {
+        if (tx.type !== 'expense') continue;
+        const [y, m, d] = tx.date.split('-').map(Number);
+        const key = y * 100 + m;
+        if (key === monthKey) {
+          thisMonthSpent[tx.category] = (thisMonthSpent[tx.category] || 0) + tx.amount;
+          if (d === now.getDate()) {
+            todaySpent[tx.category] = (todaySpent[tx.category] || 0) + tx.amount;
+          }
+        } else if (key === lastMonthKey) {
+          lastMonthSpent[tx.category] = (lastMonthSpent[tx.category] || 0) + tx.amount;
+        }
+      }
+
+      // Total budget thresholds (needs an active plan).
+      if (plan) {
+        const totalLimit = plan.budget.total_spending_budget;
+        if (totalLimit > 0) {
+          const pct = (monthlySpent / totalLimit) * 100;
+          if (pct >= 80 && pct < 100) {
+            fire(`total80:${monthKey}`, {
+              category: 'budget',
+              title: 'Monthly budget 80% used',
+              message: `You've used ${Math.round(pct)}% of your monthly budget (${fmt(
+                monthlySpent
+              )} of ${fmt(totalLimit)}).`,
+              progress: 0.8,
+              accent_color: 'orange',
+              action_type: 'review_budget',
+            });
+          }
+          if (pct >= 100) {
+            fire(`total100:${monthKey}`, {
+              category: 'budget',
+              title: 'Monthly budget used up',
+              message: `You have spent ${fmt(monthlySpent)} of your ${fmt(
+                totalLimit
+              )} total budget this month.`,
+              progress: Math.min(pct / 100, 1.99),
+              accent_color: 'red',
+              action_type: 'review_spending',
+            });
+          }
+        }
+
+        // Per-category overrun (spent >= category limit).
+        for (const cb of categoryBudgets) {
+          if (cb.limit > 0 && cb.percentage_used >= 100) {
+            fire(`cat:${monthKey}:${cb.category}`, {
+              category: 'budget',
+              title: 'Budget overrun',
+              message: `${cb.category} is ${Math.round(
+                cb.percentage_used - 100
+              )}% over its monthly limit of ${fmt(cb.limit)}. Review your recent spending.`,
+              progress: Math.min(cb.spent / cb.limit, 1.99),
+              accent_color: 'red',
+              action_type: 'review_budget',
+            });
+          }
+        }
+      }
+
+      // Month-over-month increase: Only alert when past mid-month or with massive increase,
+      // and with meaningful minimum spend thresholds so users aren't spammed with trivial amounts.
+      const daysElapsed = now.getDate();
+      for (const cat of Object.keys(thisMonthSpent)) {
+        const current = thisMonthSpent[cat];
+        const last = lastMonthSpent[cat] || 0;
+        const isMidMonthOrHuge = daysElapsed >= 15 || current >= last * 1.4;
+
+        if (
+          isMidMonthOrHuge &&
+          last >= 500 &&
+          current >= last * 1.25 &&
+          current - last >= 500
+        ) {
+          fire(`mom:${monthKey}:${cat}`, {
             category: 'budget',
-            title: 'Monthly budget 80% used',
-            message: `You've used ${Math.round(pct)}% of your monthly budget (${fmt(
-              monthlySpent
-            )} of ${fmt(totalLimit)}).`,
-            progress: 0.8,
+            title: `${cat} is higher than last month`,
+            message: `You've spent ${fmt(current)} on ${cat} this month, up from ${fmt(
+              last
+            )} last month.`,
+            progress: null,
             accent_color: 'orange',
             action_type: 'review_budget',
           });
         }
-        if (pct >= 100) {
-          fire(`total100:${monthKey}`, {
+
+        // Daily spike: today's spend in a category at least 2.5x daily pace,
+        // requiring at least 3 days into the month and meaningful spending (>= ৳1000).
+        const today = todaySpent[cat] || 0;
+        const avgDaily = daysElapsed > 0 ? current / daysElapsed : 0;
+        if (
+          daysElapsed >= 3 &&
+          today >= 1000 &&
+          avgDaily >= 200 &&
+          today >= 2.5 * avgDaily
+        ) {
+          fire(`daily:${todayKey}:${cat}`, {
             category: 'budget',
-            title: 'Monthly budget used up',
-            message: `You have spent ${fmt(monthlySpent)} of your ${fmt(
-              totalLimit
-            )} total budget this month.`,
-            progress: Math.min(pct / 100, 1.99),
+            title: `You spent too much on ${cat} today!`,
+            message: `Your ${cat} spending today (${fmt(
+              today
+            )}) is well above your usual daily pace.`,
+            progress: null,
             accent_color: 'red',
             action_type: 'review_spending',
           });
         }
       }
-
-      // Per-category overrun (spent >= category limit).
-      for (const cb of categoryBudgets) {
-        if (cb.limit > 0 && cb.percentage_used >= 100) {
-          fire(`cat:${monthKey}:${cb.category}`, {
-            category: 'budget',
-            title: 'Budget overrun',
-            message: `${cb.category} is ${Math.round(
-              cb.percentage_used - 100
-            )}% over its monthly limit of ${fmt(cb.limit)}. Review your recent spending.`,
-            progress: Math.min(cb.spent / cb.limit, 1.99),
-            accent_color: 'red',
-            action_type: 'review_budget',
-          });
-        }
-      }
-    }
-
-    // Month-over-month increase (real data, no plan required).
-    for (const cat of Object.keys(thisMonthSpent)) {
-      const current = thisMonthSpent[cat];
-      const last = lastMonthSpent[cat] || 0;
-      if (last > 0 && current > last) {
-        fire(`mom:${monthKey}:${cat}`, {
-          category: 'budget',
-          title: `${cat} is higher than last month`,
-          message: `You've spent ${fmt(current)} on ${cat} this month, up from ${fmt(
-            last
-          )} last month.`,
-          progress: null,
-          accent_color: 'orange',
-          action_type: 'review_budget',
-        });
-      }
-
-      // Daily spike: today's spend in a category at least double its daily pace.
-      const today = todaySpent[cat] || 0;
-      const daysElapsed = now.getDate();
-      const avgDaily = daysElapsed > 0 ? current / daysElapsed : 0;
-      if (today > 0 && avgDaily > 0 && today >= 2 * avgDaily) {
-        fire(`daily:${todayKey}:${cat}`, {
-          category: 'budget',
-          title: `You spent too much on ${cat} today!`,
-          message: `Your ${cat} spending today (${fmt(
-            today
-          )}) is well above your usual daily pace.`,
-          progress: null,
-          accent_color: 'red',
-          action_type: 'review_spending',
-        });
-      }
-    }
+    });
   }, [user, plan, categoryBudgets, monthlySpent, transactions, hasLoaded, notify]);
 
   const openBudgetModal = useCallback(() => setBudgetModalVisible(true), []);
