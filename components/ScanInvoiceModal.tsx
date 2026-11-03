@@ -139,7 +139,11 @@ export default function ScanInvoiceModal({
     setErrorMsg(null);
     let photo;
     try {
-      photo = await cameraRef.current?.takePictureAsync({ quality: 0.7, base64: true });
+      photo = await cameraRef.current?.takePictureAsync({
+        quality: 0.5,
+        base64: true,
+        shutterSound: false,
+      });
     } catch (err) {
       console.error('Receipt capture failed:', err);
       setErrorMsg('Could not take a photo. Please try again.');
@@ -172,7 +176,7 @@ export default function ScanInvoiceModal({
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 0.7,
+      quality: 0.5,
       base64: true,
     });
     if (result.canceled) return;

@@ -24,11 +24,10 @@ export interface VoiceIntent {
  * automatically.
  */
 const GEMINI_MODELS = [
-  'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3.5-flash-lite',
   'gemini-3.5-flash',
-  'gemini-3-flash',
-  'gemini-3.6-flash',
 ];
 
 const MAX_AMOUNT = 1_000_000_000;
@@ -126,7 +125,7 @@ const sanitizeCategory = (value: unknown, action: VoiceIntentAction): string | u
  */
 export async function parseVoiceIntent(
   text: string,
-  timeoutMs = 15000
+  timeoutMs = 25000
 ): Promise<VoiceIntent> {
   const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
   if (!apiKey) {
@@ -140,6 +139,7 @@ export async function parseVoiceIntent(
       apiKey,
       models: GEMINI_MODELS,
       timeoutMs,
+      perModelTimeoutMs: 7000,
       body: {
         contents: [
           {

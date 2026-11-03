@@ -48,13 +48,10 @@ export class PdfInvalidPasswordError extends PdfStatementError {}
  * falling back automatically if rate-limited or busy.
  */
 export const GEMINI_STATEMENT_MODELS = [
-  'gemini-3.6-flash',
-  'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
-  'gemini-3.8-flash',
-  'gemini-3.7-flash',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3.5-flash-lite',
   'gemini-3.5-flash',
-  'gemini-flash-latest',
 ];
 
 const EXPENSE_CATEGORIES_LIST = TRANSACTION_CATEGORIES.map((c) => c.label).join(', ');

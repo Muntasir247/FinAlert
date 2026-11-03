@@ -20,11 +20,10 @@ export interface ReceiptData {
  * automatically.
  */
 const GEMINI_MODELS = [
-  'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3.5-flash-lite',
   'gemini-3.5-flash',
-  'gemini-3-flash',
-  'gemini-3.6-flash',
 ];
 
 const MAX_AMOUNT = 1_000_000_000;
@@ -119,7 +118,7 @@ const sanitizeDate = (value: unknown): string | undefined => {
 export async function parseReceiptFromImage(
   base64Image: string,
   mimeType = 'image/jpeg',
-  timeoutMs = 30000
+  timeoutMs = 45000
 ): Promise<ReceiptData> {
   const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
   if (!apiKey) {
@@ -133,6 +132,7 @@ export async function parseReceiptFromImage(
       apiKey,
       models: GEMINI_MODELS,
       timeoutMs,
+      perModelTimeoutMs: 15000,
       body: {
         contents: [
           {

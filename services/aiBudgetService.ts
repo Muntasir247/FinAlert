@@ -24,13 +24,10 @@ export interface AiBudgetRecommendation {
 }
 
 const GEMINI_MODELS = [
-  'gemini-3.6-flash',
-  'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
-  'gemini-3.8-flash',
-  'gemini-3.7-flash',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3.5-flash-lite',
   'gemini-3.5-flash',
-  'gemini-flash-latest',
 ];
 
 const STANDARD_CATEGORIES = [
@@ -234,6 +231,7 @@ Please provide an optimized monthly budget plan tailored to this user. Analyze w
       apiKey,
       models: GEMINI_MODELS,
       timeoutMs,
+      perModelTimeoutMs: 15000,
       body: {
         contents: [
           {
