@@ -99,7 +99,6 @@ export default function ForgotPasswordScreen() {
         setErrorMsg(error.message || 'Invalid or expired code. Please try again.');
       } else {
         setSuccessMsg('Password updated successfully! Redirecting...');
-        // The auth state change will automatically redirect authenticated users to /(tabs)
       }
     } catch (err: any) {
       setErrorMsg('An unexpected error occurred. Please try again.');
@@ -135,51 +134,53 @@ export default function ForgotPasswordScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
+      {/* Fixed Top Bar: Back arrow strictly at top */}
+      <View
+        style={{ paddingTop: insets.top + 6, paddingHorizontal: 16 }}
+        className="flex-row items-center"
+      >
+        <TouchableOpacity
+          onPress={() => {
+            if (step === 'verify_and_reset') {
+              setStep('request_otp');
+              setErrorMsg(null);
+              setSuccessMsg(null);
+            } else {
+              router.back();
+            }
+          }}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          style={{
+            width: 48,
+            height: 48,
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginLeft: -8,
+          }}
+        >
+          <Ionicons name="arrow-back" size={24} color="#091E15" />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         contentContainerStyle={{
           flexGrow: 1,
-          paddingTop: insets.top + 16,
-          paddingBottom: insets.bottom + 20,
+          paddingTop: 8,
+          paddingBottom: insets.bottom + 16,
           paddingHorizontal: 20,
-          justifyContent: 'space-between',
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-1 justify-center py-6">
-          {/* Top Back Navigation Bar */}
-          <View className="flex-row items-center mb-4">
-            <TouchableOpacity
-              onPress={() => {
-                if (step === 'verify_and_reset') {
-                  setStep('request_otp');
-                  setErrorMsg(null);
-                  setSuccessMsg(null);
-                } else {
-                  router.back();
-                }
-              }}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-              style={{
-                width: 48,
-                height: 48,
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginLeft: -8,
-              }}
-            >
-              <Ionicons name="arrow-back" size={24} color="#091E15" />
-            </TouchableOpacity>
-          </View>
-
+        <View className="pt-2 pb-6">
           {/* Branding Block */}
           <View className="items-center mb-6">
-            <View className="w-[80px] h-[80px] rounded-[40px] bg-light-green items-center justify-center mb-3 shadow-sm">
+            <View className="w-[72px] h-[72px] rounded-[36px] bg-light-green items-center justify-center mb-3 shadow-sm">
               <Image
                 source={require('../../assets/images/logo.png')}
-                className="w-12 h-12"
+                className="w-11 h-11"
                 resizeMode="contain"
               />
             </View>
@@ -187,12 +188,14 @@ export default function ForgotPasswordScreen() {
             <Text className="text-[20px] leading-[22px] font-bold text-light-bg-text">
               {step === 'request_otp' ? 'Forgot Password' : 'Enter Verification Code'}
             </Text>
+
             {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
-            <Text className="text-[13px] leading-[15px] font-normal text-light-bg-shade mt-1 text-center px-4">
-              {step === 'request_otp'
-                ? 'Enter your registered email address to receive a 6-digit recovery code.'
-                : `We sent a 6-digit code to ${email}. Enter the code and set your new password.`}
-            </Text>
+            {/* Only shown for Step 1. In Step 2, duplicate subtitle is removed as requested */}
+            {step === 'request_otp' && (
+              <Text className="text-[13px] leading-[15px] font-normal text-light-bg-shade mt-1 text-center px-4">
+                Enter your registered email address to receive a 6-digit recovery code.
+              </Text>
+            )}
           </View>
 
           {/* Feedback Messages */}
@@ -432,7 +435,7 @@ export default function ForgotPasswordScreen() {
         </View>
 
         {/* Footer */}
-        <View className="flex-row justify-center items-center flex-wrap pt-4 border-t border-light-green h-12">
+        <View className="flex-row justify-center items-center flex-wrap mt-auto pt-4 border-t border-light-green min-h-[48px]">
           {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
           <Text className="text-[13px] leading-[15px] font-normal text-light-bg-shade">
             Remember your password?{' '}
@@ -455,4 +458,3 @@ export default function ForgotPasswordScreen() {
     </KeyboardAvoidingView>
   );
 }
-

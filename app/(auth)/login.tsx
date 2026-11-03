@@ -58,19 +58,16 @@ export default function LoginScreen() {
       <ScrollView
         contentContainerStyle={{
           flexGrow: 1,
-          paddingTop: insets.top + 20,
-          paddingBottom: insets.bottom + 20,
+          paddingTop: insets.top + 16,
+          paddingBottom: insets.bottom + 16,
           paddingHorizontal: 20,
-          justifyContent: 'space-between',
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-1 justify-center py-6">
-          <View className="h-6" />
-
+        <View className="pt-2 pb-6">
           {/* Branding Block */}
-          <View className="items-center mb-8">
+          <View className="items-center mb-6">
             <View className="w-[80px] h-[80px] rounded-[40px] bg-light-green items-center justify-center mb-3 shadow-sm">
               <Image
                 source={require('../../assets/images/logo.png')}
@@ -227,7 +224,7 @@ export default function LoginScreen() {
         </View>
 
         {/* Footer */}
-        <View className="flex-row justify-center items-center flex-wrap pt-4 border-t border-light-green h-12">
+        <View className="flex-row justify-center items-center flex-wrap mt-auto pt-4 border-t border-light-green min-h-[48px]">
           {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
           <Text className="text-[13px] leading-[15px] font-normal text-light-bg-shade">
             Don't have an account?{' '}
