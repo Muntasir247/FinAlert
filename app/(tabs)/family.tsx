@@ -13,6 +13,7 @@ import { useFocusEffect } from 'expo-router';
 import { useFamily } from '../../context/FamilyContext';
 import { useAuth } from '../../context/AuthContext';
 import InviteFamilyModal from '../../components/InviteFamilyModal';
+import FamilySettingsModal from '../../components/FamilySettingsModal';
 import FamilyJoinScreen from '../../components/FamilyJoinScreen';
 import { useFamilyFinance } from '../../components/family/useFamilyFinance';
 import FamilyMembersPanel from '../../components/family/FamilyMembersPanel';
@@ -33,6 +34,7 @@ export default function FamilyScreen() {
   const finance = useFamilyFinance(family?.id ?? null, user?.id);
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'members' | 'expenses' | 'transactions'>('overview');
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
+  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
 
   // Re-fetch finance data every time the screen gains focus so changes made by
   // other members (expenses, transactions, roles) show up without an app relaunch.
@@ -80,15 +82,26 @@ export default function FamilyScreen() {
               {memberCount} {memberCount === 1 ? 'member' : 'members'}
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.inviteBtn}
-            onPress={() => setInviteModalVisible(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Invite to family"
-          >
-            <Feather name="user-plus" size={18} color="#0FB384" />
-            <Text style={styles.inviteBtnLabel}>Invite</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.inviteBtn}
+              onPress={() => setInviteModalVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Invite to family"
+            >
+              <Feather name="user-plus" size={18} color="#0FB384" />
+              <Text style={styles.inviteBtnLabel}>Invite</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.settingsBtn}
+              onPress={() => setSettingsModalVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Family settings"
+            >
+              <Ionicons name="settings-outline" size={18} color="#64748B" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* ── Summary Metrics ── */}
@@ -245,6 +258,11 @@ export default function FamilyScreen() {
         familyName={family.name}
         onClose={() => setInviteModalVisible(false)}
       />
+
+      <FamilySettingsModal
+        visible={settingsModalVisible}
+        onClose={() => setSettingsModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -279,6 +297,11 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 2,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   inviteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -295,6 +318,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#0FB384',
+  },
+  settingsBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingContainer: {
     flex: 1,

@@ -113,3 +113,30 @@ export async function joinFamilyByCode(code: string): Promise<Family> {
   }
   return data as Family;
 }
+
+export async function leaveFamily(): Promise<void> {
+  const { error } = await supabase.rpc('leave_family');
+  if (error) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { error: directError } = await supabase
+        .from('family_members')
+        .delete()
+        .eq('user_id', user.id);
+      if (directError) throw error;
+      return;
+    }
+    throw error;
+  }
+}
+
+export async function deleteFamily(familyId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_family', { p_family_id: familyId });
+  if (error) {
+    const { error: directError } = await supabase
+      .from('families')
+      .delete()
+      .eq('id', familyId);
+    if (directError) throw error;
+  }
+}

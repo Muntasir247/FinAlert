@@ -154,7 +154,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       });
-      return { error: updateError ?? null };
+      if (updateError) {
+        return { error: updateError };
+      }
+
+      // Explicitly sign out so the user is not automatically logged in
+      await supabase.auth.signOut();
+      return { error: null };
     } catch (err: any) {
       return { error: err };
     }

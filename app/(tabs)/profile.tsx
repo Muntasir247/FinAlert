@@ -385,7 +385,7 @@ export default function ProfileScreen() {
                       <Text style={styles.bulletTitle}>Direct Support</Text>
                       {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
                       <Text style={styles.bulletDesc}>
-                        Need assistance or have feedback? Reach out to our dedicated support team at support@finalert.app.
+                        Need assistance or have feedback? Reach out to our dedicated support team at adormuntasir@gmail.com.
                       </Text>
                     </View>
                   </View>

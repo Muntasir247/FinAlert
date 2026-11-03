@@ -51,7 +51,7 @@ export default function ForgotPasswordScreen() {
       if (error) {
         setErrorMsg(error.message || 'Failed to send recovery code. Please check your email.');
       } else {
-        setSuccessMsg(`A 6-digit recovery code has been sent to ${email.trim()}.`);
+        setSuccessMsg(`A recovery code has been sent to ${email.trim()}.`);
         setStep('verify_and_reset');
       }
     } catch (err: any) {
@@ -65,12 +65,12 @@ export default function ForgotPasswordScreen() {
   // Handle Step 2: Verify OTP and set new password
   const handleResetPassword = async () => {
     if (!otpCode.trim() || !newPassword.trim() || !confirmPassword.trim()) {
-      setErrorMsg('Please enter the 6-digit code and your new password.');
+      setErrorMsg('Please enter the verification code and your new password.');
       return;
     }
 
     if (otpCode.trim().length < 6) {
-      setErrorMsg('Please enter a valid 6-digit verification code.');
+      setErrorMsg('Please enter a valid verification code.');
       return;
     }
 
@@ -98,7 +98,10 @@ export default function ForgotPasswordScreen() {
       if (error) {
         setErrorMsg(error.message || 'Invalid or expired code. Please try again.');
       } else {
-        setSuccessMsg('Password updated successfully! Redirecting...');
+        setSuccessMsg('Password updated successfully! Redirecting to login...');
+        setTimeout(() => {
+          router.replace('/(auth)/login');
+        }, 1200);
       }
     } catch (err: any) {
       setErrorMsg('An unexpected error occurred. Please try again.');
@@ -118,7 +121,7 @@ export default function ForgotPasswordScreen() {
       if (error) {
         setErrorMsg(error.message || 'Failed to resend code. Please try again.');
       } else {
-        setSuccessMsg('A new 6-digit code has been sent to your email.');
+        setSuccessMsg('A new verification code has been sent to your email.');
       }
     } catch (err: any) {
       setErrorMsg('Failed to resend code. Please try again.');
@@ -193,7 +196,7 @@ export default function ForgotPasswordScreen() {
             {/* Only shown for Step 1. In Step 2, duplicate subtitle is removed as requested */}
             {step === 'request_otp' && (
               <Text className="text-[13px] leading-[15px] font-normal text-light-bg-shade mt-1 text-center px-4">
-                Enter your registered email address to receive a 6-digit recovery code.
+                Enter your registered email address to receive a recovery code.
               </Text>
             )}
           </View>
@@ -279,15 +282,15 @@ export default function ForgotPasswordScreen() {
               <View className="gap-y-1.5">
                 {/* Subtext token: text-[14px] font-normal */}
                 <Text className="text-[14px] font-normal text-light-bg-text">
-                  6-Digit Verification Code
+                  Verification Code
                 </Text>
                 <View className="flex-row items-center bg-white border border-light-green rounded-xl px-4 h-[52px]">
                   <TextInput
                     className="flex-1 text-[14px] font-normal text-light-bg-text h-full tracking-widest"
-                    placeholder="123456"
+                    placeholder="Enter code"
                     placeholderTextColor="#A0ADB6"
                     keyboardType="number-pad"
-                    maxLength={6}
+                    maxLength={10}
                     autoCapitalize="none"
                     autoCorrect={false}
                     value={otpCode}

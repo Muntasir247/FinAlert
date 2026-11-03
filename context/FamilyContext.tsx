@@ -5,6 +5,8 @@ import {
   fetchUserFamily,
   createFamily as createFamilyDb,
   joinFamilyByCode as joinFamilyByCodeDb,
+  leaveFamily as leaveFamilyDb,
+  deleteFamily as deleteFamilyDb,
 } from '../lib/families';
 import type { Family, FamilyMember } from '../lib/families';
 
@@ -15,6 +17,8 @@ interface FamilyContextType {
   hasLoaded: boolean;
   createFamily: (name: string) => Promise<{ error: any; family?: Family }>;
   joinFamily: (code: string) => Promise<{ error: any; family?: Family }>;
+  leaveFamily: () => Promise<{ error: any }>;
+  deleteFamily: () => Promise<{ error: any }>;
   refreshFamily: () => Promise<void>;
 }
 
@@ -27,6 +31,12 @@ function mapFamilyError(err: any): string {
   }
   if (msg.includes('INVALID_CODE')) {
     return 'Invalid family code. Please check and try again.';
+  }
+  if (msg.includes('SOLE_ADMIN_CANNOT_LEAVE')) {
+    return 'Please promote another member to Admin before leaving, or delete the family.';
+  }
+  if (msg.includes('NOT_ADMIN')) {
+    return 'Only an admin can perform this action.';
   }
   if (msg.includes('Family name is required')) {
     return 'Please enter a name for your family.';
@@ -128,6 +138,49 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     [user, loadFamily, notify]
   );
 
+  const leaveFamily = useCallback(async () => {
+    try {
+      await leaveFamilyDb();
+      setFamily(null);
+      setMembers([]);
+      notify({
+        category: 'family',
+        title: 'Left family group',
+        message: 'You have left the family group.',
+        progress: null,
+        accent_color: 'blue',
+        action_type: 'view_family',
+      });
+      return { error: null };
+    } catch (error) {
+      console.error('Error leaving family:', error);
+      return { error: { message: mapFamilyError(error) } };
+    }
+  }, [notify]);
+
+  const deleteFamily = useCallback(async () => {
+    if (!family) {
+      return { error: { message: 'No active family' } };
+    }
+    try {
+      await deleteFamilyDb(family.id);
+      setFamily(null);
+      setMembers([]);
+      notify({
+        category: 'family',
+        title: 'Family group deleted',
+        message: `${family.name} was deleted.`,
+        progress: null,
+        accent_color: 'blue',
+        action_type: 'view_family',
+      });
+      return { error: null };
+    } catch (error) {
+      console.error('Error deleting family:', error);
+      return { error: { message: mapFamilyError(error) } };
+    }
+  }, [family, notify]);
+
   return (
     <FamilyContext.Provider
       value={{
@@ -137,6 +190,8 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         hasLoaded,
         createFamily,
         joinFamily,
+        leaveFamily,
+        deleteFamily,
         refreshFamily,
       }}
     >

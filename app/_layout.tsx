@@ -62,6 +62,7 @@ function NavigationLayout() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const isForgotPassword = (segments as string[]).includes('forgot-password');
     const inTabsGroup = segments[0] === '(tabs)';
     const isRoot = segments[0] === 'index' || !segments[0];
 
@@ -71,8 +72,9 @@ function NavigationLayout() {
         router.replace('/(auth)/login');
       }
     } else {
-      // Direct authenticated users away from landing/auth screens to the tab system
-      if (inAuthGroup || isRoot) {
+      // Direct authenticated users away from landing/auth screens to the tab system,
+      // except while on the password recovery screen to allow redirecting to login.
+      if ((inAuthGroup && !isForgotPassword) || isRoot) {
         router.replace('/(tabs)');
       }
     }
