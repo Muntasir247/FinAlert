@@ -1,0 +1,458 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  ActivityIndicator,
+  Image,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../../context/AuthContext';
+import { LinearGradient } from 'expo-linear-gradient';
+
+export default function ForgotPasswordScreen() {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { resetPassword, verifyOtpAndResetPassword } = useAuth();
+
+  // Step 1: 'request_otp' | Step 2: 'verify_and_reset'
+  const [step, setStep] = useState<'request_otp' | 'verify_and_reset'>('request_otp');
+
+  const [email, setEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [newPasswordVisible, setNewPasswordVisible] = useState(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Handle Step 1: Send OTP to email
+  const handleSendCode = async () => {
+    if (!email.trim()) {
+      setErrorMsg('Please enter your email address.');
+      return;
+    }
+
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setLoading(true);
+
+    try {
+      const { error } = await resetPassword(email.trim());
+      if (error) {
+        setErrorMsg(error.message || 'Failed to send recovery code. Please check your email.');
+      } else {
+        setSuccessMsg(`A 6-digit recovery code has been sent to ${email.trim()}.`);
+        setStep('verify_and_reset');
+      }
+    } catch (err: any) {
+      setErrorMsg('An unexpected error occurred. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Step 2: Verify OTP and set new password
+  const handleResetPassword = async () => {
+    if (!otpCode.trim() || !newPassword.trim() || !confirmPassword.trim()) {
+      setErrorMsg('Please enter the 6-digit code and your new password.');
+      return;
+    }
+
+    if (otpCode.trim().length < 6) {
+      setErrorMsg('Please enter a valid 6-digit verification code.');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setErrorMsg('Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setErrorMsg('Passwords do not match. Please verify and try again.');
+      return;
+    }
+
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setLoading(true);
+
+    try {
+      const { error } = await verifyOtpAndResetPassword(
+        email.trim(),
+        otpCode.trim(),
+        newPassword
+      );
+
+      if (error) {
+        setErrorMsg(error.message || 'Invalid or expired code. Please try again.');
+      } else {
+        setSuccessMsg('Password updated successfully! Redirecting...');
+        // The auth state change will automatically redirect authenticated users to /(tabs)
+      }
+    } catch (err: any) {
+      setErrorMsg('An unexpected error occurred. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Resend code in Step 2
+  const handleResendCode = async () => {
+    setErrorMsg(null);
+    setLoading(true);
+
+    try {
+      const { error } = await resetPassword(email.trim());
+      if (error) {
+        setErrorMsg(error.message || 'Failed to resend code. Please try again.');
+      } else {
+        setSuccessMsg('A new 6-digit code has been sent to your email.');
+      }
+    } catch (err: any) {
+      setErrorMsg('Failed to resend code. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView
+      className="flex-1 bg-green-white"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
+    >
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingTop: insets.top + 16,
+          paddingBottom: insets.bottom + 20,
+          paddingHorizontal: 20,
+          justifyContent: 'space-between',
+        }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="flex-1 justify-center py-6">
+          {/* Top Back Navigation Bar */}
+          <View className="flex-row items-center mb-4">
+            <TouchableOpacity
+              onPress={() => {
+                if (step === 'verify_and_reset') {
+                  setStep('request_otp');
+                  setErrorMsg(null);
+                  setSuccessMsg(null);
+                } else {
+                  router.back();
+                }
+              }}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              style={{
+                width: 48,
+                height: 48,
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginLeft: -8,
+              }}
+            >
+              <Ionicons name="arrow-back" size={24} color="#091E15" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Branding Block */}
+          <View className="items-center mb-6">
+            <View className="w-[80px] h-[80px] rounded-[40px] bg-light-green items-center justify-center mb-3 shadow-sm">
+              <Image
+                source={require('../../assets/images/logo.png')}
+                className="w-12 h-12"
+                resizeMode="contain"
+              />
+            </View>
+            {/* Title token: text-[20px] leading-[22px] font-bold */}
+            <Text className="text-[20px] leading-[22px] font-bold text-light-bg-text">
+              {step === 'request_otp' ? 'Forgot Password' : 'Enter Verification Code'}
+            </Text>
+            {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
+            <Text className="text-[13px] leading-[15px] font-normal text-light-bg-shade mt-1 text-center px-4">
+              {step === 'request_otp'
+                ? 'Enter your registered email address to receive a 6-digit recovery code.'
+                : `We sent a 6-digit code to ${email}. Enter the code and set your new password.`}
+            </Text>
+          </View>
+
+          {/* Feedback Messages */}
+          {errorMsg && (
+            <View className="p-3 bg-red-50 border border-red-200 rounded-xl mb-4">
+              {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
+              <Text className="text-[13px] leading-[15px] font-normal text-red-600">
+                {errorMsg}
+              </Text>
+            </View>
+          )}
+
+          {successMsg && (
+            <View className="p-3 bg-green-50 border border-green-200 rounded-xl mb-4">
+              {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
+              <Text className="text-[13px] leading-[15px] font-normal text-green-600">
+                {successMsg}
+              </Text>
+            </View>
+          )}
+
+          {/* Step 1: Email Form */}
+          {step === 'request_otp' && (
+            <View className="gap-y-4">
+              {/* Email Field */}
+              <View className="gap-y-1.5">
+                {/* Subtext token: text-[14px] font-normal */}
+                <Text className="text-[14px] font-normal text-light-bg-text">
+                  Email Address
+                </Text>
+                <View className="flex-row items-center bg-white border border-light-green rounded-xl px-4 h-[52px]">
+                  <TextInput
+                    className="flex-1 text-[14px] font-normal text-light-bg-text h-full"
+                    placeholder="Enter your email"
+                    placeholderTextColor="#A0ADB6"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={email}
+                    onChangeText={setEmail}
+                    editable={!loading}
+                    accessibilityLabel="Email input for password recovery"
+                  />
+                </View>
+              </View>
+
+              {/* Submit Button */}
+              <View className="mt-2 rounded-[26px] overflow-hidden h-[52px]">
+                <LinearGradient
+                  colors={loading ? ['#9AE1C9', '#82D2B4'] : ['#02C78E', '#0FB384']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  className="flex-1"
+                >
+                  <TouchableOpacity
+                    className="flex-1 justify-center items-center"
+                    onPress={handleSendCode}
+                    disabled={loading}
+                    activeOpacity={0.82}
+                    accessibilityRole="button"
+                    accessibilityLabel="Send Verification Code"
+                  >
+                    {loading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      /* Subtitle token: text-[16px] font-medium */
+                      <Text className="text-[16px] font-medium text-white">
+                        Send Verification Code
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </LinearGradient>
+              </View>
+            </View>
+          )}
+
+          {/* Step 2: Code Verification & Password Reset Form */}
+          {step === 'verify_and_reset' && (
+            <View className="gap-y-4">
+              {/* Code Field */}
+              <View className="gap-y-1.5">
+                {/* Subtext token: text-[14px] font-normal */}
+                <Text className="text-[14px] font-normal text-light-bg-text">
+                  6-Digit Verification Code
+                </Text>
+                <View className="flex-row items-center bg-white border border-light-green rounded-xl px-4 h-[52px]">
+                  <TextInput
+                    className="flex-1 text-[14px] font-normal text-light-bg-text h-full tracking-widest"
+                    placeholder="123456"
+                    placeholderTextColor="#A0ADB6"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={otpCode}
+                    onChangeText={setOtpCode}
+                    editable={!loading}
+                    accessibilityLabel="Verification code input"
+                  />
+                </View>
+              </View>
+
+              {/* New Password Field */}
+              <View className="gap-y-1.5">
+                {/* Subtext token: text-[14px] font-normal */}
+                <Text className="text-[14px] font-normal text-light-bg-text">
+                  New Password
+                </Text>
+                <View className="flex-row items-center bg-white border border-light-green rounded-xl px-4 h-[52px]">
+                  <TextInput
+                    className="flex-1 text-[14px] font-normal text-light-bg-text h-full"
+                    placeholder="Enter new password"
+                    placeholderTextColor="#A0ADB6"
+                    secureTextEntry={!newPasswordVisible}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    editable={!loading}
+                    accessibilityLabel="New password input"
+                  />
+                  <TouchableOpacity
+                    onPress={() => setNewPasswordVisible(!newPasswordVisible)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={newPasswordVisible ? 'Hide password' : 'Show password'}
+                    style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}
+                  >
+                    <Ionicons
+                      name={newPasswordVisible ? 'eye-outline' : 'eye-off-outline'}
+                      size={20}
+                      color="#6B7280"
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Confirm New Password Field */}
+              <View className="gap-y-1.5">
+                {/* Subtext token: text-[14px] font-normal */}
+                <Text className="text-[14px] font-normal text-light-bg-text">
+                  Confirm New Password
+                </Text>
+                <View className="flex-row items-center bg-white border border-light-green rounded-xl px-4 h-[52px]">
+                  <TextInput
+                    className="flex-1 text-[14px] font-normal text-light-bg-text h-full"
+                    placeholder="Re-enter new password"
+                    placeholderTextColor="#A0ADB6"
+                    secureTextEntry={!confirmPasswordVisible}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    editable={!loading}
+                    accessibilityLabel="Confirm password input"
+                  />
+                  <TouchableOpacity
+                    onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={confirmPasswordVisible ? 'Hide password' : 'Show password'}
+                    style={{ width: 48, height: 48, justifyContent: 'center', alignItems: 'center' }}
+                  >
+                    <Ionicons
+                      name={confirmPasswordVisible ? 'eye-outline' : 'eye-off-outline'}
+                      size={20}
+                      color="#6B7280"
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Resend Code & Change Email Row */}
+              <View className="flex-row justify-between items-center -mt-1">
+                <TouchableOpacity
+                  onPress={() => {
+                    setStep('request_otp');
+                    setErrorMsg(null);
+                    setSuccessMsg(null);
+                  }}
+                  disabled={loading}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change email"
+                  style={{ minHeight: 48, justifyContent: 'center', paddingHorizontal: 4 }}
+                >
+                  {/* Subtext token: text-[14px] font-normal */}
+                  <Text className="text-[14px] font-normal text-light-bg-shade">
+                    Change Email
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleResendCode}
+                  disabled={loading}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Resend code"
+                  style={{ minHeight: 48, justifyContent: 'center', paddingHorizontal: 4 }}
+                >
+                  {/* Subtext token: text-[14px] font-normal */}
+                  <Text className="text-[14px] font-normal text-alt-accent">
+                    Resend Code
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Submit Button */}
+              <View className="mt-2 rounded-[26px] overflow-hidden h-[52px]">
+                <LinearGradient
+                  colors={loading ? ['#9AE1C9', '#82D2B4'] : ['#02C78E', '#0FB384']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  className="flex-1"
+                >
+                  <TouchableOpacity
+                    className="flex-1 justify-center items-center"
+                    onPress={handleResetPassword}
+                    disabled={loading}
+                    activeOpacity={0.82}
+                    accessibilityRole="button"
+                    accessibilityLabel="Reset Password"
+                  >
+                    {loading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      /* Subtitle token: text-[16px] font-medium */
+                      <Text className="text-[16px] font-medium text-white">
+                        Reset Password
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </LinearGradient>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* Footer */}
+        <View className="flex-row justify-center items-center flex-wrap pt-4 border-t border-light-green h-12">
+          {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
+          <Text className="text-[13px] leading-[15px] font-normal text-light-bg-shade">
+            Remember your password?{' '}
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.push('/(auth)/login')}
+            disabled={loading}
+            activeOpacity={0.7}
+            accessibilityRole="link"
+            accessibilityLabel="Navigate to login screen"
+            style={{ minHeight: 48, justifyContent: 'center', paddingHorizontal: 4 }}
+          >
+            {/* Subtitle token: text-[16px] font-medium */}
+            <Text className="text-[16px] font-medium text-alt-accent">
+              Login
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+

@@ -179,8 +179,25 @@ export default function LoginScreen() {
               </View>
             </View>
 
+            {/* Forgot Password Link */}
+            <View className="items-end -mt-1">
+              <TouchableOpacity
+                onPress={() => router.push('/(auth)/forgot-password')}
+                disabled={loading}
+                activeOpacity={0.7}
+                accessibilityRole="link"
+                accessibilityLabel="Forgot Password"
+                style={{ minHeight: 48, justifyContent: 'center', paddingHorizontal: 4 }}
+              >
+                {/* Subtext token: text-[14px] font-normal */}
+                <Text className="text-[14px] font-normal text-alt-accent">
+                  Forgot Password?
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Submit Button */}
-            <View className="mt-4 rounded-[26px] overflow-hidden h-[52px]">
+            <View className="mt-2 rounded-[26px] overflow-hidden h-[52px]">
               <LinearGradient
                 colors={loading ? ['#9AE1C9', '#82D2B4'] : ['#02C78E', '#0FB384']}
                 start={{ x: 0, y: 0 }}

@@ -17,6 +17,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
+  resetPassword: (email: string) => Promise<{ error: any }>;
+  verifyOtpAndResetPassword: (email: string, token: string, newPassword: string) => Promise<{ error: any }>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -133,6 +135,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error };
   };
 
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    return { error: error ?? null };
+  };
+
+  const verifyOtpAndResetPassword = async (email: string, token: string, newPassword: string) => {
+    try {
+      const { error: otpError } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'recovery',
+      });
+      if (otpError) {
+        return { error: otpError };
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      return { error: updateError ?? null };
+    } catch (err: any) {
+      return { error: err };
+    }
+  };
+
   const refreshProfile = async () => {
     if (user) {
       await loadProfile(user.id, user.email ?? '');
@@ -149,6 +176,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         signUp,
         signOut,
+        resetPassword,
+        verifyOtpAndResetPassword,
         refreshProfile,
       }}
     >
