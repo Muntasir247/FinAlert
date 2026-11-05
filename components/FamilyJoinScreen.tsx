@@ -10,9 +10,14 @@ import {
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useFamily } from '../context/FamilyContext';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function FamilyJoinScreen() {
   const { joinFamily, createFamily } = useFamily();
+  const { colors, isDark } = useTheme();
+  const { language } = useLanguage();
+  const isBangla = language === 'bn';
   const [mode, setMode] = useState<'join' | 'create'>('join');
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
@@ -66,28 +71,34 @@ export default function FamilyJoinScreen() {
       contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"
     >
-      <View style={styles.iconCircle}>
+      <View style={[styles.iconCircle, isDark && { backgroundColor: '#14382A' }]}>
         <Ionicons name="people" size={32} color="#0FB384" />
       </View>
 
-      <Text style={styles.title}>Join a Family Group</Text>
-      <Text style={styles.description}>
-        Enter the invite code shared by your family member to join.
+      <Text style={[styles.title, { color: colors.text }]}>
+        {mode === 'join'
+          ? (isBangla ? 'পারিবারিক গ্রুপে যুক্ত হন' : 'Join a Family Group')
+          : (isBangla ? 'নতুন পরিবার তৈরি করুন' : 'Create a New Family')}
+      </Text>
+      <Text style={[styles.description, { color: colors.textSecondary }]}>
+        {mode === 'join'
+          ? (isBangla ? 'যোগ দিতে আপনার পরিবারের সদস্যের শেয়ার করা আমন্ত্রণ কোডটি লিখুন।' : 'Enter the invite code shared by your family member to join.')
+          : (isBangla ? 'আপনার পরিবারের জন্য একটি অনন্য গ্রুপ তৈরি করুন।' : 'Create a unique group for your family.')}
       </Text>
 
       {mode === 'join' ? (
         <>
-          <View style={styles.inputWrap}>
+          <View style={[styles.inputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
             <Feather name="hash" size={18} color="#0FB384" />
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: colors.text }]}
               value={code}
               onChangeText={(text) => {
                 setCode(text);
                 setErrorMsg(null);
               }}
               placeholder="FAMS-XXXX"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={colors.textMuted}
               autoCapitalize="characters"
               autoCorrect={false}
               maxLength={9}
@@ -106,40 +117,46 @@ export default function FamilyJoinScreen() {
             {submitting ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={styles.primaryButtonText}>Join Family</Text>
+              <Text style={styles.primaryButtonText}>
+                {isBangla ? 'পরিবারে যুক্ত হন' : 'Join Family'}
+              </Text>
             )}
           </TouchableOpacity>
 
           <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
+            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+            <Text style={[styles.dividerText, { color: colors.textSecondary }]}>
+              {isBangla ? 'অথবা' : 'or'}
+            </Text>
+            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
           </View>
 
           <TouchableOpacity
-            style={styles.secondaryButton}
+            style={[styles.secondaryButton, { backgroundColor: isDark ? colors.surfaceSubtle : '#FFFFFF' }]}
             onPress={() => switchMode('create')}
             disabled={submitting}
             accessibilityRole="button"
             accessibilityLabel="Create a new family group"
           >
             <Ionicons name="add-circle-outline" size={18} color="#0FB384" />
-            <Text style={styles.secondaryButtonText}>Create a new family</Text>
+            <Text style={styles.secondaryButtonText}>
+              {isBangla ? 'নতুন পরিবার তৈরি করুন' : 'Create a new family'}
+            </Text>
           </TouchableOpacity>
         </>
       ) : (
         <>
-          <View style={styles.inputWrap}>
+          <View style={[styles.inputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
             <Feather name="users" size={18} color="#0FB384" />
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: colors.text }]}
               value={name}
               onChangeText={(text) => {
                 setName(text);
                 setErrorMsg(null);
               }}
-              placeholder="Family name (e.g., My Family)"
-              placeholderTextColor="#94A3B8"
+              placeholder={isBangla ? 'পরিবারের নাম (যেমন: আমাদের পরিবার)' : 'Family name (e.g., My Family)'}
+              placeholderTextColor={colors.textMuted}
               autoCapitalize="words"
               autoCorrect={false}
               editable={!submitting}
@@ -157,7 +174,9 @@ export default function FamilyJoinScreen() {
             {submitting ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={styles.primaryButtonText}>Create Family</Text>
+              <Text style={styles.primaryButtonText}>
+                {isBangla ? 'পরিবার তৈরি করুন' : 'Create Family'}
+              </Text>
             )}
           </TouchableOpacity>
 
@@ -169,14 +188,16 @@ export default function FamilyJoinScreen() {
             accessibilityLabel="Back to join with a code"
           >
             <Feather name="arrow-left" size={16} color="#0FB384" />
-            <Text style={styles.secondaryButtonText}>Back to join</Text>
+            <Text style={styles.secondaryButtonText}>
+              {isBangla ? 'যোগদানে ফিরুন' : 'Back to join'}
+            </Text>
           </TouchableOpacity>
         </>
       )}
 
       {errorMsg && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{errorMsg}</Text>
+        <View style={[styles.errorBox, isDark && { backgroundColor: '#3B1828', borderColor: '#BE185D' }]}>
+          <Text style={[styles.errorText, isDark && { color: '#FCA5A5' }]}>{errorMsg}</Text>
         </View>
       )}
     </ScrollView>

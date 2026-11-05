@@ -17,6 +17,8 @@ import {
 import type { ExpoSpeechRecognitionErrorEvent } from 'expo-speech-recognition';
 import { parseVoiceIntent } from '../services/voiceIntentService';
 import type { VoiceIntent } from '../services/voiceIntentService';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const SHEET_MAX_HEIGHT = 500;
 
@@ -61,8 +63,11 @@ export default function VoiceEntryModal({
   onIntent: (intent: VoiceIntent) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const { language } = useLanguage();
+  const isBangla = language === 'bn';
 
-  const [lang, setLang] = useState<LangKey>('bn-BD');
+  const [lang, setLang] = useState<LangKey>(isBangla ? 'bn-BD' : 'en-US');
   const [status, setStatus] = useState<Status>('idle');
   const [partialText, setPartialText] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -91,7 +96,7 @@ export default function VoiceEntryModal({
 
   useEffect(() => {
     if (visible) {
-      setLang('bn-BD');
+      setLang(language === 'bn' ? 'bn-BD' : 'en-US');
       setStatus('idle');
       setPartialText('');
       setErrorMsg(null);
@@ -310,22 +315,29 @@ export default function VoiceEntryModal({
         <Animated.View
           style={[
             styles.sheet,
-            { paddingBottom: Math.max(insets.bottom, 16), transform: [{ translateY }] },
+            {
+              backgroundColor: colors.card,
+              borderTopColor: colors.cardBorder,
+              paddingBottom: Math.max(insets.bottom, 16),
+              transform: [{ translateY }],
+            },
           ]}
         >
           {/* Drag handle */}
-          <View style={styles.handle} />
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Voice Entry</Text>
+            <Text style={[styles.title, { color: colors.text }]}>
+              {isBangla ? 'ভয়েস এন্ট্রি' : 'Voice Entry'}
+            </Text>
             <TouchableOpacity
-              style={styles.closeButton}
+              style={[styles.closeButton, { backgroundColor: isDark ? colors.surfaceSubtle : '#F3F4F6' }]}
               onPress={handleClose}
               accessibilityRole="button"
               accessibilityLabel="Close Voice Entry"
             >
-              <Ionicons name="close" size={22} color="#091E15" />
+              <Ionicons name="close" size={22} color={colors.text} />
             </TouchableOpacity>
           </View>
 
@@ -334,6 +346,7 @@ export default function VoiceEntryModal({
             <Animated.View
               style={[
                 styles.micOuter,
+                isDark && { backgroundColor: isListening ? 'rgba(239, 68, 68, 0.25)' : 'rgba(15, 179, 132, 0.25)' },
                 isListening && styles.micOuterActive,
                 { transform: [{ scale: pulse }] },
               ]}
@@ -367,34 +380,36 @@ export default function VoiceEntryModal({
               {isProcessing ? (
                 <>
                   {partialText ? (
-                    <Text style={styles.partialText}>{partialText}</Text>
+                    <Text style={[styles.partialText, { color: colors.text }]}>{partialText}</Text>
                   ) : null}
-                  <Text style={styles.processingText}>
-                    Understanding your request...
+                  <Text style={[styles.processingText, { color: colors.textSecondary }]}>
+                    {isBangla ? 'আপনার অনুরোধ বোঝা হচ্ছে...' : 'Understanding your request...'}
                   </Text>
                 </>
               ) : isListening ? (
                 <>
-                  <Text style={styles.partialText}>
-                    {partialText || 'Listening...'}
+                  <Text style={[styles.partialText, { color: colors.text }]}>
+                    {partialText || (isBangla ? 'শুনছি...' : 'Listening...')}
                   </Text>
-                  <Text style={styles.hint}>Tap the button when you are done</Text>
+                  <Text style={[styles.hint, { color: colors.textSecondary }]}>
+                    {isBangla ? 'সম্পন্ন হলে বাটনে চাপ দিন' : 'Tap the button when you are done'}
+                  </Text>
                 </>
               ) : (
                 <>
-                  <Text style={styles.instruction}>
-                    Tap the mic and speak your expense or income
+                  <Text style={[styles.instruction, { color: colors.text }]}>
+                    {isBangla ? 'মাইক্রোফোনে চাপ দিয়ে খরচ বা আয় বলুন' : 'Tap the mic and speak your expense or income'}
                   </Text>
-                  <Text style={styles.hint}>
-                    Example: {"Spent 500 taka on food"} or {"Received 10000 salary"}
+                  <Text style={[styles.hint, { color: colors.textSecondary }]}>
+                    {isBangla ? 'উদাহরণ: "খাবারে ৫০০ টাকা খরচ" অথবা "বেতন পেয়েছি ১০০০০"' : 'Example: "Spent 500 taka on food" or "Received 10000 salary"'}
                   </Text>
                 </>
               )}
             </View>
 
             {errorMsg && (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{errorMsg}</Text>
+              <View style={[styles.errorBox, isDark && { backgroundColor: '#3B1828', borderColor: '#BE185D' }]}>
+                <Text style={[styles.errorText, isDark && { color: '#FCA5A5' }]}>{errorMsg}</Text>
               </View>
             )}
 
@@ -407,7 +422,11 @@ export default function VoiceEntryModal({
                     key={item.key}
                     style={[
                       styles.langChip,
-                      isActive && styles.langChipActive,
+                      {
+                        backgroundColor: isDark ? colors.surfaceSubtle : '#F8FAFC',
+                        borderColor: isDark ? colors.cardBorder : '#E2E8F0',
+                      },
+                      isActive && [styles.langChipActive, isDark && { backgroundColor: '#143D2E', borderColor: '#0FB384' }],
                       isProcessing && styles.langChipDisabled,
                     ]}
                     onPress={() => setLang(item.key)}
@@ -419,7 +438,8 @@ export default function VoiceEntryModal({
                     <Text
                       style={[
                         styles.langChipText,
-                        isActive && styles.langChipTextActive,
+                        { color: isDark ? colors.textSecondary : '#334155' },
+                        isActive && [styles.langChipTextActive, isDark && { color: '#A7F3D0' }],
                       ]}
                     >
                       {item.label}

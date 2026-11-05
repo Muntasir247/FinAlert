@@ -11,6 +11,8 @@ import {
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTransactions } from '../context/TransactionsContext';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   markTrxIdProcessed,
   removePendingTransaction,
@@ -35,6 +37,8 @@ export default function BKashBatchReviewModal({
 }: BKashBatchReviewModalProps) {
   const insets = useSafeAreaInsets();
   const { addTransactions } = useTransactions();
+  const { colors, isDark } = useTheme();
+  const { isBangla, formatCurrency, translateCategory } = useLanguage();
 
   // Local state for items and selections
   const [items, setItems] = useState<Array<BKashTransaction & { selected: boolean }>>([]);
@@ -130,17 +134,21 @@ export default function BKashBatchReviewModal({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 16) }]}>
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}>
             <View style={styles.headerTitleRow}>
               <View style={styles.iconWrap}>
                 <Ionicons name="phone-portrait" size={18} color="#FFFFFF" />
               </View>
               <View>
-                <Text style={styles.title}>Review Detected bKash SMS</Text>
-                <Text style={styles.subtitle}>
-                  {selectedItems.length} of {items.length} transactions selected
+                <Text style={[styles.title, { color: colors.text }]}>
+                  {isBangla ? 'শনাক্তকৃত বিকাশ এসএমএস পর্যালোচনা' : 'Review Detected bKash SMS'}
+                </Text>
+                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                  {isBangla
+                    ? `${items.length}টির মধ্যে ${selectedItems.length}টি লেনদেন নির্বাচিত`
+                    : `${selectedItems.length} of ${items.length} transactions selected`}
                 </Text>
               </View>
             </View>
@@ -150,12 +158,20 @@ export default function BKashBatchReviewModal({
               accessibilityRole="button"
               accessibilityLabel="Close batch review"
             >
-              <Feather name="x" size={22} color="#6B7280" />
+              <Feather name="x" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           {/* Quick Select Bar */}
-          <View style={styles.bulkBar}>
+          <View
+            style={[
+              styles.bulkBar,
+              {
+                backgroundColor: isDark ? colors.surfaceSubtle : '#F9FAFB',
+                borderBottomColor: colors.cardBorder,
+              },
+            ]}
+          >
             <TouchableOpacity
               style={styles.toggleBtn}
               onPress={() => handleToggleAll(selectedItems.length !== items.length)}
@@ -174,11 +190,15 @@ export default function BKashBatchReviewModal({
                 color="#0FB384"
               />
               <Text style={styles.toggleText}>
-                {selectedItems.length === items.length ? 'Deselect All' : 'Select All'}
+                {selectedItems.length === items.length
+                  ? (isBangla ? 'সব অনির্বাচন' : 'Deselect All')
+                  : (isBangla ? 'সব নির্বাচন' : 'Select All')}
               </Text>
             </TouchableOpacity>
 
-            <Text style={styles.bulkNote}>Human-in-the-loop: Uncheck any to ignore</Text>
+            <Text style={[styles.bulkNote, { color: colors.textSecondary }]}>
+              {isBangla ? 'বাদ দিতে আনচেক করুন' : 'Human-in-the-loop: Uncheck any to ignore'}
+            </Text>
           </View>
 
           {/* Transaction List */}
@@ -188,7 +208,14 @@ export default function BKashBatchReviewModal({
               return (
                 <View
                   key={tx.trxId}
-                  style={[styles.card, !tx.selected && styles.cardUnselected]}
+                  style={[
+                    styles.card,
+                    {
+                      backgroundColor: isDark ? colors.surfaceSubtle : '#FFFFFF',
+                      borderColor: colors.cardBorder,
+                    },
+                    !tx.selected && (isDark ? { backgroundColor: '#0B2219', opacity: 0.5 } : styles.cardUnselected),
+                  ]}
                 >
                   {/* Checkbox */}
                   <TouchableOpacity
@@ -200,14 +227,14 @@ export default function BKashBatchReviewModal({
                     <Ionicons
                       name={tx.selected ? 'checkbox' : 'square-outline'}
                       size={24}
-                      color={tx.selected ? '#0FB384' : '#9CA3AF'}
+                      color={tx.selected ? '#0FB384' : colors.textMuted}
                     />
                   </TouchableOpacity>
 
                   {/* Body */}
                   <View style={styles.cardBody}>
                     <View style={styles.topRow}>
-                      <Text style={styles.counterparty} numberOfLines={1}>
+                      <Text style={[styles.counterparty, { color: colors.text }]} numberOfLines={1}>
                         {tx.counterparty}
                       </Text>
                       <Text
@@ -216,26 +243,32 @@ export default function BKashBatchReviewModal({
                           isIncome ? styles.amountIncome : styles.amountExpense,
                         ]}
                       >
-                        {isIncome ? '+' : '-'}৳{tx.amount.toFixed(2)}
+                        {isIncome ? '+' : '-'}{formatCurrency(tx.amount)}
                       </Text>
                     </View>
 
                     <View style={styles.bottomRow}>
-                      <Text style={styles.trxPill}>TrxID: {tx.trxId}</Text>
+                      <Text style={[styles.trxPill, isDark && { backgroundColor: '#14382A', color: '#A7F3D0' }]}>
+                        TrxID: {tx.trxId}
+                      </Text>
                       {tx.reference && (
-                        <Text style={styles.refPill}>Ref: {tx.reference}</Text>
+                        <Text style={[styles.refPill, isDark && { backgroundColor: '#2E1D52', color: '#DDD6FE' }]}>
+                          Ref: {tx.reference}
+                        </Text>
                       )}
-                      <Text style={styles.dateText}>{tx.date}</Text>
+                      <Text style={[styles.dateText, { color: colors.textSecondary }]}>{tx.date}</Text>
 
                       {/* Category tag */}
                       <TouchableOpacity
-                        style={styles.catBadge}
+                        style={[styles.catBadge, isDark && { backgroundColor: '#14382A' }]}
                         onPress={() => setCategoryPickerTrxId(tx.trxId)}
                         accessibilityRole="button"
                         accessibilityLabel={`Change category ${tx.category}`}
                       >
-                        <Text style={styles.catText}>{tx.category}</Text>
-                        <Feather name="chevron-down" size={12} color="#059669" />
+                        <Text style={[styles.catText, isDark && { color: '#A7F3D0' }]}>
+                          {translateCategory(tx.category)}
+                        </Text>
+                        <Feather name="chevron-down" size={12} color={isDark ? '#A7F3D0' : '#059669'} />
                       </TouchableOpacity>
 
                       {/* Remove */}
@@ -245,7 +278,7 @@ export default function BKashBatchReviewModal({
                         accessibilityRole="button"
                         accessibilityLabel="Ignore transaction"
                       >
-                        <Feather name="trash-2" size={14} color="#9CA3AF" />
+                        <Feather name="trash-2" size={14} color={colors.textMuted} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -255,9 +288,12 @@ export default function BKashBatchReviewModal({
           </ScrollView>
 
           {/* Footer Action */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { backgroundColor: colors.card, borderTopColor: colors.cardBorder }]}>
             <TouchableOpacity
-              style={[styles.importBtn, (selectedItems.length === 0 || importing) && styles.btnDisabled]}
+              style={[
+                styles.importBtn,
+                (selectedItems.length === 0 || importing) && [styles.btnDisabled, isDark && { backgroundColor: colors.surfaceSubtle }],
+              ]}
               onPress={handleImportSelected}
               disabled={selectedItems.length === 0 || importing}
               accessibilityRole="button"
@@ -266,8 +302,10 @@ export default function BKashBatchReviewModal({
               <Feather name="check-circle" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
               <Text style={styles.importBtnText}>
                 {importing
-                  ? 'Saving...'
-                  : `Confirm & Add Selected (${selectedItems.length})`}
+                  ? (isBangla ? 'সংরক্ষণ করা হচ্ছে...' : 'Saving...')
+                  : (isBangla
+                    ? `নিশ্চিত করুন এবং যুক্ত করুন (${selectedItems.length})`
+                    : `Confirm & Add Selected (${selectedItems.length})`)}
               </Text>
             </TouchableOpacity>
           </View>
@@ -281,22 +319,26 @@ export default function BKashBatchReviewModal({
               onRequestClose={() => setCategoryPickerTrxId(null)}
             >
               <View style={styles.pickerOverlay}>
-                <View style={styles.pickerCard}>
+                <View style={[styles.pickerCard, { backgroundColor: colors.card }]}>
                   <View style={styles.pickerHeader}>
-                    <Text style={styles.pickerTitle}>Select Category</Text>
+                    <Text style={[styles.pickerTitle, { color: colors.text }]}>
+                      {isBangla ? 'খাত নির্বাচন করুন' : 'Select Category'}
+                    </Text>
                     <TouchableOpacity onPress={() => setCategoryPickerTrxId(null)}>
-                      <Feather name="x" size={20} color="#6B7280" />
+                      <Feather name="x" size={20} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
                   <ScrollView style={{ maxHeight: 300 }}>
                     {categoryOptions.map((cat) => (
                       <TouchableOpacity
                         key={cat.label}
-                        style={styles.categoryOption}
+                        style={[styles.categoryOption, { borderBottomColor: colors.cardBorder }]}
                         onPress={() => handleChangeCategory(categoryPickerTrxId, cat.label)}
                       >
                         <Text style={{ fontSize: 20, marginRight: 10 }}>{cat.emoji}</Text>
-                        <Text style={styles.categoryOptionText}>{cat.label}</Text>
+                        <Text style={[styles.categoryOptionText, { color: colors.text }]}>
+                          {translateCategory(cat.label)}
+                        </Text>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>

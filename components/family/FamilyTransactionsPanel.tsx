@@ -4,6 +4,8 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import AddTransactionModal from './AddTransactionModal';
 import { expenseCategoryMeta, formatDateLabel, formatMoney, initialsOf } from './familyConstants';
 import type { FamilyFinanceApi, FamilyTransaction, FamilyTransactionType } from './useFamilyFinance';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface FamilyTransactionsPanelProps {
   finance: FamilyFinanceApi;
@@ -29,6 +31,8 @@ function groupByDate(txs: FamilyTransaction[]) {
 }
 
 export default function FamilyTransactionsPanel({ finance }: FamilyTransactionsPanelProps) {
+  const { colors, isDark } = useTheme();
+  const { isBangla, translateCategory } = useLanguage();
   const [modalVisible, setModalVisible] = useState(false);
   const [confirmTx, setConfirmTx] = useState<FamilyTransaction | null>(null);
   const [busy, setBusy] = useState(false);
@@ -60,38 +64,44 @@ export default function FamilyTransactionsPanel({ finance }: FamilyTransactionsP
         accessibilityLabel="Add family transaction"
       >
         <Ionicons name="swap-horizontal" size={16} color="#FFFFFF" />
-        <Text style={styles.addBtnText}>Family Transaction</Text>
+        <Text style={styles.addBtnText}>{isBangla ? 'পারিবারিক লেনদেন যোগ করুন' : 'Family Transaction'}</Text>
       </TouchableOpacity>
 
       {finance.transactions.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Ionicons name="receipt-outline" size={32} color="#94A3B8" />
-          <Text style={styles.emptyTitle}>No transactions yet</Text>
-          <Text style={styles.emptyText}>Record payments and extra contributions here.</Text>
+        <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <Ionicons name="receipt-outline" size={32} color={colors.textMuted} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            {isBangla ? 'এখনও কোনো লেনদেন নেই' : 'No transactions yet'}
+          </Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            {isBangla ? 'পরিশোধ ও অতিরিক্ত অবদানের রেকর্ড এখানে দেখাবে।' : 'Record payments and extra contributions here.'}
+          </Text>
         </View>
       ) : (
         groups.map((group) => (
           <View key={group.date} style={styles.dateGroup}>
-            <Text style={styles.dateLabel}>{formatDateLabel(group.date)}</Text>
+            <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>{formatDateLabel(group.date)}</Text>
             {group.items.map((tx) => {
               const meta = TX_META[tx.type];
               const cat = expenseCategoryMeta(tx.expenseCategory);
               return (
-                <View key={tx.id} style={styles.txRow}>
+                <View key={tx.id} style={[styles.txRow, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
                   <View style={styles.txAvatar}>
                     <Text style={styles.txAvatarText}>{initialsOf(tx.memberName)}</Text>
                   </View>
                   <View style={styles.txInfo}>
-                    <Text style={styles.txTitle} numberOfLines={1}>
+                    <Text style={[styles.txTitle, { color: colors.text }]} numberOfLines={1}>
                       {tx.memberName}
-                      <Text style={styles.txNote}> · {tx.note || meta.label}</Text>
+                      <Text style={[styles.txNote, { color: colors.textSecondary }]}> · {tx.note || meta.label}</Text>
                     </Text>
                     <View style={styles.txMetaRow}>
                       <View style={[styles.txTypePill, { backgroundColor: `${meta.tint}1A` }]}>
                         <Ionicons name={meta.icon} size={10} color={meta.tint} />
                         <Text style={[styles.txTypeText, { color: meta.tint }]}>{meta.label}</Text>
                       </View>
-                      <Text style={styles.txCategory}>{tx.expenseCategory}</Text>
+                      <Text style={[styles.txCategory, { color: colors.textSecondary }]}>
+                        {translateCategory(tx.expenseCategory)}
+                      </Text>
                     </View>
                   </View>
                   <View style={styles.txAmountWrap}>
@@ -126,12 +136,14 @@ export default function FamilyTransactionsPanel({ finance }: FamilyTransactionsP
         onRequestClose={() => setConfirmTx(null)}
       >
         <View style={styles.confirmOverlay}>
-          <View style={styles.confirmCard}>
+          <View style={[styles.confirmCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
             <View style={styles.confirmIconWrap}>
               <Feather name="alert-triangle" size={24} color="#EF4444" />
             </View>
-            <Text style={styles.confirmTitle}>Delete this transaction?</Text>
-            <Text style={styles.confirmText}>
+            <Text style={[styles.confirmTitle, { color: colors.text }]}>
+              {isBangla ? 'লেনদেনটি মুছবেন?' : 'Delete this transaction?'}
+            </Text>
+            <Text style={[styles.confirmText, { color: colors.textSecondary }]}>
               {confirmTx?.type === 'payment' ? 'Payment' : confirmTx?.type === 'extra' ? 'Extra' : 'Unable'}{' '}
               of {formatMoney(confirmTx?.amount ?? 0)} will be removed from{' '}
               {confirmTx?.expenseCategory}.
@@ -141,12 +153,14 @@ export default function FamilyTransactionsPanel({ finance }: FamilyTransactionsP
             )}
             <View style={styles.confirmActions}>
               <TouchableOpacity
-                style={[styles.confirmBtn, styles.cancelBtn]}
+                style={[styles.confirmBtn, styles.cancelBtn, isDark && { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}
                 onPress={() => setConfirmTx(null)}
                 disabled={busy}
                 accessibilityRole="button"
               >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={[styles.cancelBtnText, isDark && { color: colors.text }]}>
+                  {isBangla ? 'বাতিল' : 'Cancel'}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.confirmBtn, styles.deleteBtnBg]}
@@ -154,7 +168,9 @@ export default function FamilyTransactionsPanel({ finance }: FamilyTransactionsP
                 disabled={busy}
                 accessibilityRole="button"
               >
-                <Text style={styles.deleteBtnText}>{busy ? 'Deleting…' : 'Delete'}</Text>
+                <Text style={styles.deleteBtnText}>
+                  {busy ? (isBangla ? 'মুছছি…' : 'Deleting…') : (isBangla ? 'মুছুন' : 'Delete')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

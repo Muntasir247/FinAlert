@@ -128,6 +128,17 @@ export async function addSavingsContribution(
   return data as SavingsGoal;
 }
 
+export async function deleteSavingsGoal(goalId: string): Promise<void> {
+  const { error } = await supabase
+    .from('savings_goals')
+    .delete()
+    .eq('id', goalId);
+
+  if (error) {
+    throw error;
+  }
+}
+
 // Seed a few realistic demo goals for a brand-new user so the Home carousel
 // is populated on first open. No-op once the user has rows.
 export async function seedDemoSavingsGoalsIfEmpty(userId: string): Promise<void> {

@@ -4,6 +4,8 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import FamilySheetModal from './FamilySheetModal';
 import { formatMoney } from './familyConstants';
 import type { MemberFinance } from './useFamilyFinance';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface ContributionModalProps {
   visible: boolean;
@@ -13,6 +15,8 @@ interface ContributionModalProps {
 }
 
 export default function ContributionModal({ visible, member, onClose, onSave }: ContributionModalProps) {
+  const { colors, isDark } = useTheme();
+  const { isBangla } = useLanguage();
   const [amountText, setAmountText] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -55,12 +59,12 @@ export default function ContributionModal({ visible, member, onClose, onSave }: 
   return (
     <FamilySheetModal
       visible={visible}
-      title="Contribution Amount"
+      title={isBangla ? 'অবদানের পরিমাণ' : 'Contribution Amount'}
       onClose={handleClose}
       keyboardAvoiding
     >
       {member && (
-        <View style={styles.memberBanner}>
+        <View style={[styles.memberBanner, { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}>
           <View style={styles.memberAvatar}>
             <Text style={styles.memberAvatarText}>
               {member.name
@@ -73,32 +77,36 @@ export default function ContributionModal({ visible, member, onClose, onSave }: 
             </Text>
           </View>
           <View style={styles.memberInfo}>
-            <Text style={styles.memberName}>{member.name}</Text>
-            <Text style={styles.memberMeta}>
-              {member.role} · Currently {formatMoney(member.limit)}
+            <Text style={[styles.memberName, { color: colors.text }]}>{member.name}</Text>
+            <Text style={[styles.memberMeta, { color: colors.textSecondary }]}>
+              {member.role} · {isBangla ? 'বর্তমান' : 'Currently'} {formatMoney(member.limit)}
             </Text>
           </View>
         </View>
       )}
 
-      <Text style={styles.label}>Monthly Contribution</Text>
-      <View style={styles.amountWrap}>
-        <Text style={styles.currencyPrefix}>৳</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>
+        {isBangla ? 'মাসিক অবদান' : 'Monthly Contribution'}
+      </Text>
+      <View style={[styles.amountWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+        <Text style={[styles.currencyPrefix, { color: colors.text }]}>৳</Text>
         <TextInput
-          style={styles.amountInput}
+          style={[styles.amountInput, { color: colors.text }]}
           value={amountText}
           onChangeText={setAmountText}
           keyboardType="decimal-pad"
           placeholder="0"
-          placeholderTextColor="#A0ADB6"
+          placeholderTextColor={colors.textMuted}
           accessibilityLabel="Monthly contribution amount"
         />
       </View>
 
-      <View style={styles.infoBanner}>
-        <Ionicons name="wallet-outline" size={18} color="#64748B" />
-        <Text style={styles.infoBannerText}>
-          The family budget is the sum of all members' contributions.
+      <View style={[styles.infoBanner, isDark && { backgroundColor: colors.surfaceSubtle }]}>
+        <Ionicons name="wallet-outline" size={18} color={colors.textSecondary} />
+        <Text style={[styles.infoBannerText, { color: colors.textSecondary }]}>
+          {isBangla
+            ? 'পারিবারিক বাজেট হল সকল সদস্যদের অবদানের মোট সমষ্টি।'
+            : "The family budget is the sum of all members' contributions."}
         </Text>
       </View>
 
@@ -110,31 +118,31 @@ export default function ContributionModal({ visible, member, onClose, onSave }: 
         accessibilityLabel="Save contribution amount"
       >
         {saving ? (
-          <Text style={styles.saveBtnText}>Saving…</Text>
+          <Text style={styles.saveBtnText}>{isBangla ? 'সংরক্ষণ করা হচ্ছে…' : 'Saving…'}</Text>
         ) : (
           <>
             <Feather name="check" size={18} color="#FFFFFF" />
-            <Text style={styles.saveBtnText}>Save Contribution</Text>
+            <Text style={styles.saveBtnText}>{isBangla ? 'অবদান সংরক্ষণ করুন' : 'Save Contribution'}</Text>
           </>
         )}
       </TouchableOpacity>
 
       {errorMsg && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{errorMsg}</Text>
+        <View style={[styles.errorBox, isDark && { backgroundColor: '#38161A', borderColor: '#7F1D1D' }]}>
+          <Text style={[styles.errorText, isDark && { color: '#FCA5A5' }]}>{errorMsg}</Text>
         </View>
       )}
 
       {hasExisting && (
         <TouchableOpacity
-          style={styles.deleteBtn}
+          style={[styles.deleteBtn, isDark && { backgroundColor: '#38161A', borderColor: '#7F1D1D' }]}
           onPress={() => handleSave(0)}
           disabled={saving}
           accessibilityRole="button"
           accessibilityLabel="Delete contribution"
         >
           <Feather name="trash-2" size={18} color="#EF4444" />
-          <Text style={styles.deleteBtnText}>Delete Contribution</Text>
+          <Text style={styles.deleteBtnText}>{isBangla ? 'অবদান মুছুন' : 'Delete Contribution'}</Text>
         </TouchableOpacity>
       )}
     </FamilySheetModal>

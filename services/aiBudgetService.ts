@@ -1,4 +1,6 @@
-import { generateGeminiContent, GeminiAllRateLimitedError } from './geminiClient';
+import { generateGeminiContent, GeminiAllRateLimitedError, DEFAULT_GEMINI_MODELS } from './geminiClient';
+import { isGroqConfigured, generateGroqJsonContent } from './groqClient';
+import { AiErrorCode, classifyAiError } from './aiError';
 import type { SpendingAnalyticsSummary } from './spendingAnalyticsService';
 
 export interface AiCategoryAllocation {
@@ -21,14 +23,8 @@ export interface AiBudgetRecommendation {
   category_allocations: AiCategoryAllocation[];
   insight: AiBudgetInsight;
   isFallback: boolean;
+  errorCode?: AiErrorCode;
 }
-
-const GEMINI_MODELS = [
-  'gemini-3.1-flash-lite',
-  'gemini-3.1-flash-lite-preview',
-  'gemini-3.5-flash-lite',
-  'gemini-3.5-flash',
-];
 
 const STANDARD_CATEGORIES = [
   'Bills & Utilities',
@@ -110,7 +106,9 @@ const BUDGET_RESPONSE_SCHEMA = {
  */
 export function generateFallbackBudget(
   analytics: SpendingAnalyticsSummary,
-  userGivenIncome?: number
+  userGivenIncome?: number,
+  errorCode?: AiErrorCode,
+  errorSnippet?: string
 ): AiBudgetRecommendation {
   const income = userGivenIncome && userGivenIncome > 0
     ? userGivenIncome
@@ -149,15 +147,21 @@ export function generateFallbackBudget(
     };
   });
 
+  const headline = errorCode
+    ? `[${errorCode}] Standard 50/30/20 Budget`
+    : 'Balanced 50/30/20 Starter Budget';
+  const reasoning = errorCode
+    ? `AI service was unavailable (${errorSnippet || errorCode}). Applied standard 50/30/20 budget framework so you can continue managing your expenses.`
+    : 'Based on the classic 50/30/20 rule (50% essentials, 30% lifestyle, 20% savings). As you track more expenses with bKash and receipt scanning, your recommendations will automatically personalize to your unique spending habits.';
+
   return {
     monthly_income: income,
     savings_target_percentage: savingsPct,
     total_spending_budget: spendingBudget,
     category_allocations: allocations,
     insight: {
-      headline: 'Balanced 50/30/20 Starter Budget',
-      reasoning:
-        'Based on the classic 50/30/20 rule (50% essentials, 30% lifestyle, 20% savings). As you track more expenses with bKash and receipt scanning, your recommendations will automatically personalize to your unique spending habits.',
+      headline,
+      reasoning,
       tips: [
         'Track daily expenses quickly via voice entry or automated bKash SMS sync.',
         'Aim to automate your 20% savings at the start of each month.',
@@ -165,6 +169,7 @@ export function generateFallbackBudget(
       ],
     },
     isFallback: true,
+    errorCode,
   };
 }
 
@@ -183,9 +188,10 @@ export async function generateSmartBudgetRecommendation(
   }
 
   const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-  if (!apiKey) {
-    console.warn('[aiBudgetService] Missing EXPO_PUBLIC_GEMINI_API_KEY, using fallback budget.');
-    return generateFallbackBudget(analytics, userGivenIncome);
+  const groqAvailable = isGroqConfigured();
+  if (!apiKey && !groqAvailable) {
+    console.warn('[aiBudgetService] Missing AI API keys (Gemini / Groq), using fallback budget.');
+    return generateFallbackBudget(analytics, userGivenIncome, 'AI_ERR_NO_KEY', 'API keys not configured');
   }
 
   const incomeToUse =
@@ -226,10 +232,32 @@ ${goalsLines}
 
 Please provide an optimized monthly budget plan tailored to this user. Analyze where they are overspending, trim non-essentials responsibly, and allocate adequate funds for essentials and savings goals.`;
 
+  // 1. Try Groq fast path first if configured
+  if (groqAvailable) {
+    try {
+      const { data } = await generateGroqJsonContent({
+        systemPrompt: `${SYSTEM_INSTRUCTION}\nReturn JSON strictly matching this schema:\n${JSON.stringify(BUDGET_RESPONSE_SCHEMA)}`,
+        userPrompt,
+        timeoutMs: Math.min(12000, timeoutMs),
+        perModelTimeoutMs: 6000,
+      });
+      if (data && typeof data === 'object') {
+        return parseBudgetRecommendationJson(data, analytics, incomeToUse);
+      }
+    } catch (groqErr) {
+      console.warn('[aiBudgetService] Groq budget generation failed, trying Gemini:', groqErr);
+    }
+  }
+
+  // 2. Fall back to Gemini API
+  if (!apiKey) {
+    return generateFallbackBudget(analytics, incomeToUse, 'AI_ERR_NO_KEY', 'Gemini key missing after Groq failure');
+  }
+
   try {
     const { response, model } = await generateGeminiContent({
       apiKey,
-      models: GEMINI_MODELS,
+      models: DEFAULT_GEMINI_MODELS,
       timeoutMs,
       perModelTimeoutMs: 15000,
       body: {
@@ -251,7 +279,8 @@ Please provide an optimized monthly budget plan tailored to this user. Analyze w
 
     if (!response.ok) {
       console.warn(`[aiBudgetService] Gemini request failed status ${response.status} (${model}), falling back.`);
-      return generateFallbackBudget(analytics, incomeToUse);
+      const classified = classifyAiError(`Gemini returned status ${response.status}`, 'gemini');
+      return generateFallbackBudget(analytics, incomeToUse, classified.code, classified.message);
     }
 
     const data = await response.json();
@@ -259,82 +288,87 @@ Please provide an optimized monthly budget plan tailored to this user. Analyze w
     const raw = Array.isArray(parts) ? parts.map((p: { text?: string }) => p.text ?? '').join('') : '';
     const parsed = JSON.parse(raw);
 
-    const recommendedIncome =
-      typeof parsed.recommended_monthly_income === 'number' && parsed.recommended_monthly_income > 0
-        ? parsed.recommended_monthly_income
-        : incomeToUse;
+    return parseBudgetRecommendationJson(parsed, analytics, incomeToUse);
+  } catch (err) {
+    const classified = classifyAiError(err, 'gemini');
+    console.warn(`[aiBudgetService] [${classified.code}] Budget generation failed, using fallback:`, err);
+    return generateFallbackBudget(analytics, incomeToUse, classified.code, classified.message);
+  }
+}
 
-    const savingsPct =
-      typeof parsed.recommended_savings_percentage === 'number' &&
-      parsed.recommended_savings_percentage >= 5 &&
-      parsed.recommended_savings_percentage <= 50
-        ? Math.round(parsed.recommended_savings_percentage)
-        : 20;
+function parseBudgetRecommendationJson(
+  parsed: any,
+  analytics: SpendingAnalyticsSummary,
+  incomeToUse: number
+): AiBudgetRecommendation {
+  const recommendedIncome =
+    typeof parsed?.recommended_monthly_income === 'number' && parsed.recommended_monthly_income > 0
+      ? parsed.recommended_monthly_income
+      : incomeToUse;
 
-    const spendingBudget = Math.round(recommendedIncome * (1 - savingsPct / 100));
+  const savingsPct =
+    typeof parsed?.recommended_savings_percentage === 'number' &&
+    parsed.recommended_savings_percentage >= 5 &&
+    parsed.recommended_savings_percentage <= 50
+      ? Math.round(parsed.recommended_savings_percentage)
+      : 20;
 
-    // Map and sanitize category allocations
-    const rawAllocations = Array.isArray(parsed.category_allocations) ? parsed.category_allocations : [];
-    const allocMap = new Map<string, { pct: number; amount: number; reasoning: string }>();
+  const spendingBudget = Math.round(recommendedIncome * (1 - savingsPct / 100));
 
-    for (const item of rawAllocations) {
-      if (!item || typeof item !== 'object') continue;
-      const catName = typeof item.category === 'string' ? item.category.trim() : '';
-      const matched = STANDARD_CATEGORIES.find((sc) => sc.toLowerCase() === catName.toLowerCase());
-      if (matched) {
-        allocMap.set(matched, {
-          pct: Number(item.percentage_of_budget) || 0,
-          amount: Number(item.allocated_amount) || 0,
-          reasoning: typeof item.reasoning === 'string' ? item.reasoning.trim() : '',
-        });
-      }
+  // Map and sanitize category allocations
+  const rawAllocations = Array.isArray(parsed?.category_allocations) ? parsed.category_allocations : [];
+  const allocMap = new Map<string, { pct: number; amount: number; reasoning: string }>();
+
+  for (const item of rawAllocations) {
+    if (!item || typeof item !== 'object') continue;
+    const catName = typeof item.category === 'string' ? item.category.trim() : '';
+    const matched = STANDARD_CATEGORIES.find((sc) => sc.toLowerCase() === catName.toLowerCase());
+    if (matched) {
+      allocMap.set(matched, {
+        pct: Number(item.percentage_of_budget) || 0,
+        amount: Number(item.allocated_amount) || 0,
+        reasoning: typeof item.reasoning === 'string' ? item.reasoning.trim() : '',
+      });
     }
+  }
 
-    // Build final sanitized 8-category allocation array summing to spending budget
-    let sumAssigned = 0;
-    const finalAllocations: AiCategoryAllocation[] = STANDARD_CATEGORIES.map((cat, idx) => {
-      const found = allocMap.get(cat);
-      const pct = found ? Math.max(1, Math.round(found.pct)) : 10;
-      let amount = Math.round((spendingBudget * pct) / 100);
+  // Build final sanitized 8-category allocation array summing to spending budget
+  let sumAssigned = 0;
+  const finalAllocations: AiCategoryAllocation[] = STANDARD_CATEGORIES.map((cat, idx) => {
+    const found = allocMap.get(cat);
+    const pct = found ? Math.max(1, Math.round(found.pct)) : 10;
+    let amount = Math.round((spendingBudget * pct) / 100);
 
-      if (idx === STANDARD_CATEGORIES.length - 1) {
-        amount = Math.max(0, spendingBudget - sumAssigned);
-      } else {
-        sumAssigned += amount;
-      }
-
-      return {
-        category: cat,
-        percentage_of_budget: pct,
-        allocated_amount: amount,
-        reasoning: found?.reasoning || `Recommended allocation based on spending habits.`,
-      };
-    });
-
-    const headline = parsed?.insight?.headline || 'Optimized for Your Spending Habits';
-    const reasoning =
-      parsed?.insight?.reasoning ||
-      `Based on your last ${analytics.daysAnalyzed} days of spending, we optimized your category limits to support your savings goals while funding essentials.`;
-    const tips = Array.isArray(parsed?.insight?.tips) ? parsed.insight.tips : [];
+    if (idx === STANDARD_CATEGORIES.length - 1) {
+      amount = Math.max(0, spendingBudget - sumAssigned);
+    } else {
+      sumAssigned += amount;
+    }
 
     return {
-      monthly_income: recommendedIncome,
-      savings_target_percentage: savingsPct,
-      total_spending_budget: spendingBudget,
-      category_allocations: finalAllocations,
-      insight: {
-        headline,
-        reasoning,
-        tips: tips.slice(0, 3),
-      },
-      isFallback: false,
+      category: cat,
+      percentage_of_budget: pct,
+      allocated_amount: amount,
+      reasoning: found?.reasoning || `Recommended allocation based on spending habits.`,
     };
-  } catch (err) {
-    if (err instanceof GeminiAllRateLimitedError) {
-      console.warn('[aiBudgetService] Rate limited on all Gemini models, using fallback budget.');
-    } else {
-      console.error('[aiBudgetService] Error generating smart budget:', err);
-    }
-    return generateFallbackBudget(analytics, incomeToUse);
-  }
+  });
+
+  const headline = parsed?.insight?.headline || 'Optimized for Your Spending Habits';
+  const reasoning =
+    parsed?.insight?.reasoning ||
+    `Based on your last ${analytics.daysAnalyzed} days of spending, we optimized your category limits to support your savings goals while funding essentials.`;
+  const tips = Array.isArray(parsed?.insight?.tips) ? parsed.insight.tips : [];
+
+  return {
+    monthly_income: recommendedIncome,
+    savings_target_percentage: savingsPct,
+    total_spending_budget: spendingBudget,
+    category_allocations: finalAllocations,
+    insight: {
+      headline,
+      reasoning,
+      tips: tips.slice(0, 3),
+    },
+    isFallback: false,
+  };
 }

@@ -1,5 +1,6 @@
 import { TRANSACTION_CATEGORIES } from '../lib/transactionCategories';
-import { generateGeminiContent, GeminiAllRateLimitedError } from './geminiClient';
+import { generateGeminiContent, GeminiAllRateLimitedError, DEFAULT_MULTIMODAL_MODELS } from './geminiClient';
+import { AiErrorCode, classifyAiError, formatAiErrorString } from './aiError';
 
 export interface ReceiptItem {
   name: string;
@@ -14,17 +15,16 @@ export interface ReceiptData {
   items: ReceiptItem[];
 }
 
-/**
- * Models tried in order. Flash-Lite offers higher free-tier rate limits, so it
- * is preferred; if it is rate limited (429) the next model is tried
- * automatically.
- */
-const GEMINI_MODELS = [
-  'gemini-3.1-flash-lite',
-  'gemini-3.1-flash-lite-preview',
-  'gemini-3.5-flash-lite',
-  'gemini-3.5-flash',
-];
+export class ReceiptError extends Error {
+  public code: AiErrorCode;
+
+  constructor(message: string, code: AiErrorCode = 'AI_ERR_UNKNOWN') {
+    const formatted = message.startsWith('[AI_ERR_') ? message : formatAiErrorString(code, message);
+    super(formatted);
+    this.name = 'ReceiptError';
+    this.code = code;
+  }
+}
 
 const MAX_AMOUNT = 1_000_000_000;
 
@@ -69,8 +69,6 @@ const RESPONSE_SCHEMA = {
   },
   required: ['merchant', 'total'],
 };
-
-export class ReceiptError extends Error {}
 
 const CATEGORY_LABELS = TRANSACTION_CATEGORIES.map((c) => c.label);
 
@@ -123,14 +121,15 @@ export async function parseReceiptFromImage(
   const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
   if (!apiKey) {
     throw new ReceiptError(
-      'Receipt scanning is not configured yet. Add EXPO_PUBLIC_GEMINI_API_KEY to your .env file.'
+      'Receipt scanning is not configured yet. Add EXPO_PUBLIC_GEMINI_API_KEY to your .env file.',
+      'AI_ERR_NO_KEY'
     );
   }
 
   try {
     const { response } = await generateGeminiContent({
       apiKey,
-      models: GEMINI_MODELS,
+      models: DEFAULT_MULTIMODAL_MODELS,
       timeoutMs,
       perModelTimeoutMs: 15000,
       body: {
@@ -156,7 +155,8 @@ export async function parseReceiptFromImage(
     if (!response.ok) {
       const body = await response.text();
       console.error('Gemini receipt error:', response.status, body);
-      throw new ReceiptError('Could not reach the scanning AI backend.');
+      const classified = classifyAiError(`Gemini error ${response.status}: ${body}`, 'gemini');
+      throw new ReceiptError(classified.message, classified.code);
     }
 
     const data = await response.json();
@@ -187,22 +187,16 @@ export async function parseReceiptFromImage(
 
     if (total <= 0) {
       throw new ReceiptError(
-        'Could not read a total from that image. Please try a clearer photo.'
+        'Could not read a valid total from that image. Please try a clearer photo.',
+        'AI_ERR_PARSE'
       );
     }
 
     return { merchant, date, total, category, items };
   } catch (error) {
     if (error instanceof ReceiptError) throw error;
-    if (error instanceof GeminiAllRateLimitedError) {
-      throw new ReceiptError(
-        'Scanning AI limit reached. Please try again later or check your API quota.'
-      );
-    }
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new ReceiptError('Scanning took too long. Please try again.');
-    }
-    console.error('parseReceiptFromImage failed:', error);
-    throw new ReceiptError('Could not process that receipt. Please try again.');
+    const classified = classifyAiError(error, 'gemini');
+    console.error(`[receiptIntentService] [${classified.code}] Receipt scan failed:`, error);
+    throw new ReceiptError(classified.message, classified.code);
   }
 }

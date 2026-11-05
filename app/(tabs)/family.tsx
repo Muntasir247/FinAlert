@@ -12,6 +12,8 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useFamily } from '../../context/FamilyContext';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 import InviteFamilyModal from '../../components/InviteFamilyModal';
 import FamilySettingsModal from '../../components/FamilySettingsModal';
 import FamilyJoinScreen from '../../components/FamilyJoinScreen';
@@ -31,6 +33,8 @@ const SUB_TABS: { label: string; key: 'overview' | 'members' | 'expenses' | 'tra
 export default function FamilyScreen() {
   const { family, members, isLoading } = useFamily();
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
+  const { t, isBangla, formatCurrency } = useLanguage();
   const finance = useFamilyFinance(family?.id ?? null, user?.id);
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'members' | 'expenses' | 'transactions'>('overview');
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
@@ -46,7 +50,7 @@ export default function FamilyScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0FB384" />
         </View>
@@ -56,7 +60,7 @@ export default function FamilyScreen() {
 
   if (!family) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <FamilyJoinScreen />
       </SafeAreaView>
     );
@@ -68,8 +72,15 @@ export default function FamilyScreen() {
   const totalPaid = finance.expenses.reduce((sum, e) => sum + finance.expensePaid(e), 0);
   const budgetPct = totalBudget > 0 ? Math.min((totalExpense / totalBudget) * 100, 100) : 0;
 
+  const subTabs = [
+    { label: t('family.subtab_overview', 'Overview'), key: 'overview' as const },
+    { label: t('family.subtab_members', 'Members'), key: 'members' as const },
+    { label: t('family.subtab_expenses', 'Expenses'), key: 'expenses' as const },
+    { label: t('family.subtab_transactions', 'Transactions'), key: 'transactions' as const },
+  ];
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -77,52 +88,81 @@ export default function FamilyScreen() {
         {/* ── Header ── */}
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.headerTitle}>Family Finance</Text>
-            <Text style={styles.headerSubtext}>
-              {memberCount} {memberCount === 1 ? 'member' : 'members'}
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              {isBangla ? 'পারিবারিক হিসাব' : 'Family Finance'}
+            </Text>
+            <Text style={[styles.headerSubtext, { color: colors.textSecondary }]}>
+              {isBangla ? `${memberCount} জন সদস্য` : `${memberCount} ${memberCount === 1 ? 'member' : 'members'}`}
             </Text>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity
-              style={styles.inviteBtn}
+              style={[styles.inviteBtn, isDark && { backgroundColor: '#143D2E', borderColor: '#0FB384' }]}
               onPress={() => setInviteModalVisible(true)}
               accessibilityRole="button"
               accessibilityLabel="Invite to family"
             >
               <Feather name="user-plus" size={18} color="#0FB384" />
-              <Text style={styles.inviteBtnLabel}>Invite</Text>
+              <Text style={styles.inviteBtnLabel}>{t('family.invite_member', 'Invite')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.settingsBtn}
+              style={[styles.settingsBtn, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
               onPress={() => setSettingsModalVisible(true)}
               accessibilityRole="button"
               accessibilityLabel="Family settings"
             >
-              <Ionicons name="settings-outline" size={18} color="#64748B" />
+              <Ionicons name="settings-outline" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* ── Summary Metrics ── */}
         <View style={styles.metricsRow}>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Total Budget</Text>
-            <Text style={styles.metricIncome}>{formatMoney(totalBudget)}</Text>
+          <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              {isBangla ? 'মোট বাজেট' : 'Total Budget'}
+            </Text>
+            <Text
+              style={styles.metricIncome}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {formatCurrency(totalBudget)}
+            </Text>
           </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Total Expense</Text>
-            <Text style={styles.metricExpense}>{formatMoney(totalExpense)}</Text>
+          <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              {isBangla ? 'মোট খরচ' : 'Total Expense'}
+            </Text>
+            <Text
+              style={styles.metricExpense}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {formatCurrency(totalExpense)}
+            </Text>
           </View>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Total Paid</Text>
-            <Text style={styles.metricPaid}>{formatMoney(totalPaid)}</Text>
+          <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              {isBangla ? 'পরিশোধিত' : 'Total Paid'}
+            </Text>
+            <Text
+              style={styles.metricPaid}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {formatCurrency(totalPaid)}
+            </Text>
           </View>
         </View>
 
         {/* ── Sub-Tab Bar ── */}
-        <View style={styles.subTabBar}>
-          {SUB_TABS.map((tab) => {
+        <View style={[styles.subTabBar, { borderBottomColor: colors.divider }]}>
+          {subTabs.map((tab) => {
             const isActive = activeSubTab === tab.key;
             return (
               <TouchableOpacity
@@ -133,8 +173,11 @@ export default function FamilyScreen() {
                 <Text
                   style={[
                     styles.subTabLabel,
-                    isActive ? styles.subTabLabelActive : styles.subTabLabelInactive,
+                    isActive ? styles.subTabLabelActive : [styles.subTabLabelInactive, { color: colors.textSecondary }],
                   ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
                 >
                   {tab.label}
                 </Text>
@@ -148,7 +191,7 @@ export default function FamilyScreen() {
         {activeSubTab === 'overview' && (
           <>
             {/* Member Avatars Grid */}
-            <View style={styles.avatarCard}>
+            <View style={[styles.avatarCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
               <View style={styles.avatarRow}>
                 {members.map((m) => {
                   const displayName = m.full_name || 'Family Member';
@@ -157,10 +200,10 @@ export default function FamilyScreen() {
                       <View style={[styles.avatarCircle, { backgroundColor: '#0FB384' }]}>
                         <Text style={styles.avatarInitials}>{initialsOf(displayName)}</Text>
                       </View>
-                      <Text style={styles.avatarName} numberOfLines={1}>
+                      <Text style={[styles.avatarName, { color: colors.text }]} numberOfLines={1}>
                         {displayName}
                       </Text>
-                      <View style={[styles.rolePill, { backgroundColor: ROLE_BG[m.role] }]}>
+                      <View style={[styles.rolePill, { backgroundColor: isDark ? '#143D2E' : ROLE_BG[m.role] }]}>
                         <Text style={[styles.rolePillText, { color: ROLE_TEXT_COLOR[m.role] }]}>
                           {m.role}
                         </Text>
@@ -178,29 +221,39 @@ export default function FamilyScreen() {
                 <View style={styles.inviteMemberCircle}>
                   <Text style={styles.inviteMemberPlus}>+</Text>
                 </View>
-                <Text style={styles.inviteMemberLabel}>Invite Member</Text>
+                <Text style={styles.inviteMemberLabel}>{t('family.invite_member', 'Invite Member')}</Text>
               </TouchableOpacity>
             </View>
 
             {/* Budget Usage */}
-            <View style={styles.budgetCard}>
-              <Text style={styles.budgetTitle}>Budget Usage</Text>
-              <View style={styles.budgetTrack}>
+            <View style={[styles.budgetCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.budgetTitle, { color: colors.text }]}>
+                {isBangla ? 'বাজেট ব্যবহার' : 'Budget Usage'}
+              </Text>
+              <View style={[styles.budgetTrack, { backgroundColor: colors.divider }]}>
                 <View style={[styles.budgetFill, { width: `${budgetPct}%` }]} />
               </View>
               <View style={styles.budgetFooter}>
-                <Text style={styles.budgetSpent}>{formatMoney(totalExpense)} spent</Text>
-                <Text style={styles.budgetTotal}>{formatMoney(totalBudget)} budget</Text>
+                <Text style={styles.budgetSpent}>
+                  {formatCurrency(totalExpense)} {isBangla ? 'খরচ হয়েছে' : 'spent'}
+                </Text>
+                <Text style={[styles.budgetTotal, { color: colors.textSecondary }]}>
+                  {formatCurrency(totalBudget)} {isBangla ? 'বাজেট' : 'budget'}
+                </Text>
               </View>
             </View>
 
             {/* Contributions */}
-            <View style={styles.contributionsCard}>
-              <Text style={styles.contributionsTitle}>Contributions</Text>
+            <View style={[styles.contributionsCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.contributionsTitle, { color: colors.text }]}>
+                {isBangla ? 'অবদান' : 'Contributions'}
+              </Text>
               {finance.finances.length === 0 ? (
                 <View style={styles.feedEmpty}>
-                  <Ionicons name="people-outline" size={28} color="#94A3B8" />
-                  <Text style={styles.feedEmptyText}>No members yet.</Text>
+                  <Ionicons name="people-outline" size={28} color={colors.textMuted} />
+                  <Text style={[styles.feedEmptyText, { color: colors.textSecondary }]}>
+                    {isBangla ? 'এখনও কোনো সদস্য নেই।' : 'No members yet.'}
+                  </Text>
                 </View>
               ) : (
                 finance.finances.map((m) => {
@@ -208,32 +261,30 @@ export default function FamilyScreen() {
                   const pct = m.limit > 0 ? Math.min((paid / m.limit) * 100, 100) : 0;
                   return (
                     <View key={m.memberId} style={styles.contribRow}>
-                      <View style={styles.contribHeader}>
-                        <View style={styles.contribAvatar}>
-                          <Text style={styles.contribAvatarText}>{initialsOf(m.name)}</Text>
-                        </View>
-                        <View style={styles.contribInfo}>
-                          <View style={styles.contribNameRow}>
-                            <Text style={styles.contribName} numberOfLines={1}>
-                              {m.name}
-                            </Text>
-                            {m.extra > 0.01 && (
-                              <View style={styles.extraPill}>
-                                <Text style={styles.extraPillText}>+৳{Math.round(m.extra)}</Text>
-                              </View>
-                            )}
-                            {m.unable > 0.01 && (
-                              <View style={styles.unablePill}>
-                                <Text style={styles.unablePillText}>-৳{Math.round(m.unable)}</Text>
-                              </View>
-                            )}
-                          </View>
-                          <View style={styles.contribTrack}>
-                            <View style={[styles.contribFill, { width: `${pct}%` }]} />
-                          </View>
-                        </View>
-                        <Text style={styles.contribTarget}>{formatMoney(m.limit)}</Text>
+                      <View style={styles.contribAvatar}>
+                        <Text style={styles.contribAvatarText}>{initialsOf(m.name)}</Text>
                       </View>
+                      <View style={styles.contribInfo}>
+                        <View style={styles.contribNameRow}>
+                          <Text style={[styles.contribName, { color: colors.text }]} numberOfLines={1}>
+                            {m.name}
+                          </Text>
+                          {m.extra > 0.01 && (
+                            <View style={styles.extraPill}>
+                              <Text style={styles.extraPillText}>+{formatCurrency(m.extra)}</Text>
+                            </View>
+                          )}
+                          {m.unable > 0.01 && (
+                            <View style={styles.unablePill}>
+                              <Text style={styles.unablePillText}>-{formatCurrency(m.unable)}</Text>
+                            </View>
+                          )}
+                        </View>
+                        <View style={[styles.contribTrack, { backgroundColor: colors.divider }]}>
+                          <View style={[styles.contribFill, { width: `${pct}%` }]} />
+                        </View>
+                      </View>
+                      <Text style={[styles.contribTarget, { color: colors.textSecondary }]}>{formatCurrency(m.limit)}</Text>
                     </View>
                   );
                 })
@@ -338,8 +389,8 @@ const styles = StyleSheet.create({
   // ── Summary Metrics ──
   metricsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
+    gap: 8,
+    marginBottom: 20,
   },
   metricCard: {
     flex: 1,
@@ -347,30 +398,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
   metricLabel: {
     fontSize: 12,
     lineHeight: 14,
     fontWeight: '400',
     color: '#6B7280',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   metricIncome: {
-    fontSize: 16,
+    fontSize: 15,
     lineHeight: 18,
     fontWeight: '700',
     color: '#0FB384',
   },
   metricExpense: {
-    fontSize: 16,
+    fontSize: 15,
     lineHeight: 18,
     fontWeight: '700',
     color: '#EF4444',
   },
   metricPaid: {
-    fontSize: 16,
+    fontSize: 15,
     lineHeight: 18,
     fontWeight: '700',
     color: '#02C78E',
@@ -386,11 +437,14 @@ const styles = StyleSheet.create({
   subTabItem: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingBottom: 10,
+    paddingHorizontal: 2,
   },
   subTabLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
+    textAlign: 'center',
   },
   subTabLabelActive: {
     color: '#0FB384',

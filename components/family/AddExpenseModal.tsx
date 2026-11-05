@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import FamilySheetModal from './FamilySheetModal';
 import { EXPENSE_CATEGORIES, formatMoney } from './familyConstants';
 import type { MemberFinance, SharedExpense, AddExpenseInput } from './useFamilyFinance';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface AddExpenseModalProps {
   visible: boolean;
@@ -20,6 +22,8 @@ export default function AddExpenseModal({
   onSubmit,
   editing = null,
 }: AddExpenseModalProps) {
+  const { colors, isDark } = useTheme();
+  const { isBangla, translateCategory } = useLanguage();
   const [category, setCategory] = useState(EXPENSE_CATEGORIES[0].label);
   const [customCategory, setCustomCategory] = useState('');
   const [totalText, setTotalText] = useState('');
@@ -109,24 +113,33 @@ export default function AddExpenseModal({
   };
 
   return (
-    <FamilySheetModal visible={visible} title={editing ? 'Edit Shared Expense' : 'Add Shared Expense'} onClose={handleClose} keyboardAvoiding>
+    <FamilySheetModal
+      visible={visible}
+      title={editing ? (isBangla ? 'যৌথ খরচ সম্পাদনা' : 'Edit Shared Expense') : (isBangla ? 'যৌথ খরচ যোগ করুন' : 'Add Shared Expense')}
+      onClose={handleClose}
+      keyboardAvoiding
+    >
       {/* Category selector */}
-      <Text style={styles.label}>Category</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>{isBangla ? 'খাত' : 'Category'}</Text>
       <View style={styles.grid}>
         {EXPENSE_CATEGORIES.map((c) => {
           const selected = category === c.label;
           return (
             <TouchableOpacity
               key={c.label}
-              style={[styles.gridItem, selected && styles.gridItemActive]}
+              style={[
+                styles.gridItem,
+                { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                selected && styles.gridItemActive,
+              ]}
               onPress={() => setCategory(c.label)}
               accessibilityRole="button"
               accessibilityLabel={`Category ${c.label}`}
               accessibilityState={{ selected }}
             >
               <Ionicons name={c.icon} size={20} color={selected ? '#FFFFFF' : c.tint} />
-              <Text style={[styles.gridItemLabel, selected && styles.gridItemLabelActive]}>
-                {c.label}
+              <Text style={[styles.gridItemLabel, { color: colors.text }, selected && styles.gridItemLabelActive]}>
+                {translateCategory(c.label)}
               </Text>
             </TouchableOpacity>
           );
@@ -136,15 +149,17 @@ export default function AddExpenseModal({
       {/* Custom name when Others is selected */}
       {category === 'Others' && (
         <>
-          <Text style={styles.label}>What is this expense for?</Text>
-          <View style={styles.amountWrap}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            {isBangla ? 'এই খরচটি কী উদ্দেশ্যে?' : 'What is this expense for?'}
+          </Text>
+          <View style={[styles.amountWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
             <Ionicons name="pricetag-outline" size={18} color="#8B5CF6" style={styles.customIcon} />
             <TextInput
-              style={styles.amountInput}
+              style={[styles.amountInput, { color: colors.text }]}
               value={customCategory}
               onChangeText={setCustomCategory}
-              placeholder="e.g. School fees"
-              placeholderTextColor="#A0ADB6"
+              placeholder={isBangla ? 'যেমন: স্কুলের বেতন' : 'e.g. School fees'}
+              placeholderTextColor={colors.textMuted}
               maxLength={40}
               accessibilityLabel="Expense description"
             />
@@ -153,31 +168,33 @@ export default function AddExpenseModal({
       )}
 
       {/* Total amount */}
-      <Text style={styles.label}>Total Amount</Text>
-      <View style={styles.amountWrap}>
-        <Text style={styles.currencyPrefix}>৳</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>{isBangla ? 'মোট পরিমাণ' : 'Total Amount'}</Text>
+      <View style={[styles.amountWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+        <Text style={[styles.currencyPrefix, { color: colors.text }]}>৳</Text>
         <TextInput
-          style={styles.amountInput}
+          style={[styles.amountInput, { color: colors.text }]}
           value={totalText}
           onChangeText={setTotalText}
           keyboardType="decimal-pad"
           placeholder="0"
-          placeholderTextColor="#A0ADB6"
+          placeholderTextColor={colors.textMuted}
           accessibilityLabel="Total expense amount"
         />
       </View>
 
       {/* Assign to members */}
-      <Text style={styles.label}>Assign to Members</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>{isBangla ? 'সদস্যদের বরাদ্দ করুন' : 'Assign to Members'}</Text>
       {finances.length === 0 ? (
-        <Text style={styles.noMembers}>No family members yet.</Text>
+        <Text style={[styles.noMembers, { color: colors.textSecondary }]}>
+          {isBangla ? 'এখনও কোনো পরিবারের সদস্য নেই।' : 'No family members yet.'}
+        </Text>
       ) : (
         finances.map((m) => {
           const isDependent = m.role === 'Dependent';
           const value = assignments[m.memberId] ?? '';
           return (
-            <View key={m.memberId} style={styles.assignRow}>
-              <View style={[styles.assignAvatar, { backgroundColor: isDependent ? '#F1F5F9' : '#0FB384' }]}>
+            <View key={m.memberId} style={[styles.assignRow, { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}>
+              <View style={[styles.assignAvatar, { backgroundColor: isDependent ? (isDark ? colors.card : '#F1F5F9') : '#0FB384' }]}>
                 <Text style={styles.assignAvatarText}>
                   {m.name
                     .split(/\s+/)
@@ -189,22 +206,26 @@ export default function AddExpenseModal({
                 </Text>
               </View>
               <View style={styles.assignInfo}>
-                <Text style={styles.assignName}>{m.name}</Text>
-                <Text style={[styles.assignLimit, isDependent && styles.assignLimitZero]}>
-                  {isDependent ? 'No contribution' : m.limit > 0 ? `Max: ${formatMoney(m.limit)}` : 'No limit set'}
+                <Text style={[styles.assignName, { color: colors.text }]}>{m.name}</Text>
+                <Text style={[styles.assignLimit, { color: colors.textSecondary }, isDependent && styles.assignLimitZero]}>
+                  {isDependent
+                    ? (isBangla ? 'কোনো অবদান নেই' : 'No contribution')
+                    : m.limit > 0
+                    ? `${isBangla ? 'সর্বোচ্চ:' : 'Max:'} ${formatMoney(m.limit)}`
+                    : (isBangla ? 'কোনো সীমা নেই' : 'No limit set')}
                 </Text>
               </View>
-              <View style={[styles.assignInputWrap, isDependent && styles.assignInputWrapDisabled]}>
-                <Text style={styles.assignCurrency}>৳</Text>
+              <View style={[styles.assignInputWrap, { backgroundColor: colors.card, borderColor: colors.cardBorder }, isDependent && [styles.assignInputWrapDisabled, isDark && { backgroundColor: colors.surfaceSubtle }]]}>
+                <Text style={[styles.assignCurrency, { color: colors.text }]}>৳</Text>
                 <TextInput
-                  style={styles.assignInput}
+                  style={[styles.assignInput, { color: colors.text }]}
                   value={value}
                   onChangeText={(text) =>
                     setAssignments((prev) => ({ ...prev, [m.memberId]: text }))
                   }
                   keyboardType="decimal-pad"
                   placeholder="0"
-                  placeholderTextColor="#A0ADB6"
+                  placeholderTextColor={colors.textMuted}
                   editable={!isDependent}
                   accessibilityLabel={`Assigned amount for ${m.name}`}
                 />
@@ -216,21 +237,27 @@ export default function AddExpenseModal({
 
       {/* Total assigned counter */}
       <View style={styles.counterRow}>
-        <Text style={styles.counterLabel}>Total Assigned</Text>
+        <Text style={[styles.counterLabel, { color: colors.textSecondary }]}>
+          {isBangla ? 'মোট বরাদ্দ' : 'Total Assigned'}
+        </Text>
         <Text style={[styles.counterValue, { color: counterColor }]}>
           {formatMoney(assignedTotal)} / {formatMoney(total)}
         </Text>
       </View>
       {balance > 0.01 && (
-        <Text style={styles.counterHint}>Unassigned: {formatMoney(balance)}</Text>
+        <Text style={[styles.counterHint, { color: colors.textSecondary }]}>
+          {isBangla ? 'অবশিষ্ট:' : 'Unassigned:'} {formatMoney(balance)}
+        </Text>
       )}
       {balance < -0.01 && (
-        <Text style={styles.counterError}>Assigned amount exceeds the total.</Text>
+        <Text style={styles.counterError}>
+          {isBangla ? 'বরাদ্দকৃত পরিমাণ মোট খরচের চেয়ে বেশি।' : 'Assigned amount exceeds the total.'}
+        </Text>
       )}
 
       {errorMsg && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{errorMsg}</Text>
+        <View style={[styles.errorBox, isDark && { backgroundColor: '#38161A', borderColor: '#7F1D1D' }]}>
+          <Text style={[styles.errorText, isDark && { color: '#FCA5A5' }]}>{errorMsg}</Text>
         </View>
       )}
 
@@ -242,7 +269,11 @@ export default function AddExpenseModal({
         accessibilityLabel={editing ? 'Save Changes' : 'Add Expense'}
       >
         <Ionicons name={editing ? 'checkmark' : 'add'} size={18} color="#FFFFFF" />
-        <Text style={styles.submitBtnText}>{editing ? 'Save Changes' : 'Add Expense'}</Text>
+        <Text style={styles.submitBtnText}>
+          {editing
+            ? (isBangla ? 'পরিবর্তন সংরক্ষণ করুন' : 'Save Changes')
+            : (isBangla ? 'খরচ যোগ করুন' : 'Add Expense')}
+        </Text>
       </TouchableOpacity>
     </FamilySheetModal>
   );

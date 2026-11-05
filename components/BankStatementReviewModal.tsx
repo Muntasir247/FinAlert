@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Clipboard from 'expo-clipboard';
 import { useTransactions } from '../context/TransactionsContext';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   parseBankStatementPdf,
   readPdfAsBase64,
@@ -48,6 +50,8 @@ export default function BankStatementReviewModal({
 }: BankStatementReviewModalProps) {
   const insets = useSafeAreaInsets();
   const { addTransactions, transactions: existingTransactions } = useTransactions();
+  const { colors, isDark } = useTheme();
+  const { isBangla, formatCurrency, translateCategory } = useLanguage();
 
   const [stage, setStage] = useState<Stage>('pick');
   const [selectedFile, setSelectedFile] = useState<{
@@ -328,25 +332,29 @@ export default function BankStatementReviewModal({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.overlay}
       >
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 20) }]}>
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}>
             <View style={styles.headerTitleRow}>
-              <View style={styles.iconBox}>
+              <View style={[styles.iconBox, { backgroundColor: isDark ? '#14382A' : '#E8F7F1' }]}>
                 <Ionicons name="document-text" size={20} color="#0FB384" />
               </View>
               <View>
-                <Text style={styles.headerTitle}>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>
                   {stage === 'review'
-                    ? 'Review Statement Transactions'
-                    : 'Bank Statement Import'}
+                    ? (isBangla ? 'স্টেটমেন্ট লেনদেন পর্যালোচনা' : 'Review Statement Transactions')
+                    : (isBangla ? 'ব্যাংক স্টেটমেন্ট ইমপোর্ট' : 'Bank Statement Import')}
                 </Text>
-                <Text style={styles.headerSubtitle}>
+                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
                   {stage === 'review'
                     ? duplicateCount > 0
-                      ? `${selectedCount} selected • ${newCount} new, ${duplicateCount} already added`
-                      : `${selectedCount} of ${transactions.length} items selected`
-                    : 'PDF statement parsing'}
+                      ? (isBangla
+                        ? `${selectedCount}টি নির্বাচিত • ${newCount}টি নতুন, ${duplicateCount}টি ইতিমধ্যে যুক্ত`
+                        : `${selectedCount} selected • ${newCount} new, ${duplicateCount} already added`)
+                      : (isBangla
+                        ? `${transactions.length}টির মধ্যে ${selectedCount}টি নির্বাচিত`
+                        : `${selectedCount} of ${transactions.length} items selected`)
+                    : (isBangla ? 'পিডিএফ স্টেটমেন্ট পার্সিং' : 'PDF statement parsing')}
                 </Text>
               </View>
             </View>
@@ -356,7 +364,7 @@ export default function BankStatementReviewModal({
               accessibilityRole="button"
               accessibilityLabel="Close statement parser"
             >
-              <Feather name="x" size={22} color="#6B7280" />
+              <Feather name="x" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -367,11 +375,23 @@ export default function BankStatementReviewModal({
               contentContainerStyle={styles.pickContent}
               keyboardShouldPersistTaps="handled"
             >
-              <View style={styles.uploadArea}>
+              <View
+                style={[
+                  styles.uploadArea,
+                  {
+                    backgroundColor: isDark ? colors.surfaceSubtle : '#F4FBF7',
+                    borderColor: isDark ? '#144633' : '#D1FAE5',
+                  },
+                ]}
+              >
                 <Ionicons name="cloud-upload-outline" size={48} color="#0FB384" />
-                <Text style={styles.uploadTitle}>Select Bank Statement PDF</Text>
-                <Text style={styles.uploadSubtitle}>
-                  Supports standard checking, savings, or credit card PDF statements.
+                <Text style={[styles.uploadTitle, { color: colors.text }]}>
+                  {isBangla ? 'ব্যাংক স্টেটমেন্ট পিডিএফ নির্বাচন করুন' : 'Select Bank Statement PDF'}
+                </Text>
+                <Text style={[styles.uploadSubtitle, { color: colors.textSecondary }]}>
+                  {isBangla
+                    ? 'চেকিং, সেভিংস বা ক্রেডিট কার্ডের স্ট্যান্ডার্ড পিডিএফ স্টেটমেন্ট সমর্থন করে।'
+                    : 'Supports standard checking, savings, or credit card PDF statements.'}
                 </Text>
 
                 <TouchableOpacity
@@ -382,29 +402,41 @@ export default function BankStatementReviewModal({
                 >
                   <Feather name="file" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
                   <Text style={styles.chooseFileText}>
-                    {selectedFile ? 'Choose Different PDF' : 'Browse Files'}
+                    {selectedFile
+                      ? (isBangla ? 'ভিন্ন পিডিএফ নির্বাচন করুন' : 'Choose Different PDF')
+                      : (isBangla ? 'ফাইল ব্রাউজ করুন' : 'Browse Files')}
                   </Text>
                 </TouchableOpacity>
               </View>
 
               {isCheckingFile && (
-                <View style={styles.checkingFileCard}>
+                <View style={[styles.checkingFileCard, { backgroundColor: colors.surfaceSubtle }]}>
                   <ActivityIndicator size="small" color="#0FB384" />
-                  <Text style={styles.checkingFileText}>Checking PDF protection status...</Text>
+                  <Text style={[styles.checkingFileText, { color: colors.text }]}>
+                    {isBangla ? 'পিডিএফ পাসওয়ার্ড যাচাই করা হচ্ছে...' : 'Checking PDF protection status...'}
+                  </Text>
                 </View>
               )}
 
               {selectedFile && (
-                <View style={styles.selectedFileCard}>
+                <View
+                  style={[
+                    styles.selectedFileCard,
+                    {
+                      backgroundColor: isDark ? colors.surfaceSubtle : '#F8FAFC',
+                      borderColor: colors.cardBorder,
+                    },
+                  ]}
+                >
                   <View style={styles.fileIcon}>
                     <Ionicons name="document-attach" size={24} color="#BE185D" />
                   </View>
                   <View style={styles.fileDetails}>
-                    <Text style={styles.fileName} numberOfLines={1}>
+                    <Text style={[styles.fileName, { color: colors.text }]} numberOfLines={1}>
                       {selectedFile.name}
                     </Text>
                     {selectedFile.size && (
-                      <Text style={styles.fileSize}>
+                      <Text style={[styles.fileSize, { color: colors.textSecondary }]}>
                         {(selectedFile.size / 1024).toFixed(1)} KB
                       </Text>
                     )}
@@ -419,25 +451,40 @@ export default function BankStatementReviewModal({
 
               {/* Password Protection Input Card */}
               {selectedFile && isPasswordProtected && (
-                <View style={styles.passwordCard}>
+                <View
+                  style={[
+                    styles.passwordCard,
+                    isDark && { backgroundColor: '#2D2010', borderColor: '#78350F' },
+                  ]}
+                >
                   <View style={styles.passwordHeader}>
                     <View style={styles.passwordLockCircle}>
                       <Ionicons name="lock-closed" size={16} color="#B45309" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.passwordTitle}>Password Protected Statement</Text>
-                      <Text style={styles.passwordSubtitle}>
-                        Enter the PDF password to unlock transactions
+                      <Text style={[styles.passwordTitle, isDark && { color: '#FDE68A' }]}>
+                        {isBangla ? 'পাসওয়ার্ড সুরক্ষিত স্টেটমেন্ট' : 'Password Protected Statement'}
+                      </Text>
+                      <Text style={[styles.passwordSubtitle, isDark && { color: '#FCD34D' }]}>
+                        {isBangla ? 'লেনদেন আনলক করতে পিডিএফ পাসওয়ার্ড দিন' : 'Enter the PDF password to unlock transactions'}
                       </Text>
                     </View>
                   </View>
 
-                  <View style={styles.passwordInputWrapper}>
-                    <Ionicons name="key-outline" size={18} color="#6B7280" style={{ marginRight: 10 }} />
+                  <View
+                    style={[
+                      styles.passwordInputWrapper,
+                      {
+                        backgroundColor: colors.inputBg,
+                        borderColor: isDark ? '#B45309' : '#FCD34D',
+                      },
+                    ]}
+                  >
+                    <Ionicons name="key-outline" size={18} color={colors.textSecondary} style={{ marginRight: 10 }} />
                     <TextInput
-                      style={styles.passwordInput}
-                      placeholder="Enter PDF password (e.g. DDMMYYYY)"
-                      placeholderTextColor="#9CA3AF"
+                      style={[styles.passwordInput, { color: colors.text }]}
+                      placeholder={isBangla ? 'পিডিএফ পাসওয়ার্ড দিন (যেমন: দিন/মাস/বছর)' : 'Enter PDF password (e.g. DDMMYYYY)'}
+                      placeholderTextColor={colors.textMuted}
                       value={password}
                       onChangeText={(text) => {
                         setPassword(text);
@@ -456,15 +503,17 @@ export default function BankStatementReviewModal({
                       <Ionicons
                         name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                         size={20}
-                        color="#6B7280"
+                        color={colors.textSecondary}
                       />
                     </TouchableOpacity>
                   </View>
 
                   <View style={styles.passwordHintRow}>
                     <Ionicons name="information-circle-outline" size={16} color="#92400E" style={{ marginTop: 1 }} />
-                    <Text style={styles.passwordHintText}>
-                      Common passwords in Bangladesh: Date of Birth (DDMMYYYY) or your National ID (NID).
+                    <Text style={[styles.passwordHintText, isDark && { color: '#FDE68A' }]}>
+                      {isBangla
+                        ? 'সাধারণ পাসওয়ার্ড: জন্ম তারিখ (DDMMYYYY) অথবা জাতীয় পরিচয়পত্র নম্বর (NID)।'
+                        : 'Common passwords in Bangladesh: Date of Birth (DDMMYYYY) or your National ID (NID).'}
                     </Text>
                   </View>
                 </View>
@@ -512,15 +561,22 @@ export default function BankStatementReviewModal({
                 </View>
               )}
 
-              <View style={styles.noticeBox}>
+              <View
+                style={[
+                  styles.noticeBox,
+                  isDark && { backgroundColor: 'rgba(5, 150, 105, 0.15)', borderColor: 'rgba(5, 150, 105, 0.3)' },
+                ]}
+              >
                 <Ionicons name="shield-checkmark" size={18} color="#059669" />
-                <Text style={styles.noticeText}>
-                  Transactions are never saved automatically. You will review and confirm each entry before anything is written and saved.
+                <Text style={[styles.noticeText, isDark && { color: '#A7F3D0' }]}>
+                  {isBangla
+                    ? 'লেনদেন কখনও স্বয়ংক্রিয়ভাবে সংরক্ষিত হয় না। সংরক্ষণ করার আগে আপনি প্রতিটি লেনদেন পর্যালোচনা ও নিশ্চিত করতে পারবেন।'
+                    : 'Transactions are never saved automatically. You will review and confirm each entry before anything is written and saved.'}
                 </Text>
               </View>
 
               <TouchableOpacity
-                style={[styles.extractBtn, !selectedFile && styles.btnDisabled]}
+                style={[styles.extractBtn, !selectedFile && [styles.btnDisabled, isDark && { backgroundColor: colors.surfaceSubtle }]]}
                 onPress={handleStartExtraction}
                 disabled={!selectedFile}
                 accessibilityRole="button"
@@ -533,7 +589,9 @@ export default function BankStatementReviewModal({
                   style={{ marginRight: 8 }}
                 />
                 <Text style={styles.extractBtnText}>
-                  {isPasswordProtected ? 'Unlock & Extract Transactions' : 'Extract Transactions'}
+                  {isPasswordProtected
+                    ? (isBangla ? 'আনলক করুন এবং লেনদেন এক্সট্রাক্ট করুন' : 'Unlock & Extract Transactions')
+                    : (isBangla ? 'লেনদেন এক্সট্রাক্ট করুন' : 'Extract Transactions')}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -543,19 +601,19 @@ export default function BankStatementReviewModal({
           {(stage === 'parsing' || stage === 'importing') && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#0FB384" />
-              <Text style={styles.loadingTitle}>
+              <Text style={[styles.loadingTitle, { color: colors.text }]}>
                 {stage === 'parsing'
                   ? isPasswordProtected
-                    ? 'Decrypting & Analyzing Statement...'
-                    : 'Analyzing Statement...'
-                  : 'Importing Transactions to Database...'}
+                    ? (isBangla ? 'স্টেটমেন্ট ডিক্রিপ্ট এবং বিশ্লেষণ করা হচ্ছে...' : 'Decrypting & Analyzing Statement...')
+                    : (isBangla ? 'স্টেটমেন্ট বিশ্লেষণ করা হচ্ছে...' : 'Analyzing Statement...')
+                  : (isBangla ? 'লেনদেন ডাটাবেসে ইমপোর্ট করা হচ্ছে...' : 'Importing Transactions to Database...')}
               </Text>
-              <Text style={styles.loadingSubtitle}>
+              <Text style={[styles.loadingSubtitle, { color: colors.textSecondary }]}>
                 {stage === 'parsing'
                   ? isPasswordProtected
-                    ? 'Unlocking PDF with your password and extracting transaction line items.'
-                    : 'Extracting transaction dates, descriptions, amounts, and inferred categories.'
-                  : 'Writing selected records to Supabase transactions table.'}
+                    ? (isBangla ? 'পাসওয়ার্ড দিয়ে পিডিএফ আনলক করা হচ্ছে এবং লেনদেন বের করা হচ্ছে।' : 'Unlocking PDF with your password and extracting transaction line items.')
+                    : (isBangla ? 'তারিখ, বিবরণ, পরিমাণ এবং খরচের খাত বিশ্লেষণ করা হচ্ছে।' : 'Extracting transaction dates, descriptions, amounts, and inferred categories.')
+                  : (isBangla ? 'নির্বাচিত রেকর্ডগুলো সেভ করা হচ্ছে।' : 'Writing selected records to Supabase transactions table.')}
               </Text>
             </View>
           )}
@@ -564,35 +622,60 @@ export default function BankStatementReviewModal({
           {stage === 'review' && (
             <View style={styles.reviewContainer}>
               {/* Statement Summary Banner */}
-              <View style={styles.statementSummaryBanner}>
+              <View
+                style={[
+                  styles.statementSummaryBanner,
+                  {
+                    backgroundColor: isDark ? colors.surfaceSubtle : '#F8FAFC',
+                    borderBottomColor: colors.cardBorder,
+                  },
+                ]}
+              >
                 <View style={{ flex: 1, marginRight: 12 }}>
-                  <Text style={styles.statementBankName}>{extractionResult?.bankName}</Text>
+                  <Text style={[styles.statementBankName, { color: colors.text }]}>{extractionResult?.bankName}</Text>
                   {extractionResult?.period && (
-                    <Text style={styles.statementPeriod}>Period: {extractionResult.period}</Text>
+                    <Text style={[styles.statementPeriod, { color: colors.textSecondary }]}>
+                      {isBangla ? `সময়কাল: ${extractionResult.period}` : `Period: ${extractionResult.period}`}
+                    </Text>
                   )}
                 </View>
                 <View style={styles.summaryTotalsRow}>
                   <Text style={styles.summaryDebits}>
-                    -৳{extractionResult?.totalDebit.toLocaleString()}
+                    -{formatCurrency(extractionResult?.totalDebit || 0)}
                   </Text>
                   <Text style={styles.summaryCredits}>
-                    +৳{extractionResult?.totalCredit.toLocaleString()}
+                    +{formatCurrency(extractionResult?.totalCredit || 0)}
                   </Text>
                 </View>
               </View>
 
               {/* Duplicate Notice Banner */}
               {duplicateCount > 0 && (
-                <View style={styles.duplicateNoticeBanner}>
+                <View
+                  style={[
+                    styles.duplicateNoticeBanner,
+                    isDark && { backgroundColor: '#33230A', borderColor: '#78350F' },
+                  ]}
+                >
                   <Ionicons name="information-circle" size={16} color="#B45309" style={{ marginTop: 1 }} />
-                  <Text style={styles.duplicateNoticeText}>
-                    {duplicateCount} {duplicateCount === 1 ? 'transaction was' : 'transactions were'} already found in your account and unselected to avoid duplicates.
+                  <Text style={[styles.duplicateNoticeText, isDark && { color: '#FDE68A' }]}>
+                    {isBangla
+                      ? `${duplicateCount}টি লেনদেন ইতিমধ্যে আপনার অ্যাকাউন্টে রয়েছে এবং ডুপ্লিকেট এড়াতে আনচেক করা হয়েছে।`
+                      : `${duplicateCount} ${duplicateCount === 1 ? 'transaction was' : 'transactions were'} already found in your account and unselected to avoid duplicates.`}
                   </Text>
                 </View>
               )}
 
               {/* Bulk Toggle Bar */}
-              <View style={styles.bulkActionBar}>
+              <View
+                style={[
+                  styles.bulkActionBar,
+                  {
+                    backgroundColor: colors.card,
+                    borderBottomColor: colors.cardBorder,
+                  },
+                ]}
+              >
                 <TouchableOpacity
                   style={styles.toggleTextBtn}
                   onPress={() => handleSelectAll(selectedCount !== transactions.length)}
@@ -612,13 +695,18 @@ export default function BankStatementReviewModal({
                     style={{ marginRight: 6 }}
                   />
                   <Text style={styles.toggleText}>
-                    {selectedCount === transactions.length ? 'Deselect All' : 'Select All'}
+                    {selectedCount === transactions.length
+                      ? (isBangla ? 'সব অনির্বাচন' : 'Deselect All')
+                      : (isBangla ? 'সব নির্বাচন' : 'Select All')}
                   </Text>
                 </TouchableOpacity>
 
                 {duplicateCount > 0 && (
                   <TouchableOpacity
-                    style={styles.selectNewOnlyBtn}
+                    style={[
+                      styles.selectNewOnlyBtn,
+                      isDark && { backgroundColor: '#14382A' },
+                    ]}
                     onPress={() => {
                       setTransactions((prev) =>
                         prev.map((tx) => ({ ...tx, selected: !tx.alreadyExists }))
@@ -627,12 +715,16 @@ export default function BankStatementReviewModal({
                     accessibilityRole="button"
                     accessibilityLabel="Select only new transactions"
                   >
-                    <Text style={styles.selectNewOnlyBtnText}>Select New Only ({newCount})</Text>
+                    <Text style={styles.selectNewOnlyBtnText}>
+                      {isBangla ? `শুধু নতুনগুলো (${newCount})` : `Select New Only (${newCount})`}
+                    </Text>
                   </TouchableOpacity>
                 )}
 
-                <Text style={styles.selectedCountBadge}>
-                  {selectedCount} selected of {transactions.length}
+                <Text style={[styles.selectedCountBadge, { color: colors.textSecondary }]}>
+                  {isBangla
+                    ? `${transactions.length}টির মধ্যে ${selectedCount}টি নির্বাচিত`
+                    : `${selectedCount} selected of ${transactions.length}`}
                 </Text>
               </View>
 
@@ -652,7 +744,14 @@ export default function BankStatementReviewModal({
                   return (
                     <View
                       key={tx.id}
-                      style={[styles.transactionCard, !tx.selected && styles.transactionCardUnchecked]}
+                      style={[
+                        styles.transactionCard,
+                        {
+                          backgroundColor: isDark ? colors.surfaceSubtle : '#FFFFFF',
+                          borderColor: colors.cardBorder,
+                        },
+                        !tx.selected && (isDark ? { backgroundColor: '#0B2219', opacity: 0.5 } : styles.transactionCardUnchecked),
+                      ]}
                     >
                       {/* Checkbox */}
                       <TouchableOpacity
@@ -665,14 +764,14 @@ export default function BankStatementReviewModal({
                         <Ionicons
                           name={tx.selected ? 'checkbox' : 'square-outline'}
                           size={24}
-                          color={tx.selected ? '#0FB384' : '#9CA3AF'}
+                          color={tx.selected ? '#0FB384' : colors.textMuted}
                         />
                       </TouchableOpacity>
 
                       {/* Content */}
                       <View style={styles.txMainInfo}>
                         <View style={styles.txTopRow}>
-                          <Text style={styles.txDescription} numberOfLines={2}>
+                          <Text style={[styles.txDescription, { color: colors.text }]} numberOfLines={2}>
                             {tx.description}
                           </Text>
                           <Text
@@ -681,29 +780,36 @@ export default function BankStatementReviewModal({
                               isExpense ? styles.amountExpense : styles.amountIncome,
                             ]}
                           >
-                            {isExpense ? '-' : '+'}৳{tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {isExpense ? '-' : '+'}{formatCurrency(tx.amount)}
                           </Text>
                         </View>
 
                         <View style={styles.txBottomRow}>
-                          <Text style={styles.txDate}>{tx.date}</Text>
+                          <Text style={[styles.txDate, { color: colors.textSecondary }]}>{tx.date}</Text>
 
                           {/* Editable Category Tag */}
                           <TouchableOpacity
-                            style={styles.categoryBadge}
+                            style={[
+                              styles.categoryBadge,
+                              isDark && { backgroundColor: '#14382A' },
+                            ]}
                             onPress={() => setCategoryPickerTxId(tx.id)}
                             accessibilityRole="button"
                             accessibilityLabel={`Change category from ${tx.category}`}
                           >
-                            <Text style={styles.categoryBadgeText}>{tx.category}</Text>
-                            <Feather name="chevron-down" size={12} color="#059669" />
+                            <Text style={[styles.categoryBadgeText, isDark && { color: '#A7F3D0' }]}>
+                              {translateCategory(tx.category)}
+                            </Text>
+                            <Feather name="chevron-down" size={12} color={isDark ? '#A7F3D0' : '#059669'} />
                           </TouchableOpacity>
 
                           {/* Already Added Indicator */}
                           {tx.alreadyExists && (
-                            <View style={styles.alreadyAddedBadge}>
-                              <Ionicons name="checkmark-done" size={12} color="#92400E" />
-                              <Text style={styles.alreadyAddedBadgeText}>Already Added</Text>
+                            <View style={[styles.alreadyAddedBadge, isDark && { backgroundColor: '#33230A' }]}>
+                              <Ionicons name="checkmark-done" size={12} color="#D97706" />
+                              <Text style={[styles.alreadyAddedBadgeText, isDark && { color: '#FDE68A' }]}>
+                                {isBangla ? 'যুক্ত আছে' : 'Already Added'}
+                              </Text>
                             </View>
                           )}
 
@@ -714,7 +820,7 @@ export default function BankStatementReviewModal({
                             accessibilityRole="button"
                             accessibilityLabel="Remove transaction"
                           >
-                            <Feather name="trash-2" size={14} color="#9CA3AF" />
+                            <Feather name="trash-2" size={14} color={colors.textMuted} />
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -724,9 +830,9 @@ export default function BankStatementReviewModal({
               </ScrollView>
 
               {/* Bottom Action Footer */}
-              <View style={styles.reviewFooter}>
+              <View style={[styles.reviewFooter, { backgroundColor: colors.card, borderTopColor: colors.cardBorder }]}>
                 <TouchableOpacity
-                  style={[styles.importBtn, selectedCount === 0 && styles.btnDisabled]}
+                  style={[styles.importBtn, selectedCount === 0 && [styles.btnDisabled, isDark && { backgroundColor: colors.surfaceSubtle }]]}
                   onPress={handleImportSelected}
                   disabled={selectedCount === 0}
                   accessibilityRole="button"
@@ -734,7 +840,9 @@ export default function BankStatementReviewModal({
                 >
                   <Ionicons name="checkmark-done" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
                   <Text style={styles.importBtnText}>
-                    Import Selected Transactions ({selectedCount})
+                    {isBangla
+                      ? `নির্বাচিত লেনদেন ইমপোর্ট করুন (${selectedCount})`
+                      : `Import Selected Transactions (${selectedCount})`}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -750,22 +858,26 @@ export default function BankStatementReviewModal({
               onRequestClose={() => setCategoryPickerTxId(null)}
             >
               <View style={styles.pickerOverlay}>
-                <View style={styles.pickerCard}>
+                <View style={[styles.pickerCard, { backgroundColor: colors.card }]}>
                   <View style={styles.pickerHeader}>
-                    <Text style={styles.pickerTitle}>Choose Category</Text>
+                    <Text style={[styles.pickerTitle, { color: colors.text }]}>
+                      {isBangla ? 'খাত নির্বাচন করুন' : 'Choose Category'}
+                    </Text>
                     <TouchableOpacity onPress={() => setCategoryPickerTxId(null)}>
-                      <Feather name="x" size={20} color="#6B7280" />
+                      <Feather name="x" size={20} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </View>
                   <ScrollView style={{ maxHeight: 320 }}>
                     {categoryOptions.map((cat) => (
                       <TouchableOpacity
                         key={cat.label}
-                        style={styles.categoryOptionRow}
+                        style={[styles.categoryOptionRow, { borderBottomColor: colors.cardBorder }]}
                         onPress={() => handleChangeCategory(categoryPickerTxId, cat.label)}
                       >
                         <Text style={{ fontSize: 20, marginRight: 12 }}>{cat.emoji}</Text>
-                        <Text style={styles.categoryOptionLabel}>{cat.label}</Text>
+                        <Text style={[styles.categoryOptionLabel, { color: colors.text }]}>
+                          {translateCategory(cat.label)}
+                        </Text>
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
@@ -782,15 +894,15 @@ export default function BankStatementReviewModal({
             onRequestClose={() => setShowDebugModal(false)}
           >
             <View style={styles.debugOverlay}>
-              <View style={styles.debugModalCard}>
+              <View style={[styles.debugModalCard, { backgroundColor: colors.card }]}>
                 <View style={styles.debugHeader}>
                   <View style={styles.debugHeaderLeft}>
                     <View style={styles.debugIconBubble}>
                       <Ionicons name="bug" size={18} color="#2563EB" />
                     </View>
                     <View>
-                      <Text style={styles.debugHeaderTitle}>AI Diagnostic Report</Text>
-                      <Text style={styles.debugHeaderSub}>Gemini model responses & logs</Text>
+                      <Text style={[styles.debugHeaderTitle, { color: colors.text }]}>AI Diagnostic Report</Text>
+                      <Text style={[styles.debugHeaderSub, { color: colors.textSecondary }]}>Gemini model responses & logs</Text>
                     </View>
                   </View>
                   <TouchableOpacity
@@ -799,12 +911,12 @@ export default function BankStatementReviewModal({
                     accessibilityRole="button"
                     accessibilityLabel="Close diagnostics"
                   >
-                    <Feather name="x" size={20} color="#6B7280" />
+                    <Feather name="x" size={20} color={colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
 
-                <ScrollView style={styles.debugScrollBox} showsVerticalScrollIndicator={true}>
-                  <Text style={styles.debugCodeText} selectable>
+                <ScrollView style={[styles.debugScrollBox, { backgroundColor: colors.inputBg }]} showsVerticalScrollIndicator={true}>
+                  <Text style={[styles.debugCodeText, { color: colors.text }]} selectable>
                     {debugReport || 'No diagnostic output available.'}
                   </Text>
                 </ScrollView>

@@ -14,6 +14,8 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useNotifications } from '../context/NotificationsContext';
 import { useBudgets } from '../context/BudgetsContext';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import type {
   AppNotification,
   NotificationAccent,
@@ -81,6 +83,8 @@ function NotificationCard({
   onDismiss: (id: string) => void;
   onCta: (notif: AppNotification) => void;
 }) {
+  const { colors, isDark } = useTheme();
+  const { isBangla } = useLanguage();
   const opacity = useRef(new Animated.Value(1)).current;
   const accent = ACCENT_META[notif.accent_color];
   const meta = CATEGORY_META[notif.category];
@@ -96,18 +100,18 @@ function NotificationCard({
   };
 
   return (
-    <Animated.View style={[styles.card, { opacity }]}>
+    <Animated.View style={[styles.card, { opacity, backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
       <View style={[styles.accentLine, { backgroundColor: accent.line }]} />
       <View style={styles.cardBody}>
         <View style={styles.cardTopRow}>
-          <View style={[styles.categoryIcon, { backgroundColor: accent.bg }]}>
+          <View style={[styles.categoryIcon, { backgroundColor: isDark ? '#143D2E' : accent.bg }]}>
             <Text style={styles.categoryEmoji}>{meta.emoji}</Text>
           </View>
           <View style={styles.cardTextStack}>
-            <Text style={styles.cardTitle} numberOfLines={2}>
+            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>
               {notif.title}
             </Text>
-            <Text style={styles.cardMessage} numberOfLines={2}>
+            <Text style={[styles.cardMessage, { color: colors.textSecondary }]} numberOfLines={2}>
               {notif.message}
             </Text>
           </View>
@@ -115,7 +119,7 @@ function NotificationCard({
         </View>
 
         {progress != null && (
-          <View style={styles.progressTrack}>
+          <View style={[styles.progressTrack, { backgroundColor: colors.divider }]}>
             <View
               style={[
                 styles.progressFill,
@@ -126,7 +130,7 @@ function NotificationCard({
         )}
 
         <View style={styles.cardFooter}>
-          <Text style={styles.timestamp}>{timeAgo(notif.created_at)}</Text>
+          <Text style={[styles.timestamp, { color: colors.textMuted }]}>{timeAgo(notif.created_at)}</Text>
           <View style={styles.footerActions}>
             <TouchableOpacity
               style={styles.footerButton}
@@ -135,8 +139,10 @@ function NotificationCard({
               accessibilityRole="button"
               accessibilityLabel="Dismiss notification"
             >
-              <Feather name="x-circle" size={14} color="#94A3B8" />
-              <Text style={styles.dismissText}>Dismiss</Text>
+              <Feather name="x-circle" size={14} color={colors.textMuted} />
+              <Text style={[styles.dismissText, { color: colors.textMuted }]}>
+                {isBangla ? 'বাতিল' : 'Dismiss'}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.footerButton}
@@ -166,6 +172,8 @@ export default function NotificationsScreen() {
     refreshNotifications,
   } = useNotifications();
   const { requestBudgetTab } = useBudgets();
+  const { colors, isDark } = useTheme();
+  const { t, isBangla } = useLanguage();
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState<Filter>('All');
   const [refreshing, setRefreshing] = useState(false);
@@ -179,12 +187,14 @@ export default function NotificationsScreen() {
   const handleClearAll = useCallback(() => {
     if (notifications.length === 0) return;
     Alert.alert(
-      'Clear All Alerts',
-      'Are you sure you want to dismiss all notifications?',
+      isBangla ? 'সব বিজ্ঞপ্তি মুছে ফেলবেন?' : 'Clear All Alerts',
+      isBangla
+        ? 'আপনি কি নিশ্চিত যে সমস্ত বিজ্ঞপ্তি বাতিল করতে চান?'
+        : 'Are you sure you want to dismiss all notifications?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: isBangla ? 'বাতিল' : 'Cancel', style: 'cancel' },
         {
-          text: 'Clear All',
+          text: isBangla ? 'সব মুছুন' : 'Clear All',
           style: 'destructive',
           onPress: async () => {
             await clearAllNotifications();
@@ -192,7 +202,7 @@ export default function NotificationsScreen() {
         },
       ]
     );
-  }, [notifications.length, clearAllNotifications]);
+  }, [notifications.length, clearAllNotifications, isBangla]);
 
   const filtered = useMemo(
     () =>
@@ -245,7 +255,7 @@ export default function NotificationsScreen() {
     if (items.length === 0) return null;
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>{label}</Text>
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{label}</Text>
         {items.map((n) => (
           <NotificationCard
             key={n.id}
@@ -259,23 +269,27 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* ── Header ── */}
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: colors.divider }]}>
         <TouchableOpacity
           style={styles.headerBtn}
           onPress={() => router.back()}
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
-          <Ionicons name="chevron-back" size={24} color="#0F172A" />
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
 
         <View style={styles.headerTitleBlock}>
-          <Text style={styles.headerTitle}>Alerts</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {t('notifications.title', 'Notifications')}
+          </Text>
           {unreadCount > 0 && (
             <View style={styles.newBadge}>
-              <Text style={styles.newBadgeText}>{unreadCount} new</Text>
+              <Text style={styles.newBadgeText}>
+                {unreadCount} {isBangla ? 'নতুন' : 'new'}
+              </Text>
             </View>
           )}
         </View>
@@ -288,7 +302,7 @@ export default function NotificationsScreen() {
           accessibilityLabel="Mark all notifications as read"
         >
           <Text style={[styles.markAllText, unreadCount === 0 && styles.markAllTextDisabled]}>
-            ✓ Mark all
+            {isBangla ? '✓ সব পঠিত' : '✓ Mark all'}
           </Text>
         </TouchableOpacity>
 
@@ -298,12 +312,12 @@ export default function NotificationsScreen() {
           accessibilityRole="button"
           accessibilityLabel="Open settings"
         >
-          <Ionicons name="settings-outline" size={22} color="#0F172A" />
+          <Ionicons name="settings-outline" size={22} color={colors.text} />
         </TouchableOpacity>
       </View>
 
       {/* ── Category Filter Bar ── */}
-      <View style={styles.filterBar}>
+      <View style={[styles.filterBar, { borderBottomColor: colors.divider }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -311,6 +325,16 @@ export default function NotificationsScreen() {
         >
           {FILTERS.map((filter) => {
             const active = activeFilter === filter;
+            const filterLabel =
+              filter === 'All'
+                ? t('notifications.filter_all', 'All')
+                : filter === 'Budget'
+                ? t('notifications.filter_budget', 'Budget')
+                : filter === 'Bills'
+                ? t('notifications.filter_bills', 'Bills')
+                : filter === 'Savings'
+                ? t('notifications.filter_savings', 'Savings')
+                : t('notifications.filter_family', 'Family');
             return (
               <TouchableOpacity
                 key={filter}
@@ -320,8 +344,14 @@ export default function NotificationsScreen() {
                 accessibilityLabel={`Filter by ${filter}`}
                 accessibilityState={{ selected: active }}
               >
-                <Text style={[styles.filterLabel, active && styles.filterLabelActive]}>
-                  {active ? `${filter} •` : filter}
+                <Text
+                  style={[
+                    styles.filterLabel,
+                    { color: active ? colors.primary : colors.textSecondary },
+                    active && styles.filterLabelActive,
+                  ]}
+                >
+                  {active ? `${filterLabel} •` : filterLabel}
                 </Text>
                 {active && <View style={styles.filterUnderline} />}
               </TouchableOpacity>
@@ -345,16 +375,18 @@ export default function NotificationsScreen() {
       >
         {filtered.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="notifications-off-outline" size={40} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>No alerts</Text>
-            <Text style={styles.emptyText}>
-              You're all caught up. New alerts will show up here.
+            <Ionicons name="notifications-off-outline" size={40} color={colors.textMuted} />
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>
+              {t('notifications.empty_title', 'No alerts')}
+            </Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              {t('notifications.empty_desc', "You're all caught up. New alerts will show up here.")}
             </Text>
           </View>
         ) : (
           <>
-            {renderSection('TODAY', grouped.today)}
-            {renderSection('EARLIER', grouped.earlier)}
+            {renderSection(isBangla ? 'আজকের' : 'TODAY', grouped.today)}
+            {renderSection(isBangla ? 'পূর্ববর্তী' : 'EARLIER', grouped.earlier)}
             <View style={styles.clearAllSection}>
               <TouchableOpacity
                 style={styles.clearAllBtn}
@@ -363,8 +395,10 @@ export default function NotificationsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Clear all alerts"
               >
-                <Feather name="trash-2" size={14} color="#94A3B8" />
-                <Text style={styles.clearAllText}>Clear all alerts</Text>
+                <Feather name="trash-2" size={14} color={colors.textMuted} />
+                <Text style={[styles.clearAllText, { color: colors.textMuted }]}>
+                  {isBangla ? 'সব বিজ্ঞপ্তি মুছুন' : 'Clear all alerts'}
+                </Text>
               </TouchableOpacity>
             </View>
           </>

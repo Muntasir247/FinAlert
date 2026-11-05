@@ -11,11 +11,14 @@ import {
   ScrollView,
   Animated,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSavingsGoals } from '../context/SavingsGoalsContext';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   SAVINGS_GOAL_ICONS,
   SAVINGS_GOAL_COLORS,
@@ -52,10 +55,13 @@ export default function SavingsGoalsManager({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const { goals, addContribution, createGoal } = useSavingsGoals();
+  const { goals, addContribution, createGoal, deleteGoal } = useSavingsGoals();
+  const { colors, isDark } = useTheme();
+  const { t, isBangla, formatCurrency } = useLanguage();
 
   const [view, setView] = useState<SheetView>(initialView);
   const [selectedGoal, setSelectedGoal] = useState<SavingsGoal | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Add contribution form
   const [amountText, setAmountText] = useState('');
@@ -203,6 +209,35 @@ export default function SavingsGoalsManager({
     }, 900);
   };
 
+  // ── Delete goal ──
+  const handleDeleteGoal = (goal: SavingsGoal) => {
+    Alert.alert(
+      'Delete Savings Goal?',
+      `Are you sure you want to delete "${goal.name}"? This will permanently remove this goal and its saved amount (${fmtMoney(goal.current_amount)}).`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingId(goal.id);
+            const { error } = await deleteGoal(goal.id);
+            setDeletingId(null);
+            if (error) {
+              Alert.alert('Error', error.message || 'Failed to delete savings goal. Please try again.');
+            } else {
+              // Return to the list view if we deleted from within 'add' view
+              if (selectedGoal?.id === goal.id) {
+                setSelectedGoal(null);
+                setView('list');
+              }
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // ── Create goal ──
   const createName = nameText.trim();
   const createTarget = Number.parseFloat(targetText);
@@ -236,7 +271,7 @@ export default function SavingsGoalsManager({
   const renderProgressBar = (pct: number, colorHex: string) => {
     const barPct = Math.max(0, Math.min(pct, 100));
     return (
-      <View style={styles.progressTrack}>
+      <View style={[styles.progressTrack, isDark && { backgroundColor: colors.divider }]}>
         <View
           style={[styles.progressFill, { width: `${barPct}%`, backgroundColor: colorHex }]}
         />
@@ -250,28 +285,28 @@ export default function SavingsGoalsManager({
       <View style={styles.headerSide}>
         {showBack && (
           <TouchableOpacity
-            style={styles.headerBtn}
+            style={[styles.headerBtn, { backgroundColor: isDark ? colors.surfaceSubtle : '#F3F4F6' }]}
             onPress={() => setView('list')}
             hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
             accessibilityRole="button"
             accessibilityLabel="Back to savings goals"
           >
-            <Ionicons name="arrow-back" size={20} color="#091E15" />
+            <Ionicons name="arrow-back" size={20} color={colors.text} />
           </TouchableOpacity>
         )}
       </View>
       <View style={styles.headerCenter}>
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
       </View>
       <View style={styles.headerSide}>
         <TouchableOpacity
-          style={styles.headerBtn}
+          style={[styles.headerBtn, { backgroundColor: isDark ? colors.surfaceSubtle : '#F3F4F6' }]}
           onPress={handleClose}
           hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
           accessibilityRole="button"
           accessibilityLabel="Close Savings Goals"
         >
-          <Ionicons name="close" size={22} color="#091E15" />
+          <Ionicons name="close" size={22} color={colors.text} />
         </TouchableOpacity>
       </View>
     </View>
@@ -288,9 +323,11 @@ export default function SavingsGoalsManager({
         {goals.length === 0 ? (
           <View style={styles.emptyBox}>
             <Text style={styles.emptyEmoji}>🎯</Text>
-            <Text style={styles.emptyTitle}>No savings goals yet</Text>
-            <Text style={styles.emptyText}>
-              Create your first goal below to start tracking progress.
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>
+              {isBangla ? 'এখনও কোনো লক্ষ্য নেই' : 'No savings goals yet'}
+            </Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              {isBangla ? 'অগ্রগতি ট্র্যাক করতে নিচে একটি লক্ষ্য তৈরি করুন।' : 'Create your first goal below to start tracking progress.'}
             </Text>
           </View>
         ) : (
@@ -299,7 +336,13 @@ export default function SavingsGoalsManager({
               goal.target_amount > 0 ? (goal.current_amount / goal.target_amount) * 100 : 0;
             const remaining = Math.max(0, goal.target_amount - goal.current_amount);
             return (
-              <View key={goal.id} style={styles.goalCard}>
+              <View
+                key={goal.id}
+                style={[
+                  styles.goalCard,
+                  { backgroundColor: isDark ? colors.surfaceSubtle : '#FFFFFF', borderColor: colors.cardBorder },
+                ]}
+              >
                 <View style={styles.goalCardHeader}>
                   <View
                     style={[styles.goalCardIcon, { backgroundColor: savingsGoalTint(goal.color) }]}
@@ -311,11 +354,11 @@ export default function SavingsGoalsManager({
                     />
                   </View>
                   <View style={styles.goalCardInfo}>
-                    <Text style={styles.goalCardName} numberOfLines={1}>
+                    <Text style={[styles.goalCardName, { color: colors.text }]} numberOfLines={1}>
                       {goal.name}
                     </Text>
-                    <Text style={styles.goalCardRemaining}>
-                      Remaining: {fmtMoney(remaining)}
+                    <Text style={[styles.goalCardRemaining, { color: colors.textSecondary }]}>
+                      {isBangla ? `অবশিষ্ট: ${formatCurrency(remaining)}` : `Remaining: ${fmtMoney(remaining)}`}
                     </Text>
                   </View>
                   <View style={[styles.pctBadge, { backgroundColor: savingsGoalTint(goal.color) }]}>
@@ -327,14 +370,36 @@ export default function SavingsGoalsManager({
 
                 {renderProgressBar(pct, goal.color)}
 
-                <TouchableOpacity
-                  style={[styles.addButton, { backgroundColor: goal.color }]}
-                  onPress={() => openAdd(goal)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Add contribution to ${goal.name}`}
-                >
-                  <Text style={styles.addButtonText}>+ Add</Text>
-                </TouchableOpacity>
+                <View style={styles.cardActionsRow}>
+                  <TouchableOpacity
+                    style={[styles.addButton, { backgroundColor: goal.color }]}
+                    onPress={() => openAdd(goal)}
+                    disabled={deletingId === goal.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add contribution to ${goal.name}`}
+                  >
+                    <Text style={styles.addButtonText}>
+                      {isBangla ? '+ জমা করুন' : '+ Add'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.deleteCardButton,
+                      isDark && { backgroundColor: 'rgba(239, 68, 68, 0.2)' },
+                    ]}
+                    onPress={() => handleDeleteGoal(goal)}
+                    disabled={deletingId === goal.id}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete ${goal.name} goal`}
+                  >
+                    {deletingId === goal.id ? (
+                      <ActivityIndicator size="small" color="#EF4444" />
+                    ) : (
+                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
             );
           })
@@ -349,7 +414,7 @@ export default function SavingsGoalsManager({
           accessibilityLabel="Create new savings goal"
         >
           <Text style={[styles.primaryButtonText, styles.primaryButtonTextActive]}>
-            + Create New Savings Goal
+            {isBangla ? '+ নতুন সঞ্চয় লক্ষ্য তৈরি করুন' : '+ Create New Savings Goal'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -371,7 +436,12 @@ export default function SavingsGoalsManager({
           contentContainerStyle={styles.scrollContent}
         >
           {/* Goal preview */}
-          <View style={styles.previewCard}>
+          <View
+            style={[
+              styles.previewCard,
+              { backgroundColor: isDark ? colors.surfaceSubtle : '#F8FAFC', borderColor: colors.cardBorder },
+            ]}
+          >
             <View style={styles.previewRow}>
               <View
                 style={[
@@ -386,11 +456,13 @@ export default function SavingsGoalsManager({
                 />
               </View>
               <View style={styles.goalCardInfo}>
-                <Text style={styles.previewName} numberOfLines={1}>
+                <Text style={[styles.previewName, { color: colors.text }]} numberOfLines={1}>
                   {selectedGoal.name}
                 </Text>
-                <Text style={styles.previewAmounts}>
-                  {fmtMoney(selectedGoal.current_amount)} of {fmtMoney(selectedGoal.target_amount)}
+                <Text style={[styles.previewAmounts, { color: colors.textSecondary }]}>
+                  {isBangla
+                    ? `${formatCurrency(selectedGoal.current_amount)} / ${formatCurrency(selectedGoal.target_amount)}`
+                    : `${fmtMoney(selectedGoal.current_amount)} of ${fmtMoney(selectedGoal.target_amount)}`}
                 </Text>
               </View>
               <Text style={[styles.previewPct, { color: selectedGoal.color }]}>
@@ -402,16 +474,18 @@ export default function SavingsGoalsManager({
 
           {/* Amount input */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Amount to add</Text>
-            <View style={styles.amountInputWrap}>
-              <Text style={styles.currencyPrefix}>৳</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              {isBangla ? 'জমা দেওয়ার পরিমাণ' : 'Amount to add'}
+            </Text>
+            <View style={[styles.amountInputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+              <Text style={[styles.currencyPrefix, { color: colors.text }]}>৳</Text>
               <TextInput
-                style={styles.amountInput}
+                style={[styles.amountInput, { color: colors.text }]}
                 value={amountText}
                 onChangeText={setAmountText}
                 keyboardType="decimal-pad"
                 placeholder="0"
-                placeholderTextColor="#A0ADB6"
+                placeholderTextColor={colors.textMuted}
                 editable={!addSubmitting}
                 accessibilityLabel="Contribution amount"
               />
@@ -420,14 +494,17 @@ export default function SavingsGoalsManager({
 
           {/* Quick presets */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Quick select</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              {isBangla ? 'দ্রুত নির্বাচন' : 'Quick select'}
+            </Text>
             <View style={styles.pillRow}>
               {PRESET_PILLS.map((val) => (
                 <TouchableOpacity
                   key={val}
                   style={[
                     styles.pill,
-                    addAmount === val && styles.pillActive,
+                    { backgroundColor: isDark ? colors.surfaceSubtle : '#F8FAFC', borderColor: colors.cardBorder },
+                    addAmount === val && [styles.pillActive, isDark && { backgroundColor: 'rgba(15, 179, 132, 0.25)' }],
                   ]}
                   onPress={() => setAmountText(String(val))}
                   disabled={addSubmitting}
@@ -435,20 +512,49 @@ export default function SavingsGoalsManager({
                   accessibilityLabel={`Quick add ${fmtMoney(val)}`}
                 >
                   <Text
-                    style={[styles.pillText, addAmount === val && styles.pillTextActive]}
+                    style={[
+                      styles.pillText,
+                      { color: colors.text },
+                      addAmount === val && styles.pillTextActive,
+                    ]}
                   >
-                    {fmtMoney(val)}
+                    {isBangla ? formatCurrency(val) : fmtMoney(val)}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
+          {/* Delete goal option */}
+          <TouchableOpacity
+            style={[
+              styles.deleteGoalButton,
+              isDark && { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)' },
+            ]}
+            onPress={() => handleDeleteGoal(selectedGoal)}
+            disabled={deletingId === selectedGoal.id || addSubmitting}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${selectedGoal.name} goal`}
+          >
+            {deletingId === selectedGoal.id ? (
+              <ActivityIndicator size="small" color="#EF4444" />
+            ) : (
+              <>
+                <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                <Text style={styles.deleteGoalButtonText}>
+                  {isBangla ? 'লক্ষ্য মুছে ফেলুন' : 'Delete Goal'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+
           {addSuccess && (
             <View style={styles.successBox}>
               <Ionicons name="checkmark-circle" size={18} color="#059669" />
               <Text style={styles.successText}>
-                Added {fmtMoney(addAmount)} to {selectedGoal.name}
+                {isBangla
+                  ? `${selectedGoal.name}-এ ${formatCurrency(addAmount)} যোগ করা হয়েছে`
+                  : `Added ${fmtMoney(addAmount)} to ${selectedGoal.name}`}
               </Text>
             </View>
           )}
@@ -464,7 +570,9 @@ export default function SavingsGoalsManager({
           <TouchableOpacity
             style={[
               styles.primaryButton,
-              canAdd && !addSubmitting ? styles.primaryButtonActive : styles.primaryButtonDisabled,
+              canAdd && !addSubmitting
+                ? styles.primaryButtonActive
+                : [styles.primaryButtonDisabled, isDark && { backgroundColor: colors.surfaceSubtle }],
             ]}
             onPress={handleAddSubmit}
             disabled={!canAdd || addSubmitting}
@@ -482,7 +590,7 @@ export default function SavingsGoalsManager({
                     canAdd ? styles.primaryButtonTextActive : styles.primaryButtonTextDisabled,
                   ]}
                 >
-                  Add to Savings
+                  {isBangla ? 'সঞ্চয় যোগ করুন' : 'Add to Savings'}
                 </Text>
               </View>
             )}
@@ -502,7 +610,9 @@ export default function SavingsGoalsManager({
       >
         {/* Choose icon */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Choose Icon</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            {isBangla ? 'আইকন নির্বাচন করুন' : 'Choose Icon'}
+          </Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -515,7 +625,7 @@ export default function SavingsGoalsManager({
                   key={item.key}
                   style={[
                     styles.iconTile,
-                    { backgroundColor: isSelected ? savingsGoalTint(color) : '#F1F5F9' },
+                    { backgroundColor: isSelected ? savingsGoalTint(color) : (isDark ? colors.surfaceSubtle : '#F1F5F9') },
                     isSelected && { borderColor: color },
                   ]}
                   onPress={() => setIcon(item.key)}
@@ -526,7 +636,7 @@ export default function SavingsGoalsManager({
                   <Ionicons
                     name={item.icon as IoniconName}
                     size={22}
-                    color={isSelected ? color : '#64748B'}
+                    color={isSelected ? color : (isDark ? colors.textSecondary : '#64748B')}
                   />
                 </TouchableOpacity>
               );
@@ -536,13 +646,15 @@ export default function SavingsGoalsManager({
 
         {/* Goal name */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Goal Name</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            {isBangla ? 'লক্ষ্যের নাম' : 'Goal Name'}
+          </Text>
           <TextInput
-            style={styles.textInput}
+            style={[styles.textInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
             value={nameText}
             onChangeText={setNameText}
-            placeholder="e.g. Emergency Fund, Trip to Cox's Bazar"
-            placeholderTextColor="#A0ADB6"
+            placeholder={isBangla ? 'যেমন: জরুরি তহবিল, কক্সবাজার ভ্রমণ' : "e.g. Emergency Fund, Trip to Cox's Bazar"}
+            placeholderTextColor={colors.textMuted}
             editable={!createSubmitting}
             accessibilityLabel="Savings goal name"
           />
@@ -550,16 +662,18 @@ export default function SavingsGoalsManager({
 
         {/* Target amount */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Target Amount</Text>
-          <View style={styles.amountInputWrap}>
-            <Text style={styles.currencyPrefix}>৳</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            {isBangla ? 'লক্ষ্যের পরিমাণ' : 'Target Amount'}
+          </Text>
+          <View style={[styles.amountInputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+            <Text style={[styles.currencyPrefix, { color: colors.text }]}>৳</Text>
             <TextInput
-              style={styles.amountInput}
+              style={[styles.amountInput, { color: colors.text }]}
               value={targetText}
               onChangeText={setTargetText}
               keyboardType="decimal-pad"
               placeholder="0"
-              placeholderTextColor="#A0ADB6"
+              placeholderTextColor={colors.textMuted}
               editable={!createSubmitting}
               accessibilityLabel="Target amount"
             />
@@ -568,16 +682,18 @@ export default function SavingsGoalsManager({
 
         {/* Already saved */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Already Saved (Optional)</Text>
-          <View style={styles.amountInputWrap}>
-            <Text style={styles.currencyPrefix}>৳</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            {isBangla ? 'ইতিমধ্যে সঞ্চিত (ঐচ্ছিক)' : 'Already Saved (Optional)'}
+          </Text>
+          <View style={[styles.amountInputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+            <Text style={[styles.currencyPrefix, { color: colors.text }]}>৳</Text>
             <TextInput
-              style={styles.amountInput}
+              style={[styles.amountInput, { color: colors.text }]}
               value={alreadyText}
               onChangeText={setAlreadyText}
               keyboardType="decimal-pad"
               placeholder="0"
-              placeholderTextColor="#A0ADB6"
+              placeholderTextColor={colors.textMuted}
               editable={!createSubmitting}
               accessibilityLabel="Already saved amount"
             />
@@ -586,19 +702,21 @@ export default function SavingsGoalsManager({
 
         {/* Target date */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Target Date (Optional)</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            {isBangla ? 'লক্ষ্যের তারিখ (ঐচ্ছিক)' : 'Target Date (Optional)'}
+          </Text>
           <TouchableOpacity
-            style={styles.dateInputWrap}
+            style={[styles.dateInputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}
             onPress={() => setShowPicker(true)}
             disabled={createSubmitting}
             accessibilityRole="button"
             accessibilityLabel="Select target date"
           >
-            <Ionicons name="calendar-outline" size={18} color="#6B7280" />
-            <Text style={[styles.dateText, !targetDate && styles.dateTextPlaceholder]}>
-              {targetDate ? formatDisplayDate(targetDate) : 'mm/dd/yyyy'}
+            <Ionicons name="calendar-outline" size={18} color={colors.textSecondary} />
+            <Text style={[styles.dateText, { color: colors.text }, !targetDate && styles.dateTextPlaceholder]}>
+              {targetDate ? formatDisplayDate(targetDate) : (isBangla ? 'দিন/মাস/বছর' : 'mm/dd/yyyy')}
             </Text>
-            <Ionicons name="chevron-down" size={16} color="#6B7280" />
+            <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
 
           {showPicker && (
@@ -613,7 +731,9 @@ export default function SavingsGoalsManager({
 
         {/* Goal color */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Goal Color</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            {isBangla ? 'লক্ষ্যের রঙ' : 'Goal Color'}
+          </Text>
           <View style={styles.colorRow}>
             {SAVINGS_GOAL_COLORS.map((c) => {
               const isSelected = color === c.hex;
@@ -631,7 +751,7 @@ export default function SavingsGoalsManager({
                     style={[
                       styles.colorDot,
                       { backgroundColor: c.hex },
-                      isSelected && styles.colorDotSelected,
+                      isSelected && [styles.colorDotSelected, { borderColor: colors.text }],
                     ]}
                   />
                 </TouchableOpacity>
@@ -653,7 +773,7 @@ export default function SavingsGoalsManager({
             styles.primaryButton,
             canCreate && !createSubmitting
               ? styles.primaryButtonActive
-              : styles.primaryButtonDisabled,
+              : [styles.primaryButtonDisabled, isDark && { backgroundColor: colors.surfaceSubtle }],
           ]}
           onPress={handleCreateSubmit}
           disabled={!canCreate || createSubmitting}
@@ -675,7 +795,7 @@ export default function SavingsGoalsManager({
                   canCreate ? styles.primaryButtonTextActive : styles.primaryButtonTextDisabled,
                 ]}
               >
-                Create Goal
+                {isBangla ? 'লক্ষ্য তৈরি করুন' : 'Create Goal'}
               </Text>
             </View>
           )}
@@ -709,14 +829,18 @@ export default function SavingsGoalsManager({
         <Animated.View
           style={[
             styles.sheet,
-            { paddingBottom: Math.max(insets.bottom, 16), transform: [{ translateY }] },
+            { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 16), transform: [{ translateY }] },
           ]}
         >
           {/* Drag handle */}
-          <View style={styles.handle} />
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
           {renderHeader(
-            view === 'list' ? 'Savings Goals' : view === 'add' ? 'Add Contribution' : 'Create New Goal',
+            view === 'list'
+              ? (isBangla ? 'সঞ্চয় লক্ষ্য' : 'Savings Goals')
+              : view === 'add'
+              ? (isBangla ? 'অর্থ জমা করুন' : 'Add Contribution')
+              : (isBangla ? 'নতুন লক্ষ্য তৈরি করুন' : 'Create New Goal'),
             view !== 'list'
           )}
 
@@ -946,12 +1070,44 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     fontWeight: '700',
   },
-  addButton: {
+  cardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     marginTop: 12,
-    height: 40,
-    borderRadius: 20,
+  },
+  addButton: {
+    flex: 1,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  deleteCardButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteGoalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  deleteGoalButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#EF4444',
   },
   addButtonText: {
     fontSize: 14,

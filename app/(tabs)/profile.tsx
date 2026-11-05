@@ -15,36 +15,39 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { useTransactions } from '../../context/TransactionsContext';
 import { useNotifications } from '../../context/NotificationsContext';
-
-const formatCompact = (n: number) => {
-  const sign = n < 0 ? '-' : '';
-  const abs = Math.abs(Math.round(n));
-  if (abs >= 10000) return `${sign}৳${Math.round(abs / 1000)}k`;
-  if (abs >= 1000) return `${sign}৳${(abs / 1000).toFixed(1)}k`;
-  return `${sign}৳${abs}`;
-};
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage, type Language } from '../../context/LanguageContext';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { profile, signOut } = useAuth();
   const { transactions } = useTransactions();
-
-  // Notification preferences synced with system permissions and storage
   const { notificationsEnabled, setNotificationsEnabled } = useNotifications();
-  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+  const { isDark, setTheme, colors } = useTheme();
+  const { language, setLanguage, t, formatCompactCurrency } = useLanguage();
+
+  // Bottom sheet modal state ('security' | 'support' | null)
+  const [activeModal, setActiveModal] = useState<'security' | 'support' | null>(null);
+  // Language selection modal
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
   const handleToggleNotifications = async (value: boolean) => {
     const success = await setNotificationsEnabled(value);
     if (!success && value) {
       Alert.alert(
-        'Permission Required',
-        'FinAlert needs notification permission to show alerts on your phone dashboard. Please enable notifications in your device Settings.'
+        t('profile.permission_required', 'Permission Required'),
+        t(
+          'profile.notif_permission_msg',
+          'FinAlert needs notification permission to show alerts on your phone dashboard. Please enable notifications in your device Settings.'
+        )
       );
     }
   };
 
-  // Bottom sheet modal state ('security' | 'support' | null)
-  const [activeModal, setActiveModal] = useState<'security' | 'support' | null>(null);
+  const handleSelectLanguage = async (newLang: Language) => {
+    await setLanguage(newLang);
+    setLanguageModalVisible(false);
+  };
 
   const now = new Date();
   const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -68,71 +71,96 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         {/* ── User Header Profile Block ── */}
-        <View style={styles.headerBlock}>
-          <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>
+        <View style={[styles.headerBlock, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <View style={[styles.avatarContainer, { backgroundColor: colors.badgeBg }]}>
+            <Text style={[styles.avatarText, { color: colors.primary }]}>
               {(profile?.full_name || 'U').charAt(0).toUpperCase()}
             </Text>
           </View>
           <View style={styles.userInfoStack}>
-            <Text style={styles.userName}>{profile?.full_name || 'FinAlert User'}</Text>
-            <Text style={styles.userEmail}>{profile?.email || 'No email associated'}</Text>
+            <Text style={[styles.userName, { color: colors.text }]}>{profile?.full_name || 'FinAlert User'}</Text>
+            <Text style={[styles.userEmail, { color: colors.textSecondary }]}>{profile?.email || 'No email associated'}</Text>
           </View>
         </View>
 
-
         {/* ── Summary Activity Stats Cards ── */}
         <View style={styles.statsContainer}>
-          <View style={styles.statsCard}>
-            <Text style={styles.statsValue}>{totalCount}</Text>
-            <Text style={styles.statsLabel}>Transactions</Text>
+          <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.statsValue, { color: colors.text }]}>
+              {formatCompactCurrency(totalCount).replace('৳', '')}
+            </Text>
+            <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>
+              {t('profile.transactions_stat', 'Transactions')}
+            </Text>
           </View>
-          <View style={styles.statsCard}>
-            <Text style={styles.statsValue}>{formatCompact(monthExpense)}</Text>
-            <Text style={styles.statsLabel}>This Month</Text>
+          <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.statsValue, { color: colors.text }]}>
+              {formatCompactCurrency(monthExpense)}
+            </Text>
+            <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>
+              {t('profile.this_month_stat', 'This Month')}
+            </Text>
           </View>
-          <View style={styles.statsCard}>
-            <Text style={styles.statsValue}>{formatCompact(monthSavings)}</Text>
-            <Text style={styles.statsLabel}>Saved</Text>
+          <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.statsValue, { color: colors.text }]}>
+              {formatCompactCurrency(monthSavings)}
+            </Text>
+            <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>
+              {t('profile.saved_stat', 'Saved')}
+            </Text>
           </View>
         </View>
 
         {/* ── Preferences Group Card ── */}
         <View style={styles.groupContainer}>
-          <Text style={styles.groupHeader}>PREFERENCES</Text>
-          <View style={styles.groupCard}>
+          <Text style={[styles.groupHeader, { color: colors.textMuted }]}>
+            {t('profile.preferences', 'PREFERENCES')}
+          </Text>
+          <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
             {/* Language Row */}
-            <TouchableOpacity style={styles.rowItem} activeOpacity={0.6}>
+            <TouchableOpacity
+              style={[styles.rowItem, { borderBottomColor: colors.divider }]}
+              activeOpacity={0.6}
+              onPress={() => setLanguageModalVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Change app language"
+            >
               <View style={styles.rowLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: '#E8F7F1' }]}>
+                <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#143D2E' : '#E8F7F1' }]}>
                   <Ionicons name="globe-outline" size={18} color="#10B981" />
                 </View>
-                <Text style={styles.rowTitle}>Language</Text>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>
+                  {t('profile.language', 'Language')}
+                </Text>
               </View>
               <View style={styles.rowRight}>
-                <Text style={styles.rowRightText}>English</Text>
-                <Feather name="chevron-right" size={16} color="#94A3B8" />
+                <Text style={[styles.rowRightText, { color: colors.textSecondary }]}>
+                  {language === 'bn' ? 'বাংলা' : 'English'}
+                </Text>
+                <Feather name="chevron-right" size={16} color={colors.textMuted} />
               </View>
             </TouchableOpacity>
 
             {/* Notifications Row */}
-            <View style={styles.rowItem}>
+            <View style={[styles.rowItem, { borderBottomColor: colors.divider }]}>
               <View style={styles.rowLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: '#EFF6FF' }]}>
+                <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#142E47' : '#EFF6FF' }]}>
                   <Ionicons name="notifications-outline" size={18} color="#3B82F6" />
                 </View>
-                <Text style={styles.rowTitle}>Notifications</Text>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>
+                  {t('profile.notifications', 'Notifications')}
+                </Text>
               </View>
               <Switch
-                trackColor={{ false: '#E2E8F0', true: '#A7F3D0' }}
-                thumbColor={notificationsEnabled ? '#0FB384' : '#F1F5F9'}
-                ios_backgroundColor="#E2E8F0"
+                trackColor={{ false: isDark ? '#1E3E31' : '#E2E8F0', true: isDark ? '#0FB384' : '#A7F3D0' }}
+                thumbColor={notificationsEnabled ? '#0FB384' : isDark ? '#334155' : '#F1F5F9'}
+                ios_backgroundColor={isDark ? '#1E3E31' : '#E2E8F0'}
                 onValueChange={handleToggleNotifications}
                 value={notificationsEnabled}
               />
@@ -141,17 +169,19 @@ export default function ProfileScreen() {
             {/* Dark Mode Row */}
             <View style={[styles.rowItem, styles.lastRowItem]}>
               <View style={styles.rowLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: '#F5F3FF' }]}>
+                <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#2D1B4E' : '#F5F3FF' }]}>
                   <Ionicons name="moon-outline" size={18} color="#8B5CF6" />
                 </View>
-                <Text style={styles.rowTitle}>Dark Mode</Text>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>
+                  {t('profile.dark_mode', 'Dark Mode')}
+                </Text>
               </View>
               <Switch
-                trackColor={{ false: '#E2E8F0', true: '#DDD6FE' }}
-                thumbColor={darkModeEnabled ? '#7C3AED' : '#F1F5F9'}
-                ios_backgroundColor="#E2E8F0"
-                onValueChange={setDarkModeEnabled}
-                value={darkModeEnabled}
+                trackColor={{ false: isDark ? '#1E3E31' : '#E2E8F0', true: '#DDD6FE' }}
+                thumbColor={isDark ? '#8B5CF6' : isDark ? '#334155' : '#F1F5F9'}
+                ios_backgroundColor={isDark ? '#1E3E31' : '#E2E8F0'}
+                onValueChange={(val) => setTheme(val ? 'dark' : 'light')}
+                value={isDark}
               />
             </View>
           </View>
@@ -159,23 +189,27 @@ export default function ProfileScreen() {
 
         {/* ── Account Group Card ── */}
         <View style={styles.groupContainer}>
-          <Text style={styles.groupHeader}>ACCOUNT</Text>
-          <View style={styles.groupCard}>
+          <Text style={[styles.groupHeader, { color: colors.textMuted }]}>
+            {t('profile.account', 'ACCOUNT')}
+          </Text>
+          <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
             {/* Security Row */}
             <TouchableOpacity
-              style={styles.rowItem}
+              style={[styles.rowItem, { borderBottomColor: colors.divider }]}
               activeOpacity={0.6}
               onPress={() => setActiveModal('security')}
               accessibilityRole="button"
               accessibilityLabel="View security information"
             >
               <View style={styles.rowLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: '#E8F7F1' }]}>
+                <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#143D2E' : '#E8F7F1' }]}>
                   <Ionicons name="shield-checkmark-outline" size={18} color="#10B981" />
                 </View>
-                <Text style={styles.rowTitle}>Security</Text>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>
+                  {t('profile.security', 'Security')}
+                </Text>
               </View>
-              <Feather name="chevron-right" size={16} color="#94A3B8" />
+              <Feather name="chevron-right" size={16} color={colors.textMuted} />
             </TouchableOpacity>
 
             {/* Help & Support Row */}
@@ -187,28 +221,137 @@ export default function ProfileScreen() {
               accessibilityLabel="View help and support information"
             >
               <View style={styles.rowLeft}>
-                <View style={[styles.iconWrapper, { backgroundColor: '#FEF3C7' }]}>
+                <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#3B2F14' : '#FEF3C7' }]}>
                   <Ionicons name="help-circle-outline" size={18} color="#F59E0B" />
                 </View>
-                <Text style={styles.rowTitle}>Help & Support</Text>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>
+                  {t('profile.help_support', 'Help & Support')}
+                </Text>
               </View>
-              <Feather name="chevron-right" size={16} color="#94A3B8" />
+              <Feather name="chevron-right" size={16} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* ── Logout Action & Footer ── */}
         <TouchableOpacity
-          style={styles.logoutButton}
+          style={[
+            styles.logoutButton,
+            {
+              backgroundColor: colors.dangerBg,
+              borderColor: colors.dangerBorder,
+            },
+          ]}
           onPress={handleLogout}
           activeOpacity={0.8}
         >
           <Feather name="log-out" size={18} color="#EF4444" style={styles.logoutIcon} />
-          <Text style={styles.logoutText}>Logout</Text>
+          <Text style={styles.logoutText}>{t('profile.logout', 'Logout')}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.versionText}>Version 1.0.0</Text>
+        <Text style={[styles.versionText, { color: colors.textMuted }]}>
+          {t('profile.version', 'Version')} 1.0.0
+        </Text>
       </ScrollView>
+
+      {/* ── Language Selection Modal ── */}
+      <Modal
+        visible={languageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: colors.modalOverlay }]}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setLanguageModalVisible(false)}
+          />
+          <View
+            style={[
+              styles.sheetCard,
+              {
+                backgroundColor: colors.card,
+                paddingBottom: Math.max(insets.bottom, 16) + 16,
+              },
+            ]}
+          >
+            <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
+
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderLeft}>
+                <View style={[styles.modalIconCircle, { backgroundColor: isDark ? '#143D2E' : '#E8F7F1' }]}>
+                  <Ionicons name="globe-outline" size={22} color="#0FB384" />
+                </View>
+                <View style={styles.modalHeaderTextStack}>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>
+                    {t('profile.select_language', 'Select Language')}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setLanguageModalVisible(false)}
+                style={styles.modalCloseButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.langListContainer}>
+              {/* English Option */}
+              <TouchableOpacity
+                style={[
+                  styles.langOptionCard,
+                  {
+                    backgroundColor: language === 'en' ? (isDark ? '#143D2E' : '#E8F7F1') : colors.surfaceSubtle,
+                    borderColor: language === 'en' ? colors.primary : colors.border,
+                  },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => handleSelectLanguage('en')}
+              >
+                <View style={styles.langOptionLeft}>
+                  <Text style={[styles.langOptionName, { color: colors.text }]}>
+                    English
+                  </Text>
+                  <Text style={[styles.langOptionSub, { color: colors.textSecondary }]}>
+                    Default
+                  </Text>
+                </View>
+                {language === 'en' && (
+                  <Ionicons name="checkmark-circle" size={22} color="#0FB384" />
+                )}
+              </TouchableOpacity>
+
+              {/* Bangla Option */}
+              <TouchableOpacity
+                style={[
+                  styles.langOptionCard,
+                  {
+                    backgroundColor: language === 'bn' ? (isDark ? '#143D2E' : '#E8F7F1') : colors.surfaceSubtle,
+                    borderColor: language === 'bn' ? colors.primary : colors.border,
+                  },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => handleSelectLanguage('bn')}
+              >
+                <View style={styles.langOptionLeft}>
+                  <Text style={[styles.langOptionName, { color: colors.text }]}>
+                    বাংলা (Bangla)
+                  </Text>
+                  <Text style={[styles.langOptionSub, { color: colors.textSecondary }]}>
+                    সম্পূর্ণ অ্যাপ বাংলায়
+                  </Text>
+                </View>
+                {language === 'bn' && (
+                  <Ionicons name="checkmark-circle" size={22} color="#0FB384" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Sleek Bottom Sheet Modal (Security / Help & Support) ── */}
       <Modal
@@ -217,7 +360,7 @@ export default function ProfileScreen() {
         animationType="fade"
         onRequestClose={() => setActiveModal(null)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: colors.modalOverlay }]}>
           {/* Backdrop dismissal */}
           <TouchableOpacity
             style={StyleSheet.absoluteFillObject}
@@ -229,11 +372,14 @@ export default function ProfileScreen() {
           <View
             style={[
               styles.sheetCard,
-              { paddingBottom: Math.max(insets.bottom, 16) + 16 },
+              {
+                backgroundColor: colors.card,
+                paddingBottom: Math.max(insets.bottom, 16) + 16,
+              },
             ]}
           >
             {/* Drag Handle Indicator */}
-            <View style={styles.dragHandle} />
+            <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
 
             {/* Sheet Header */}
             <View style={styles.modalHeader}>
@@ -243,7 +389,9 @@ export default function ProfileScreen() {
                     styles.modalIconCircle,
                     {
                       backgroundColor:
-                        activeModal === 'security' ? '#E8F7F1' : '#FEF3C7',
+                        activeModal === 'security'
+                          ? isDark ? '#143D2E' : '#E8F7F1'
+                          : isDark ? '#3B2F14' : '#FEF3C7',
                     },
                   ]}
                 >
@@ -258,17 +406,15 @@ export default function ProfileScreen() {
                   />
                 </View>
                 <View style={styles.modalHeaderTextStack}>
-                  {/* Title token: text-[20px] leading-[22px] font-bold */}
-                  <Text style={styles.modalTitle}>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>
                     {activeModal === 'security'
-                      ? 'Security & Privacy'
-                      : 'Help & Support'}
+                      ? t('profile.security_title', 'Security & Privacy')
+                      : t('profile.support_title', 'Help & Support')}
                   </Text>
-                  {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
-                  <Text style={styles.modalSubtext}>
+                  <Text style={[styles.modalSubtext, { color: colors.textSecondary }]}>
                     {activeModal === 'security'
-                      ? 'How we protect your financial data'
-                      : 'Helpful tips & app guidance'}
+                      ? t('profile.security_sub', 'How we protect your financial data')
+                      : t('profile.support_sub', 'Helpful tips & app guidance')}
                   </Text>
                 </View>
               </View>
@@ -280,7 +426,7 @@ export default function ProfileScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Close dialog"
               >
-                <Ionicons name="close" size={20} color="#64748B" />
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -289,57 +435,69 @@ export default function ProfileScreen() {
               {activeModal === 'security' ? (
                 <>
                   <View style={styles.bulletItem}>
-                    <View style={styles.bulletIconWrapper}>
+                    <View style={[styles.bulletIconWrapper, { backgroundColor: isDark ? '#143D2E' : '#E8F7F1' }]}>
                       <Ionicons name="lock-closed" size={15} color="#0FB384" />
                     </View>
                     <View style={styles.bulletContent}>
-                      {/* Subtitle token: text-[16px] font-medium */}
-                      <Text style={styles.bulletTitle}>End-to-End Encryption</Text>
-                      {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
-                      <Text style={styles.bulletDesc}>
-                        Transactions and user credentials are encrypted with TLS protocols and cryptographic hashing.
+                      <Text style={[styles.bulletTitle, { color: colors.text }]}>
+                        {t('profile.e2e_title', 'End-to-End Encryption')}
+                      </Text>
+                      <Text style={[styles.bulletDesc, { color: colors.textSecondary }]}>
+                        {t(
+                          'profile.e2e_desc',
+                          'Transactions and user credentials are encrypted with TLS protocols and cryptographic hashing.'
+                        )}
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.bulletItem}>
-                    <View style={styles.bulletIconWrapper}>
+                    <View style={[styles.bulletIconWrapper, { backgroundColor: isDark ? '#143D2E' : '#E8F7F1' }]}>
                       <Ionicons name="key" size={15} color="#0FB384" />
                     </View>
                     <View style={styles.bulletContent}>
-                      {/* Subtitle token: text-[16px] font-medium */}
-                      <Text style={styles.bulletTitle}>Row-Level Isolation (RLS)</Text>
-                      {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
-                      <Text style={styles.bulletDesc}>
-                        Financial data and budgets are strictly isolated in Postgres — accessible only to you and confirmed family members.
+                      <Text style={[styles.bulletTitle, { color: colors.text }]}>
+                        {t('profile.rls_title', 'Row-Level Isolation (RLS)')}
+                      </Text>
+                      <Text style={[styles.bulletDesc, { color: colors.textSecondary }]}>
+                        {t(
+                          'profile.rls_desc',
+                          'Financial data and budgets are strictly isolated in Postgres — accessible only to you and confirmed family members.'
+                        )}
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.bulletItem}>
-                    <View style={styles.bulletIconWrapper}>
+                    <View style={[styles.bulletIconWrapper, { backgroundColor: isDark ? '#143D2E' : '#E8F7F1' }]}>
                       <Ionicons name="mail" size={15} color="#0FB384" />
                     </View>
                     <View style={styles.bulletContent}>
-                      {/* Subtitle token: text-[16px] font-medium */}
-                      <Text style={styles.bulletTitle}>OTP Recovery Protection</Text>
-                      {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
-                      <Text style={styles.bulletDesc}>
-                        Password resets are secured with temporary 6-digit verification codes sent directly to your email.
+                      <Text style={[styles.bulletTitle, { color: colors.text }]}>
+                        {t('profile.otp_title', 'OTP Recovery Protection')}
+                      </Text>
+                      <Text style={[styles.bulletDesc, { color: colors.textSecondary }]}>
+                        {t(
+                          'profile.otp_desc',
+                          'Password resets are secured with temporary 6-digit verification codes sent directly to your email.'
+                        )}
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.bulletItem}>
-                    <View style={styles.bulletIconWrapper}>
+                    <View style={[styles.bulletIconWrapper, { backgroundColor: isDark ? '#143D2E' : '#E8F7F1' }]}>
                       <Ionicons name="phone-portrait" size={15} color="#0FB384" />
                     </View>
                     <View style={styles.bulletContent}>
-                      {/* Subtitle token: text-[16px] font-medium */}
-                      <Text style={styles.bulletTitle}>Device Hygiene</Text>
-                      {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
-                      <Text style={styles.bulletDesc}>
-                        We recommend using biometric lock (Fingerprint or Face ID) or a PIN on your device for enhanced local protection.
+                      <Text style={[styles.bulletTitle, { color: colors.text }]}>
+                        {t('profile.device_hygiene_title', 'Device Hygiene')}
+                      </Text>
+                      <Text style={[styles.bulletDesc, { color: colors.textSecondary }]}>
+                        {t(
+                          'profile.device_hygiene_desc',
+                          'We recommend using biometric lock (Fingerprint or Face ID) or a PIN on your device for enhanced local protection.'
+                        )}
                       </Text>
                     </View>
                   </View>
@@ -347,57 +505,69 @@ export default function ProfileScreen() {
               ) : (
                 <>
                   <View style={styles.bulletItem}>
-                    <View style={[styles.bulletIconWrapper, { backgroundColor: '#FEF3C7' }]}>
+                    <View style={[styles.bulletIconWrapper, { backgroundColor: isDark ? '#3B2F14' : '#FEF3C7' }]}>
                       <Ionicons name="add-circle" size={15} color="#F59E0B" />
                     </View>
                     <View style={styles.bulletContent}>
-                      {/* Subtitle token: text-[16px] font-medium */}
-                      <Text style={styles.bulletTitle}>Quick Expense Logging</Text>
-                      {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
-                      <Text style={styles.bulletDesc}>
-                        Tap the central (+) action button or use Voice Input to log expenses instantly with automatic AI classification.
+                      <Text style={[styles.bulletTitle, { color: colors.text }]}>
+                        {t('profile.expense_logging_title', 'Quick Expense Logging')}
+                      </Text>
+                      <Text style={[styles.bulletDesc, { color: colors.textSecondary }]}>
+                        {t(
+                          'profile.expense_logging_desc',
+                          'Tap the central (+) action button or use Voice Input to log expenses instantly with automatic AI classification.'
+                        )}
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.bulletItem}>
-                    <View style={[styles.bulletIconWrapper, { backgroundColor: '#FEF3C7' }]}>
+                    <View style={[styles.bulletIconWrapper, { backgroundColor: isDark ? '#3B2F14' : '#FEF3C7' }]}>
                       <Ionicons name="people" size={15} color="#F59E0B" />
                     </View>
                     <View style={styles.bulletContent}>
-                      {/* Subtitle token: text-[16px] font-medium */}
-                      <Text style={styles.bulletTitle}>Family Sharing</Text>
-                      {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
-                      <Text style={styles.bulletDesc}>
-                        Create or join a family circle to monitor joint budgets, split expenses, and view household analytics.
+                      <Text style={[styles.bulletTitle, { color: colors.text }]}>
+                        {t('profile.family_sharing_title', 'Family Sharing')}
+                      </Text>
+                      <Text style={[styles.bulletDesc, { color: colors.textSecondary }]}>
+                        {t(
+                          'profile.family_sharing_desc',
+                          'Create or join a family circle to monitor joint budgets, split expenses, and view household analytics.'
+                        )}
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.bulletItem}>
-                    <View style={[styles.bulletIconWrapper, { backgroundColor: '#FEF3C7' }]}>
+                    <View style={[styles.bulletIconWrapper, { backgroundColor: isDark ? '#3B2F14' : '#FEF3C7' }]}>
                       <Ionicons name="pie-chart" size={15} color="#F59E0B" />
                     </View>
                     <View style={styles.bulletContent}>
-                      {/* Subtitle token: text-[16px] font-medium */}
-                      <Text style={styles.bulletTitle}>Budget Tracking & Alerts</Text>
-                      {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
-                      <Text style={styles.bulletDesc}>
-                        Set category spending thresholds to receive real-time notifications before exceeding monthly caps.
+                      <Text style={[styles.bulletTitle, { color: colors.text }]}>
+                        {t('profile.budget_tracking_title', 'Budget Tracking & Alerts')}
+                      </Text>
+                      <Text style={[styles.bulletDesc, { color: colors.textSecondary }]}>
+                        {t(
+                          'profile.budget_tracking_desc',
+                          'Set category spending thresholds to receive real-time notifications before exceeding monthly caps.'
+                        )}
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.bulletItem}>
-                    <View style={[styles.bulletIconWrapper, { backgroundColor: '#FEF3C7' }]}>
+                    <View style={[styles.bulletIconWrapper, { backgroundColor: isDark ? '#3B2F14' : '#FEF3C7' }]}>
                       <Ionicons name="chatbubbles" size={15} color="#F59E0B" />
                     </View>
                     <View style={styles.bulletContent}>
-                      {/* Subtitle token: text-[16px] font-medium */}
-                      <Text style={styles.bulletTitle}>Direct Support</Text>
-                      {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
-                      <Text style={styles.bulletDesc}>
-                        Need assistance or have feedback? Reach out to our dedicated support team at adormuntasir@gmail.com.
+                      <Text style={[styles.bulletTitle, { color: colors.text }]}>
+                        {t('profile.support_contact_title', 'Direct Support')}
+                      </Text>
+                      <Text style={[styles.bulletDesc, { color: colors.textSecondary }]}>
+                        {t(
+                          'profile.support_contact_desc',
+                          'Need assistance or have feedback? Reach out to our dedicated support team at adormuntasir@gmail.com.'
+                        )}
                       </Text>
                     </View>
                   </View>
@@ -420,8 +590,9 @@ export default function ProfileScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Close"
                 >
-                  {/* Subtitle token: text-[16px] font-medium */}
-                  <Text style={styles.modalActionText}>Got It</Text>
+                  <Text style={styles.modalActionText}>
+                    {t('profile.got_it', 'Got It')}
+                  </Text>
                 </TouchableOpacity>
               </LinearGradient>
             </View>
@@ -435,7 +606,6 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
     padding: 16,
@@ -445,15 +615,12 @@ const styles = StyleSheet.create({
   headerBlock: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     padding: 16,
     gap: 12,
   },
   avatarContainer: {
-    backgroundColor: '#E6F4EA',
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -464,7 +631,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 22,
     fontWeight: '700',
-    color: '#0FB384',
   },
   userInfoStack: {
     flex: 1,
@@ -474,13 +640,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 22,
     fontWeight: '700',
-    color: '#0F172A',
   },
   userEmail: {
     fontSize: 13,
     lineHeight: 15,
     fontWeight: '400',
-    color: '#64748B',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -488,10 +652,8 @@ const styles = StyleSheet.create({
   },
   statsCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -501,13 +663,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 22,
     fontWeight: '700',
-    color: '#0F172A',
   },
   statsLabel: {
     fontSize: 13,
     lineHeight: 15,
     fontWeight: '400',
-    color: '#64748B',
   },
   groupContainer: {
     gap: 8,
@@ -516,14 +676,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 15,
     fontWeight: '400',
-    color: '#94A3B8',
     paddingLeft: 4,
   },
   groupCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     overflow: 'hidden',
   },
   rowItem: {
@@ -533,7 +690,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
   },
   lastRowItem: {
     borderBottomWidth: 0,
@@ -553,7 +709,6 @@ const styles = StyleSheet.create({
   rowTitle: {
     fontSize: 14,
     fontWeight: '400',
-    color: '#0F172A',
   },
   rowRight: {
     flexDirection: 'row',
@@ -564,12 +719,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 15,
     fontWeight: '400',
-    color: '#64748B',
   },
   logoutButton: {
-    backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#EF4444',
     borderRadius: 16,
     paddingVertical: 14,
     flexDirection: 'row',
@@ -590,17 +742,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 15,
     fontWeight: '400',
-    color: '#94A3B8',
     textAlign: 'center',
     marginTop: 4,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     justifyContent: 'flex-end',
   },
   sheetCard: {
-    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 12,
@@ -615,7 +764,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#E2E8F0',
     alignSelf: 'center',
     marginBottom: 16,
   },
@@ -646,19 +794,40 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 22,
     fontWeight: '700',
-    color: '#091E15',
   },
   modalSubtext: {
     fontSize: 13,
     lineHeight: 15,
     fontWeight: '400',
-    color: '#6B7280',
   },
   modalCloseButton: {
     width: 48,
     height: 48,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  langListContainer: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  langOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  langOptionLeft: {
+    gap: 2,
+  },
+  langOptionName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  langOptionSub: {
+    fontSize: 12,
   },
   modalBulletList: {
     gap: 14,
@@ -673,7 +842,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#E8F7F1',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
@@ -685,13 +853,11 @@ const styles = StyleSheet.create({
   bulletTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#091E15',
   },
   bulletDesc: {
     fontSize: 13,
     lineHeight: 15,
     fontWeight: '400',
-    color: '#6B7280',
   },
   modalActionWrapper: {
     borderRadius: 24,

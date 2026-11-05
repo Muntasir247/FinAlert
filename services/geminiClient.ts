@@ -1,4 +1,38 @@
+import {
+  AiErrorCode,
+  classifyAiError,
+  formatAiErrorString,
+  AppAiError,
+} from './aiError';
+
 export const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+/**
+ * Default fallback list of Gemini models for text and analysis tasks.
+ * Prioritizes high-throughput, low-latency Flash-Lite models first,
+ * followed by standard Flash, with proven stable models as safety nets.
+ */
+export const DEFAULT_GEMINI_MODELS = [
+  'gemini-3.1-flash-lite',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3.5-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-2.5-flash',
+  'gemini-1.5-flash',
+];
+
+/**
+ * Fallback list of multimodal Gemini models supporting image (receipts)
+ * and document (PDF bank statements) processing.
+ */
+export const DEFAULT_MULTIMODAL_MODELS = [
+  'gemini-3.1-flash-lite',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3.5-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-2.5-flash',
+  'gemini-1.5-flash',
+];
 
 export interface ModelAttemptLog {
   model: string;
@@ -16,12 +50,20 @@ export interface ModelAttemptLog {
 export class GeminiAllRateLimitedError extends Error {
   public attempts: ModelAttemptLog[];
   public lastError: string;
+  public code: AiErrorCode;
 
-  constructor(message: string, attempts: ModelAttemptLog[] = [], lastError = '') {
-    super(message);
+  constructor(
+    message: string,
+    attempts: ModelAttemptLog[] = [],
+    lastError = '',
+    code: AiErrorCode = 'AI_ERR_RATE_LIMIT_429'
+  ) {
+    const formatted = message.startsWith('[AI_ERR_') ? message : formatAiErrorString(code, message);
+    super(formatted);
     this.name = 'GeminiAllRateLimitedError';
     this.attempts = attempts;
     this.lastError = lastError;
+    this.code = code;
   }
 }
 
@@ -39,13 +81,13 @@ export interface GeminiContentResponse {
  */
 export async function generateGeminiContent({
   apiKey,
-  models,
+  models = DEFAULT_GEMINI_MODELS,
   body,
   timeoutMs,
   perModelTimeoutMs = 25000,
 }: {
   apiKey: string;
-  models: string[];
+  models?: string[];
   body: unknown;
   timeoutMs: number;
   perModelTimeoutMs?: number;
@@ -58,7 +100,11 @@ export async function generateGeminiContent({
   try {
     for (const model of models) {
       if (globalController.signal.aborted) {
-        throw new Error('Overall request timeout reached');
+        throw new AppAiError({
+          code: 'AI_ERR_TIMEOUT',
+          message: `Request timed out after ${Math.round(timeoutMs / 1000)}s.`,
+          provider: 'gemini',
+        });
       }
 
       const attemptStart = Date.now();
@@ -145,14 +191,23 @@ export async function generateGeminiContent({
         continue;
       }
 
-      // For non-retryable errors (e.g. 400 Bad Request), throw clear error with details
-      throw new Error(`Gemini API error (${model} returned ${response.status}): ${errText || 'Bad Request'}`);
+      // For non-retryable errors (e.g. 400 Bad Request, 403 Forbidden), throw classified error
+      const classified = classifyAiError(`${response.status} ${errText || 'Bad Request'}`, 'gemini');
+      throw new AppAiError({
+        code: classified.code,
+        message: `${model} error: ${classified.message}`,
+        status: response.status,
+        provider: 'gemini',
+        details: snippet,
+      });
     }
 
+    const finalClassified = classifyAiError(lastError || 'All models failed or were rate-limited', 'gemini');
     throw new GeminiAllRateLimitedError(
-      `All Gemini AI models were temporarily unavailable or rate-limited. Last error: ${lastError}`,
+      `All Gemini AI models were unavailable or rate-limited. ${finalClassified.message}`,
       attempts,
-      lastError
+      lastError,
+      finalClassified.code
     );
   } finally {
     clearTimeout(globalTimer);

@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import type { BKashTransaction } from '../services/smsReaderService';
 import { markTrxIdProcessed, removePendingTransaction } from '../services/smsReaderService';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface BKashDetectedBannerProps {
   transaction?: BKashTransaction | null;
@@ -19,6 +21,9 @@ export default function BKashDetectedBanner({
   onReviewBatch,
   onDismiss,
 }: BKashDetectedBannerProps) {
+  const { colors, isDark } = useTheme();
+  const { isBangla, formatCurrency } = useLanguage();
+
   // Normalize items
   const items = transactions && transactions.length > 0 ? transactions : transaction ? [transaction] : [];
   if (items.length === 0) return null;
@@ -48,17 +53,17 @@ export default function BKashDetectedBanner({
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
+      <View style={[styles.card, isDark && { backgroundColor: '#361523', borderColor: '#BE185D' }]}>
         {/* Top Header */}
         <View style={styles.headerRow}>
           <View style={styles.brandRow}>
             <View style={styles.bkashLogoWrap}>
               <Ionicons name="phone-portrait" size={14} color="#FFFFFF" />
             </View>
-            <Text style={styles.brandTitle}>
+            <Text style={[styles.brandTitle, isDark && { color: '#FCE7F3' }]}>
               {isMultiple
-                ? `${items.length} bKash Transactions Detected`
-                : 'bKash Transaction Detected'}
+                ? (isBangla ? `${items.length}টি বিকাশ লেনদেন শনাক্ত হয়েছে` : `${items.length} bKash Transactions Detected`)
+                : (isBangla ? 'বিকাশ লেনদেন শনাক্ত হয়েছে' : 'bKash Transaction Detected')}
             </Text>
           </View>
           <TouchableOpacity
@@ -68,46 +73,46 @@ export default function BKashDetectedBanner({
             accessibilityLabel="Dismiss bKash detection"
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Feather name="x" size={18} color="#6B7280" />
+            <Feather name="x" size={18} color={isDark ? '#F472B6' : '#6B7280'} />
           </TouchableOpacity>
         </View>
 
         {/* Transaction Content Details */}
         {isMultiple ? (
-          <View style={styles.batchDetailBox}>
-            <Text style={styles.batchTitle}>
-              {items.length} new transactions detected since your last visit.
+          <View style={[styles.batchDetailBox, isDark && { backgroundColor: '#28101A', borderColor: '#831843' }]}>
+            <Text style={[styles.batchTitle, isDark && { color: '#FCE7F3' }]}>
+              {isBangla ? `${items.length}টি নতুন লেনদেন পাওয়া গেছে।` : `${items.length} new transactions detected since your last visit.`}
             </Text>
-            <Text style={styles.batchSummary}>
-              Latest: {primaryTx.counterparty} · ৳{primaryTx.amount.toFixed(2)} (+{items.length - 1} more)
+            <Text style={[styles.batchSummary, isDark && { color: '#FBCFE8' }]}>
+              {isBangla ? 'সর্বশেষ: ' : 'Latest: '}{primaryTx.counterparty} · {formatCurrency(primaryTx.amount)} (+{items.length - 1} {isBangla ? 'আরও' : 'more'})
             </Text>
           </View>
         ) : (
           <View style={styles.detailRow}>
             <View style={styles.detailTextCol}>
-              <Text style={styles.counterpartyText} numberOfLines={1}>
-                {isIncome ? 'Received from: ' : 'Paid to: '}
+              <Text style={[styles.counterpartyText, isDark && { color: '#FCE7F3' }]} numberOfLines={1}>
+                {isIncome ? (isBangla ? 'প্রেরক: ' : 'Received from: ') : (isBangla ? 'প্রাপক: ' : 'Paid to: ')}
                 <Text style={styles.counterpartyHighlight}>{primaryTx.counterparty}</Text>
               </Text>
               <View style={styles.metaRow}>
-                <View style={styles.trxPill}>
-                  <Text style={styles.trxPillText}>TrxID: {primaryTx.trxId}</Text>
+                <View style={[styles.trxPill, isDark && { backgroundColor: '#28101A' }]}>
+                  <Text style={[styles.trxPillText, isDark && { color: '#F472B6' }]}>TrxID: {primaryTx.trxId}</Text>
                 </View>
                 {primaryTx.reference ? (
-                  <View style={styles.refPill}>
-                    <Text style={styles.refPillText}>Ref: {primaryTx.reference}</Text>
+                  <View style={[styles.refPill, isDark && { backgroundColor: '#28101A' }]}>
+                    <Text style={[styles.refPillText, isDark && { color: '#F472B6' }]}>Ref: {primaryTx.reference}</Text>
                   </View>
                 ) : null}
-                <View style={styles.catPill}>
-                  <Text style={styles.catPillText}>{primaryTx.category}</Text>
+                <View style={[styles.catPill, isDark && { backgroundColor: '#14382A' }]}>
+                  <Text style={[styles.catPillText, isDark && { color: '#A7F3D0' }]}>{primaryTx.category}</Text>
                 </View>
               </View>
             </View>
             <View style={styles.amountCol}>
               <Text style={[styles.amountText, isIncome ? styles.amountIncome : styles.amountExpense]}>
-                {isIncome ? '+' : '-'}৳{primaryTx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {isIncome ? '+' : '-'}{formatCurrency(primaryTx.amount)}
               </Text>
-              <Text style={styles.dateText}>{primaryTx.date}</Text>
+              <Text style={[styles.dateText, isDark && { color: '#F472B6' }]}>{primaryTx.date}</Text>
             </View>
           </View>
         )}
@@ -115,12 +120,14 @@ export default function BKashDetectedBanner({
         {/* Human-In-The-Loop Action Buttons */}
         <View style={styles.actionRow}>
           <TouchableOpacity
-            style={styles.dismissBtn}
+            style={[styles.dismissBtn, isDark && { backgroundColor: '#28101A', borderColor: '#831843' }]}
             onPress={handleDismissAll}
             accessibilityRole="button"
             accessibilityLabel="Ignore transactions"
           >
-            <Text style={styles.dismissBtnText}>Ignore</Text>
+            <Text style={[styles.dismissBtnText, isDark && { color: '#FBCFE8' }]}>
+              {isBangla ? 'উপেক্ষা করুন' : 'Ignore'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -131,7 +138,9 @@ export default function BKashDetectedBanner({
           >
             <Feather name="check" size={16} color="#FFFFFF" style={styles.btnIcon} />
             <Text style={styles.reviewBtnText}>
-              {isMultiple ? `Review All (${items.length})` : 'Review & Add'}
+              {isMultiple
+                ? (isBangla ? `সব পর্যালোচনা (${items.length})` : `Review All (${items.length})`)
+                : (isBangla ? 'যাচাই ও যোগ' : 'Review & Add')}
             </Text>
           </TouchableOpacity>
         </View>

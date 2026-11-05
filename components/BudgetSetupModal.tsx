@@ -17,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useBudgets } from '../context/BudgetsContext';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { TRANSACTION_CATEGORIES } from '../lib/transactionCategories';
 import { getSpendingAnalytics } from '../services/spendingAnalyticsService';
 import {
@@ -59,6 +61,8 @@ export default function BudgetSetupModal() {
     budgetModalVisible,
     closeBudgetModal,
   } = useBudgets();
+  const { colors, isDark } = useTheme();
+  const { t, isBangla, formatCurrency, translateCategory } = useLanguage();
 
   // Snapshot the latest plan data so the open effect only depends on
   // visibility (avoids re-seeding the form if transactions/plan re-render
@@ -120,7 +124,7 @@ export default function BudgetSetupModal() {
       setStep(2);
     } catch (err) {
       console.error('[BudgetSetupModal] Error generating AI budget plan:', err);
-      setErrorMsg('Could not generate AI budget recommendation. Please try again.');
+      setErrorMsg(err instanceof Error ? err.message : 'Could not generate AI budget recommendation. Please try again.');
     } finally {
       setLoadingAi(false);
     }
@@ -314,11 +318,11 @@ export default function BudgetSetupModal() {
         <Animated.View
           style={[
             styles.sheet,
-            { paddingBottom: Math.max(insets.bottom, 16), transform: [{ translateY }] },
+            { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 16), transform: [{ translateY }] },
           ]}
         >
           {/* Drag handle */}
-          <View style={styles.handle} />
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
           {/* Step progress bar */}
           <View style={styles.progressRow}>
@@ -327,7 +331,7 @@ export default function BudgetSetupModal() {
                 key={s}
                 style={[
                   styles.progressSegment,
-                  s <= step ? styles.progressSegmentActive : styles.progressSegmentInactive,
+                  s <= step ? styles.progressSegmentActive : [styles.progressSegmentInactive, { backgroundColor: colors.divider }],
                 ]}
               />
             ))}
@@ -338,29 +342,35 @@ export default function BudgetSetupModal() {
             <View style={styles.headerSide}>
               {step > 1 && (
                 <TouchableOpacity
-                  style={styles.backButton}
+                  style={[styles.backButton, { backgroundColor: isDark ? colors.surfaceSubtle : '#F3F4F6' }]}
                   onPress={() => goToStep((step - 1) as Step)}
                   disabled={submitting}
                   accessibilityRole="button"
                   accessibilityLabel="Go back"
                 >
-                  <Ionicons name="arrow-back" size={20} color="#091E15" />
+                  <Ionicons name="arrow-back" size={20} color={colors.text} />
                 </TouchableOpacity>
               )}
             </View>
             <View style={styles.headerCenter}>
-              <Text style={styles.title}>{STEP_TITLES[step]}</Text>
-              <Text style={styles.stepSubtext}>Step {step} of 3</Text>
+              <Text style={[styles.title, { color: colors.text }]}>
+                {isBangla
+                  ? (step === 1 ? 'বাজেট সেটআপ' : step === 2 ? 'খাতভিত্তিক বাজেট' : 'সারসংক্ষেপ')
+                  : STEP_TITLES[step]}
+              </Text>
+              <Text style={[styles.stepSubtext, { color: colors.textSecondary }]}>
+                {isBangla ? `ধাপ ${step} / ৩` : `Step ${step} of 3`}
+              </Text>
             </View>
             <View style={styles.headerSide}>
               <TouchableOpacity
-                style={styles.closeButton}
+                style={[styles.closeButton, { backgroundColor: isDark ? colors.surfaceSubtle : '#F3F4F6' }]}
                 onPress={handleClose}
                 disabled={submitting}
                 accessibilityRole="button"
                 accessibilityLabel="Close Budget Setup"
               >
-                <Ionicons name="close" size={22} color="#091E15" />
+                <Ionicons name="close" size={22} color={colors.text} />
               </TouchableOpacity>
             </View>
           </View>
@@ -373,60 +383,74 @@ export default function BudgetSetupModal() {
             {step === 1 && (
               <>
                 {/* Info banner */}
-                <View style={styles.infoBanner}>
+                <View style={[styles.infoBanner, isDark && { backgroundColor: 'rgba(15, 179, 132, 0.15)' }]}>
                   <Ionicons name="bulb-outline" size={18} color="#0FB384" />
-                  <Text style={styles.infoBannerText}>
-                    Enter your monthly income and savings target. We'll automatically suggest
-                    spending limits for each expense category.
+                  <Text style={[styles.infoBannerText, isDark && { color: '#A7F3D0' }]}>
+                    {isBangla
+                      ? 'আপনার মাসিক আয় এবং সঞ্চয় লক্ষ্য দিন। আমরা প্রতিটি ব্যয়ের খাতের জন্য বাজেট প্রস্তাব করব।'
+                      : "Enter your monthly income and savings target. We'll automatically suggest spending limits for each expense category."}
                   </Text>
                 </View>
 
                 {/* AI Smart Recommendation Action Card */}
                 {loadingAi ? (
-                  <View style={styles.aiLoadingCard}>
+                  <View style={[styles.aiLoadingCard, isDark && { backgroundColor: '#1E1236', borderColor: '#3B2366' }]}>
                     <View style={styles.aiLoadingHeader}>
-                      <ActivityIndicator size="small" color="#7C3AED" />
-                      <Text style={styles.aiLoadingTitle}>Analyzing spending habits...</Text>
+                      <ActivityIndicator size="small" color="#A78BFA" />
+                      <Text style={[styles.aiLoadingTitle, isDark && { color: '#DDD6FE' }]}>
+                        {isBangla ? 'খরচের অভ্যাস বিশ্লেষণ করা হচ্ছে...' : 'Analyzing spending habits...'}
+                      </Text>
                     </View>
-                    <Text style={styles.aiLoadingSubtitle}>
-                      Reviewing 90 days of transactions & savings goals with Gemini 1.5 Flash
+                    <Text style={[styles.aiLoadingSubtitle, isDark && { color: '#C4B5FD' }]}>
+                      {isBangla
+                        ? 'জেমিনি ১.৫ ফ্ল্যাশ দিয়ে ৯০ দিনের লেনদেন ও সঞ্চয় লক্ষ্য পর্যালোচনা করা হচ্ছে'
+                        : 'Reviewing 90 days of transactions & savings goals with Gemini 1.5 Flash'}
                     </Text>
-                    <View style={styles.aiSkeletonWrap}>
-                      <View style={[styles.aiSkeletonLine, { width: '85%' }]} />
-                      <View style={[styles.aiSkeletonLine, { width: '60%', marginTop: 8 }]} />
+                    <View style={[styles.aiSkeletonWrap, isDark && { backgroundColor: 'rgba(59, 35, 102, 0.4)' }]}>
+                      <View style={[styles.aiSkeletonLine, { width: '85%' }, isDark && { backgroundColor: '#7C3AED' }]} />
+                      <View style={[styles.aiSkeletonLine, { width: '60%', marginTop: 8 }, isDark && { backgroundColor: '#7C3AED' }]} />
                     </View>
                   </View>
                 ) : (
                   <TouchableOpacity
-                    style={styles.aiGenerateBtn}
+                    style={[
+                      styles.aiGenerateBtn,
+                      isDark && { backgroundColor: '#1E1236', borderColor: '#3B2366' },
+                    ]}
                     onPress={handleGenerateAiBudget}
                     disabled={submitting || loadingAi}
                     activeOpacity={0.85}
                     accessibilityRole="button"
                     accessibilityLabel="Generate AI Budget Plan based on my spending"
                   >
-                    <View style={styles.aiGenerateIconBox}>
-                      <Ionicons name="sparkles" size={20} color="#7C3AED" />
+                    <View style={[styles.aiGenerateIconBox, isDark && { backgroundColor: '#2E1D52' }]}>
+                      <Ionicons name="sparkles" size={20} color={isDark ? '#DDD6FE' : '#7C3AED'} />
                     </View>
                     <View style={styles.aiGenerateContent}>
                       <View style={styles.aiGenerateTitleRow}>
-                        <Text style={styles.aiGenerateTitle}>Generate AI Budget Plan</Text>
-                        <View style={styles.aiGenerateBadge}>
-                          <Text style={styles.aiGenerateBadgeText}>Gemini AI</Text>
+                        <Text style={[styles.aiGenerateTitle, isDark && { color: '#DDD6FE' }]}>
+                          {isBangla ? 'এআই বাজেট প্ল্যান তৈরি করুন' : 'Generate AI Budget Plan'}
+                        </Text>
+                        <View style={[styles.aiGenerateBadge, isDark && { backgroundColor: '#2E1D52' }]}>
+                          <Text style={[styles.aiGenerateBadgeText, isDark && { color: '#DDD6FE' }]}>Gemini AI</Text>
                         </View>
                       </View>
-                      <Text style={styles.aiGenerateSubtitle}>
-                        Auto-calculates smart limits based on your past spending
+                      <Text style={[styles.aiGenerateSubtitle, isDark && { color: '#C4B5FD' }]}>
+                        {isBangla
+                          ? 'অতীতের খরচের ওপর ভিত্তি করে স্বয়ংক্রিয় স্মার্ট লিমিট হিসাব করে'
+                          : 'Auto-calculates smart limits based on your past spending'}
                       </Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={18} color="#7C3AED" />
+                    <Ionicons name="chevron-forward" size={18} color={isDark ? '#DDD6FE' : '#7C3AED'} />
                   </TouchableOpacity>
                 )}
 
                 <View style={styles.orDividerWrap}>
-                  <View style={styles.orDividerLine} />
-                  <Text style={styles.orDividerText}>OR CONFIGURE MANUALLY</Text>
-                  <View style={styles.orDividerLine} />
+                  <View style={[styles.orDividerLine, isDark && { backgroundColor: colors.divider }]} />
+                  <Text style={[styles.orDividerText, isDark && { color: colors.textSecondary }]}>
+                    {isBangla ? 'অথবা নিজে কনফিগার করুন' : 'OR CONFIGURE MANUALLY'}
+                  </Text>
+                  <View style={[styles.orDividerLine, isDark && { backgroundColor: colors.divider }]} />
                 </View>
 
                 {errorMsg && (
@@ -437,23 +461,25 @@ export default function BudgetSetupModal() {
 
                 {/* Monthly Income */}
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.label}>Monthly Income</Text>
-                  <View style={styles.amountInputWrap}>
-                    <Text style={styles.currencyPrefix}>৳</Text>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>
+                    {isBangla ? 'মাসিক আয়' : 'Monthly Income'}
+                  </Text>
+                  <View style={[styles.amountInputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+                    <Text style={[styles.currencyPrefix, { color: colors.text }]}>৳</Text>
                     <TextInput
-                      style={styles.amountInput}
+                      style={[styles.amountInput, { color: colors.text }]}
                       value={incomeText}
                       onChangeText={setIncomeText}
                       keyboardType="decimal-pad"
                       placeholder="0"
-                      placeholderTextColor="#A0ADB6"
+                      placeholderTextColor={colors.textMuted}
                       editable={!submitting}
                       accessibilityLabel="Monthly income"
                     />
                   </View>
                   {incomeText.trim().length > 0 && income <= 0 && (
                     <Text style={styles.fieldErrorText}>
-                      Monthly income must be greater than 0.
+                      {isBangla ? 'মাসিক আয় ০ এর বেশি হতে হবে।' : 'Monthly income must be greater than 0.'}
                     </Text>
                   )}
                 </View>
@@ -461,7 +487,9 @@ export default function BudgetSetupModal() {
                 {/* Savings Target Slider */}
                 <View style={styles.fieldGroup}>
                   <View style={styles.sliderLabelRow}>
-                    <Text style={styles.label}>Savings Target</Text>
+                    <Text style={[styles.label, { color: colors.textSecondary }]}>
+                      {isBangla ? 'সঞ্চয় লক্ষ্য' : 'Savings Target'}
+                    </Text>
                     <Text style={styles.sliderValue}>{savingsPct}%</Text>
                   </View>
                   <Slider
@@ -472,31 +500,37 @@ export default function BudgetSetupModal() {
                     value={savingsPct}
                     onValueChange={(v) => setSavingsPct(Math.round(v))}
                     minimumTrackTintColor="#0FB384"
-                    maximumTrackTintColor="#E5E7EB"
+                    maximumTrackTintColor={isDark ? colors.divider : '#E5E7EB'}
                     thumbTintColor="#0FB384"
                     disabled={submitting}
                   />
                   <View style={styles.sliderBoundsRow}>
-                    <Text style={styles.sliderBound}>{SAVINGS_MIN}%</Text>
-                    <Text style={styles.sliderBound}>{SAVINGS_MAX}%</Text>
+                    <Text style={[styles.sliderBound, { color: colors.textMuted }]}>{SAVINGS_MIN}%</Text>
+                    <Text style={[styles.sliderBound, { color: colors.textMuted }]}>{SAVINGS_MAX}%</Text>
                   </View>
                 </View>
 
                 {/* Real-Time Calculation Card */}
                 {income > 0 && (
-                  <View style={styles.calcCard}>
+                  <View style={[styles.calcCard, { backgroundColor: isDark ? colors.surfaceSubtle : '#F4FBF7', borderColor: colors.cardBorder }]}>
                     <View style={styles.calcRow}>
-                      <Text style={styles.calcLabel}>Monthly Income</Text>
-                      <Text style={styles.calcValue}>{fmt(income)}</Text>
+                      <Text style={[styles.calcLabel, { color: colors.textSecondary }]}>
+                        {isBangla ? 'মাসিক আয়' : 'Monthly Income'}
+                      </Text>
+                      <Text style={[styles.calcValue, { color: colors.text }]}>{formatCurrency(income)}</Text>
                     </View>
                     <View style={styles.calcRow}>
-                      <Text style={styles.calcLabel}>Savings ({savingsPct}%)</Text>
-                      <Text style={styles.calcValue}>{fmt(savingsAmount)}</Text>
+                      <Text style={[styles.calcLabel, { color: colors.textSecondary }]}>
+                        {isBangla ? `সঞ্চয় (${savingsPct}%)` : `Savings (${savingsPct}%)`}
+                      </Text>
+                      <Text style={[styles.calcValue, { color: colors.text }]}>{formatCurrency(savingsAmount)}</Text>
                     </View>
-                    <View style={styles.calcDivider} />
+                    <View style={[styles.calcDivider, { backgroundColor: colors.cardBorder }]} />
                     <View style={styles.calcRow}>
-                      <Text style={styles.calcBudgetLabel}>Spending Budget</Text>
-                      <Text style={styles.calcBudgetValue}>{fmt(spendingBudget)}</Text>
+                      <Text style={[styles.calcBudgetLabel, { color: colors.text }]}>
+                        {isBangla ? 'খরচের বাজেট' : 'Spending Budget'}
+                      </Text>
+                      <Text style={styles.calcBudgetValue}>{formatCurrency(spendingBudget)}</Text>
                     </View>
                   </View>
                 )}
@@ -504,7 +538,9 @@ export default function BudgetSetupModal() {
                 <TouchableOpacity
                   style={[
                     styles.primaryButton,
-                    income <= 0 ? styles.primaryButtonDisabled : styles.primaryButtonActive,
+                    income <= 0
+                      ? [styles.primaryButtonDisabled, isDark && { backgroundColor: colors.surfaceSubtle }]
+                      : styles.primaryButtonActive,
                   ]}
                   onPress={handleNextFromStep1}
                   disabled={income <= 0 || submitting}
@@ -517,7 +553,7 @@ export default function BudgetSetupModal() {
                       income <= 0 ? styles.primaryButtonTextDisabled : styles.primaryButtonTextActive,
                     ]}
                   >
-                    Next &gt;
+                    {isBangla ? 'পরবর্তী >' : 'Next >'}
                   </Text>
                 </TouchableOpacity>
               </>
@@ -527,24 +563,30 @@ export default function BudgetSetupModal() {
               <>
                 {/* AI Recommendation Insight Card */}
                 {aiRecommendation && (
-                  <View style={styles.aiInsightCard}>
+                  <View style={[styles.aiInsightCard, isDark && { backgroundColor: '#1E1236', borderColor: '#3B2366' }]}>
                     <View style={styles.aiInsightHeader}>
-                      <View style={styles.aiInsightBadge}>
-                        <Ionicons name="sparkles" size={13} color="#6D28D9" />
-                        <Text style={styles.aiInsightBadgeText}>AI Recommendation</Text>
+                      <View style={[styles.aiInsightBadge, isDark && { backgroundColor: '#2E1D52' }]}>
+                        <Ionicons name="sparkles" size={13} color={isDark ? '#DDD6FE' : '#6D28D9'} />
+                        <Text style={[styles.aiInsightBadgeText, isDark && { color: '#DDD6FE' }]}>
+                          {isBangla ? 'এআই সুপারিশ' : 'AI Recommendation'}
+                        </Text>
                       </View>
-                      <Text style={styles.aiInsightConfidence}>
+                      <Text style={[styles.aiInsightConfidence, isDark && { color: '#C4B5FD' }]}>
                         {!aiRecommendation.isFallback ? '🎯 Personalized' : '💡 50/30/20 Rule'}
                       </Text>
                     </View>
-                    <Text style={styles.aiInsightHeadline}>{aiRecommendation.insight.headline}</Text>
-                    <Text style={styles.aiInsightReasoning}>{aiRecommendation.insight.reasoning}</Text>
+                    <Text style={[styles.aiInsightHeadline, { color: isDark ? '#DDD6FE' : '#091E15' }]}>
+                      {aiRecommendation.insight.headline}
+                    </Text>
+                    <Text style={[styles.aiInsightReasoning, { color: isDark ? '#C4B5FD' : '#4B5563' }]}>
+                      {aiRecommendation.insight.reasoning}
+                    </Text>
                     {aiRecommendation.insight.tips && aiRecommendation.insight.tips.length > 0 && (
                       <View style={styles.aiTipsWrap}>
                         {aiRecommendation.insight.tips.map((tip, idx) => (
                           <View key={idx} style={styles.aiTipRow}>
-                            <Ionicons name="bulb-outline" size={13} color="#7C3AED" style={styles.aiTipIcon} />
-                            <Text style={styles.aiTipText}>{tip}</Text>
+                            <Ionicons name="bulb-outline" size={13} color={isDark ? '#DDD6FE' : '#7C3AED'} style={styles.aiTipIcon} />
+                            <Text style={[styles.aiTipText, isDark && { color: '#DDD6FE' }]}>{tip}</Text>
                           </View>
                         ))}
                       </View>
@@ -553,16 +595,30 @@ export default function BudgetSetupModal() {
                 )}
 
                 {/* Header summary card */}
-                <View style={styles.summaryHeaderCard}>
+                <View
+                  style={[
+                    styles.summaryHeaderCard,
+                    {
+                      backgroundColor: isDark ? colors.surfaceSubtle : '#FFFFFF',
+                      borderColor: colors.cardBorder,
+                    },
+                  ]}
+                >
                   <View style={styles.summaryHeaderItem}>
-                    <Text style={styles.summaryHeaderLabel}>Spending Budget</Text>
-                    <Text style={styles.summaryHeaderValue}>{fmt(spendingBudget)}</Text>
+                    <Text style={[styles.summaryHeaderLabel, { color: colors.textSecondary }]}>
+                      {isBangla ? 'খরচের বাজেট' : 'Spending Budget'}
+                    </Text>
+                    <Text style={[styles.summaryHeaderValue, { color: colors.text }]}>
+                      {formatCurrency(spendingBudget)}
+                    </Text>
                   </View>
-                  <View style={styles.summaryHeaderDivider} />
+                  <View style={[styles.summaryHeaderDivider, { backgroundColor: colors.cardBorder }]} />
                   <View style={styles.summaryHeaderItem}>
-                    <Text style={styles.summaryHeaderLabel}>Unallocated</Text>
+                    <Text style={[styles.summaryHeaderLabel, { color: colors.textSecondary }]}>
+                      {isBangla ? 'অবরাদ্দকৃত' : 'Unallocated'}
+                    </Text>
                     <Text style={[styles.summaryHeaderValue, { color: unallocatedColor }]}>
-                      {fmt(unallocated)}
+                      {formatCurrency(unallocated)}
                     </Text>
                   </View>
                 </View>
@@ -578,37 +634,46 @@ export default function BudgetSetupModal() {
                   const aiCat = aiRecommendation?.category_allocations?.find((c) => c.category === label);
 
                   return (
-                    <View key={label} style={styles.catCard}>
+                    <View
+                      key={label}
+                      style={[
+                        styles.catCard,
+                        {
+                          backgroundColor: isDark ? colors.surfaceSubtle : '#FFFFFF',
+                          borderColor: colors.cardBorder,
+                        },
+                      ]}
+                    >
                       <View style={[styles.catIcon, { backgroundColor: cat.bg }]}>
                         <Text style={styles.catEmoji}>{cat.emoji}</Text>
                       </View>
                       <View style={styles.catInfo}>
                         <View style={styles.catNameRow}>
-                          <Text style={styles.catName}>{label}</Text>
+                          <Text style={[styles.catName, { color: colors.text }]}>{translateCategory(label)}</Text>
                           <Text style={[styles.catPct, { color: cat.fg }]}>
                             {Math.round(pct)}%
                           </Text>
                         </View>
-                        <View style={styles.catBar}>
+                        <View style={[styles.catBar, isDark && { backgroundColor: colors.divider }]}>
                           <View style={[styles.catBarFill, { width: `${barPct}%` }]} />
                         </View>
                         {aiCat?.reasoning ? (
-                          <Text style={styles.catAiReasoning} numberOfLines={1}>
+                          <Text style={[styles.catAiReasoning, isDark && { color: '#A78BFA' }]} numberOfLines={1}>
                             {aiCat.reasoning}
                           </Text>
                         ) : null}
                       </View>
-                      <View style={styles.catAmountWrap}>
-                        <Text style={styles.catCurrency}>৳</Text>
+                      <View style={[styles.catAmountWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+                        <Text style={[styles.catCurrency, { color: colors.text }]}>৳</Text>
                         <TextInput
-                          style={styles.catInput}
+                          style={[styles.catInput, { color: colors.text }]}
                           value={allocations[label]}
                           onChangeText={(text) =>
                             setAllocations((prev) => ({ ...prev, [label]: text }))
                           }
                           keyboardType="decimal-pad"
                           placeholder="0"
-                          placeholderTextColor="#A0ADB6"
+                          placeholderTextColor={colors.textMuted}
                           editable={!submitting}
                           accessibilityLabel={`${label} allocated amount`}
                         />
@@ -625,7 +690,7 @@ export default function BudgetSetupModal() {
                   accessibilityLabel="Review budget plan"
                 >
                   <Text style={[styles.primaryButtonText, styles.primaryButtonTextActive]}>
-                    Review &gt;
+                    {isBangla ? 'পর্যালোচনা >' : 'Review >'}
                   </Text>
                 </TouchableOpacity>
               </>
@@ -634,36 +699,54 @@ export default function BudgetSetupModal() {
             {step === 3 && (
               <>
                 {aiRecommendation && (
-                  <View style={styles.aiSummaryBadgeCard}>
+                  <View style={[styles.aiSummaryBadgeCard, isDark && { backgroundColor: '#1E1236', borderColor: '#3B2366' }]}>
                     <View style={styles.aiSummaryBadgeHeader}>
-                      <Ionicons name="sparkles" size={15} color="#7C3AED" />
-                      <Text style={styles.aiSummaryBadgeTitle}>AI-Optimized Budget Plan</Text>
+                      <Ionicons name="sparkles" size={15} color={isDark ? '#DDD6FE' : '#7C3AED'} />
+                      <Text style={[styles.aiSummaryBadgeTitle, isDark && { color: '#DDD6FE' }]}>
+                        {isBangla ? 'এআই-অপ্টিমাইজড বাজেট প্ল্যান' : 'AI-Optimized Budget Plan'}
+                      </Text>
                     </View>
-                    <Text style={styles.aiSummaryBadgeText}>
+                    <Text style={[styles.aiSummaryBadgeText, isDark && { color: '#C4B5FD' }]}>
                       {aiRecommendation.insight.headline}
                     </Text>
                   </View>
                 )}
 
                 {/* Overview card */}
-                <View style={styles.overviewCard}>
+                <View
+                  style={[
+                    styles.overviewCard,
+                    {
+                      backgroundColor: isDark ? colors.surfaceSubtle : '#F4FBF7',
+                      borderColor: colors.cardBorder,
+                    },
+                  ]}
+                >
                   <View style={styles.overviewRow}>
-                    <Text style={styles.overviewLabel}>Monthly Income</Text>
-                    <Text style={styles.overviewValue}>{fmt(income)}</Text>
+                    <Text style={[styles.overviewLabel, { color: colors.textSecondary }]}>
+                      {isBangla ? 'মাসিক আয়' : 'Monthly Income'}
+                    </Text>
+                    <Text style={[styles.overviewValue, { color: colors.text }]}>{formatCurrency(income)}</Text>
                   </View>
                   <View style={styles.overviewRow}>
-                    <Text style={styles.overviewLabel}>Savings ({savingsPct}%)</Text>
-                    <Text style={styles.overviewValue}>{fmt(savingsAmount)}</Text>
+                    <Text style={[styles.overviewLabel, { color: colors.textSecondary }]}>
+                      {isBangla ? `সঞ্চয় (${savingsPct}%)` : `Savings (${savingsPct}%)`}
+                    </Text>
+                    <Text style={[styles.overviewValue, { color: colors.text }]}>{formatCurrency(savingsAmount)}</Text>
                   </View>
                   <View style={styles.overviewRow}>
-                    <Text style={styles.overviewLabel}>Total Budgeted</Text>
-                    <Text style={styles.overviewValue}>{fmt(allocatedTotal)}</Text>
+                    <Text style={[styles.overviewLabel, { color: colors.textSecondary }]}>
+                      {isBangla ? 'মোট বাজেটকৃত' : 'Total Budgeted'}
+                    </Text>
+                    <Text style={[styles.overviewValue, { color: colors.text }]}>{formatCurrency(allocatedTotal)}</Text>
                   </View>
-                  <View style={styles.overviewDivider} />
+                  <View style={[styles.overviewDivider, { backgroundColor: colors.cardBorder }]} />
                   <View style={styles.overviewRow}>
-                    <Text style={styles.overviewLabel}>Unallocated</Text>
+                    <Text style={[styles.overviewLabel, { color: colors.textSecondary }]}>
+                      {isBangla ? 'অবরাদ্দকৃত' : 'Unallocated'}
+                    </Text>
                     <Text style={[styles.overviewValue, { color: unallocatedColor }]}>
-                      {fmt(unallocated)}
+                      {formatCurrency(unallocated)}
                     </Text>
                   </View>
                 </View>
@@ -676,13 +759,13 @@ export default function BudgetSetupModal() {
                   const allocated = Number.parseFloat(allocations[label]) || 0;
                   const pct = spendingBudget > 0 ? (allocated / spendingBudget) * 100 : 0;
                   return (
-                    <View key={label} style={styles.breakdownRow}>
+                    <View key={label} style={[styles.breakdownRow, { borderBottomColor: colors.cardBorder }]}>
                       <View style={[styles.breakdownIcon, { backgroundColor: cat.bg }]}>
                         <Text style={styles.breakdownEmoji}>{cat.emoji}</Text>
                       </View>
-                      <Text style={styles.breakdownName}>{label}</Text>
-                      <Text style={styles.breakdownPct}>{Math.round(pct)}%</Text>
-                      <Text style={styles.breakdownAmount}>{fmt(allocated)}</Text>
+                      <Text style={[styles.breakdownName, { color: colors.text }]}>{translateCategory(label)}</Text>
+                      <Text style={[styles.breakdownPct, { color: colors.textSecondary }]}>{Math.round(pct)}%</Text>
+                      <Text style={styles.breakdownAmount}>{formatCurrency(allocated)}</Text>
                     </View>
                   );
                 })}
@@ -706,7 +789,7 @@ export default function BudgetSetupModal() {
                     <View style={styles.saveButtonInner}>
                       <Ionicons name="checkmark" size={18} color="#FFFFFF" />
                       <Text style={[styles.primaryButtonText, styles.primaryButtonTextActive]}>
-                        Save Budget Plan
+                        {isBangla ? 'বাজেট প্ল্যান সংরক্ষণ করুন' : 'Save Budget Plan'}
                       </Text>
                     </View>
                   )}

@@ -9,7 +9,9 @@ import {
   GeminiAllRateLimitedError,
   testGeminiModel,
   ModelAttemptLog,
+  DEFAULT_MULTIMODAL_MODELS,
 } from './geminiClient';
+import { AiErrorCode, classifyAiError, formatAiErrorString } from './aiError';
 
 export interface ExtractedStatementTransaction {
   id: string;
@@ -34,10 +36,14 @@ export interface StatementExtractionResult {
 
 export class PdfStatementError extends Error {
   public debugReport?: string;
-  constructor(message: string, debugReport?: string) {
-    super(message);
+  public code: AiErrorCode;
+
+  constructor(message: string, debugReport?: string, code: AiErrorCode = 'AI_ERR_UNKNOWN') {
+    const formatted = message.startsWith('[AI_ERR_') ? message : formatAiErrorString(code, message);
+    super(formatted);
     this.name = 'PdfStatementError';
     this.debugReport = debugReport;
+    this.code = code;
   }
 }
 export class PdfPasswordRequiredError extends PdfStatementError {}
@@ -47,12 +53,7 @@ export class PdfInvalidPasswordError extends PdfStatementError {}
  * Models tried in order. Prioritizes healthy, high-quota models with PDF support,
  * falling back automatically if rate-limited or busy.
  */
-export const GEMINI_STATEMENT_MODELS = [
-  'gemini-3.1-flash-lite',
-  'gemini-3.1-flash-lite-preview',
-  'gemini-3.5-flash-lite',
-  'gemini-3.5-flash',
-];
+export const GEMINI_STATEMENT_MODELS = DEFAULT_MULTIMODAL_MODELS;
 
 const EXPENSE_CATEGORIES_LIST = TRANSACTION_CATEGORIES.map((c) => c.label).join(', ');
 const INCOME_CATEGORIES_LIST = INCOME_CATEGORIES.map((c) => c.label).join(', ');
@@ -368,7 +369,9 @@ export async function parseBankStatementPdf(
   const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
   if (!apiKey) {
     throw new PdfStatementError(
-      'Bank statement parsing is not configured yet. Add EXPO_PUBLIC_GEMINI_API_KEY to your .env file.'
+      'Bank statement parsing is not configured yet. Add EXPO_PUBLIC_GEMINI_API_KEY to your .env file.',
+      undefined,
+      'AI_ERR_NO_KEY'
     );
   }
 
@@ -543,7 +546,8 @@ export async function parseBankStatementPdf(
       console.warn('[pdfStatementService] All models rate-limited/failed:\n', fullReport);
       throw new PdfStatementError(
         'Gemini AI servers are currently busy or rate-limited. Please try again in a few moments.',
-        fullReport
+        fullReport,
+        error.code || 'AI_ERR_RATE_LIMIT_429'
       );
     }
 
@@ -552,19 +556,21 @@ export async function parseBankStatementPdf(
         ...baseReport,
         `Result: Global parsing timeout (${Math.round(timeoutMs / 1000)}s exceeded).`,
       ].join('\n');
-      throw new PdfStatementError('Statement parsing timed out. Please try a smaller PDF.', fullReport);
+      throw new PdfStatementError('Statement parsing timed out. Please try a smaller PDF.', fullReport, 'AI_ERR_TIMEOUT');
     }
 
-    const message = error instanceof Error ? error.message : String(error);
+    const classified = classifyAiError(error, 'gemini');
+    const message = classified.message;
     const fullReport = [
       ...baseReport,
-      `Error Type: ${error instanceof Error ? error.constructor.name : typeof error}`,
+      `Error Code: ${classified.code}`,
       `Error Message: ${message}`,
+      `Raw Details: ${classified.details || ''}`,
       ...(error instanceof Error && error.stack ? [`Stack: ${error.stack.slice(0, 300)}`] : []),
     ].join('\n');
 
     console.error('[pdfStatementService] Unexpected error:\n', fullReport);
-    throw new PdfStatementError(`Failed to parse bank statement: ${message || 'Please try again.'}`, fullReport);
+    throw new PdfStatementError(message, fullReport, classified.code);
   }
 }
 

@@ -4,6 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ThemeProvider, useTheme } from '../context/ThemeContext';
+import { LanguageProvider } from '../context/LanguageContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { TransactionsProvider } from '../context/TransactionsContext';
 import { BudgetsProvider } from '../context/BudgetsContext';
@@ -99,25 +101,36 @@ function NavigationLayout() {
   );
 }
 
+function AppContent() {
+  const { isDark } = useTheme();
+  return (
+    <SafeAreaProvider>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <NavigationLayout />
+      <BudgetSetupModal />
+    </SafeAreaProvider>
+  );
+}
+
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <TransactionsProvider>
-        <NotificationsProvider>
-          <BudgetsProvider>
-            <SavingsGoalsProvider>
-              <FamilyProvider>
-                <SafeAreaProvider>
-                  <StatusBar style="dark" />
-                  <NavigationLayout />
-                  <BudgetSetupModal />
-                </SafeAreaProvider>
-              </FamilyProvider>
-            </SavingsGoalsProvider>
-          </BudgetsProvider>
-        </NotificationsProvider>
-      </TransactionsProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <TransactionsProvider>
+            <NotificationsProvider>
+              <BudgetsProvider>
+                <SavingsGoalsProvider>
+                  <FamilyProvider>
+                    <AppContent />
+                  </FamilyProvider>
+                </SavingsGoalsProvider>
+              </BudgetsProvider>
+            </NotificationsProvider>
+          </TransactionsProvider>
+        </AuthProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 }
 

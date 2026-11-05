@@ -5,6 +5,8 @@ import FamilySheetModal from './FamilySheetModal';
 import { formatMoney } from './familyConstants';
 import type { FamilyRole } from './familyConstants';
 import type { MemberFinance } from './useFamilyFinance';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface ChangeRoleModalProps {
   visible: boolean;
@@ -19,6 +21,8 @@ const ROLE_OPTIONS: { value: Exclude<FamilyRole, 'Admin'>; label: string; descri
 ];
 
 export default function ChangeRoleModal({ visible, member, onClose, onSave }: ChangeRoleModalProps) {
+  const { colors, isDark } = useTheme();
+  const { isBangla } = useLanguage();
   const [role, setRole] = useState<Exclude<FamilyRole, 'Admin'>>('Contributor');
   const [limitText, setLimitText] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -63,12 +67,12 @@ export default function ChangeRoleModal({ visible, member, onClose, onSave }: Ch
   return (
     <FamilySheetModal
       visible={visible}
-      title="Change Role"
+      title={isBangla ? 'ভূমিকা পরিবর্তন করুন' : 'Change Role'}
       onClose={handleClose}
       keyboardAvoiding
     >
       {member && (
-        <View style={styles.memberBanner}>
+        <View style={[styles.memberBanner, { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}>
           <View style={styles.memberAvatar}>
             <Text style={styles.memberAvatarText}>
               {member.name
@@ -80,18 +84,22 @@ export default function ChangeRoleModal({ visible, member, onClose, onSave }: Ch
                 .toUpperCase()}
             </Text>
           </View>
-          <Text style={styles.memberName}>{member.name}</Text>
+          <Text style={[styles.memberName, { color: colors.text }]}>{member.name}</Text>
         </View>
       )}
 
-      <Text style={styles.label}>Role</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>{isBangla ? 'ভূমিকা' : 'Role'}</Text>
       <View style={styles.roleList}>
         {ROLE_OPTIONS.map((opt) => {
           const selected = role === opt.value;
           return (
             <TouchableOpacity
               key={opt.value}
-              style={[styles.roleOption, selected && styles.roleOptionActive]}
+              style={[
+                styles.roleOption,
+                { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                selected && [styles.roleOptionActive, isDark && { backgroundColor: '#14382A', borderColor: '#0FB384' }],
+              ]}
               onPress={() => {
                 setRole(opt.value);
                 if (opt.value === 'Dependent') setLimitText('');
@@ -101,17 +109,17 @@ export default function ChangeRoleModal({ visible, member, onClose, onSave }: Ch
               accessibilityState={{ selected }}
             >
               <View style={styles.roleOptionTextWrap}>
-                <Text style={[styles.roleOptionTitle, selected && styles.roleOptionTitleActive]}>
-                  {opt.label}
+                <Text style={[styles.roleOptionTitle, { color: colors.text }, selected && [styles.roleOptionTitleActive, isDark && { color: '#6EE7B7' }]]}>
+                  {isBangla ? (opt.value === 'Contributor' ? 'অবদানকারী' : 'নির্ভরশীল') : opt.label}
                 </Text>
-                <Text style={[styles.roleOptionDesc, selected && styles.roleOptionDescActive]}>
-                  {opt.description}
+                <Text style={[styles.roleOptionDesc, { color: colors.textSecondary }, selected && [styles.roleOptionDescActive, isDark && { color: '#A7F3D0' }]]}>
+                  {isBangla ? (opt.value === 'Contributor' ? 'নির্দিষ্ট মাসিক অর্থ প্রদান করে' : 'কোনো অবদান নেই') : opt.description}
                 </Text>
               </View>
               <Ionicons
                 name={selected ? 'radio-button-on' : 'radio-button-off'}
                 size={20}
-                color={selected ? '#0FB384' : '#CBD5E1'}
+                color={selected ? '#0FB384' : isDark ? '#4B5563' : '#CBD5E1'}
               />
             </TouchableOpacity>
           );
@@ -120,16 +128,18 @@ export default function ChangeRoleModal({ visible, member, onClose, onSave }: Ch
 
       {role === 'Contributor' && (
         <>
-          <Text style={styles.label}>Monthly Contribution Amount</Text>
-          <View style={styles.amountWrap}>
-            <Text style={styles.currencyPrefix}>৳</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            {isBangla ? 'মাসিক অবদানের পরিমাণ' : 'Monthly Contribution Amount'}
+          </Text>
+          <View style={[styles.amountWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+            <Text style={[styles.currencyPrefix, { color: colors.text }]}>৳</Text>
             <TextInput
-              style={styles.amountInput}
+              style={[styles.amountInput, { color: colors.text }]}
               value={limitText}
               onChangeText={setLimitText}
               keyboardType="decimal-pad"
               placeholder="0"
-              placeholderTextColor="#A0ADB6"
+              placeholderTextColor={colors.textMuted}
               accessibilityLabel="Monthly contribution amount"
             />
           </View>
@@ -137,21 +147,25 @@ export default function ChangeRoleModal({ visible, member, onClose, onSave }: Ch
       )}
 
       {role === 'Dependent' && (
-        <View style={styles.infoBanner}>
-          <Ionicons name="information-circle-outline" size={18} color="#64748B" />
-          <Text style={styles.infoBannerText}>
-            Dependents do not contribute. Their share is covered by other members.
+        <View style={[styles.infoBanner, isDark && { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}>
+          <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
+          <Text style={[styles.infoBannerText, { color: colors.textSecondary }]}>
+            {isBangla
+              ? 'নির্ভরশীলরা অর্থ প্রদান করেন না। তাদের খরচ অন্য সদস্যরা বহন করেন।'
+              : 'Dependents do not contribute. Their share is covered by other members.'}
           </Text>
         </View>
       )}
 
       {member && member.role === 'Admin' && (
-        <Text style={styles.adminNote}>The family Admin keeps full control and cannot be demoted.</Text>
+        <Text style={[styles.adminNote, { color: colors.textSecondary }]}>
+          {isBangla ? 'পারিবারিক অ্যাডমিনের সম্পূর্ণ নিয়ন্ত্রণ থাকে।' : 'The family Admin keeps full control and cannot be demoted.'}
+        </Text>
       )}
 
       {errorMsg && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{errorMsg}</Text>
+        <View style={[styles.errorBox, isDark && { backgroundColor: '#38161A', borderColor: '#7F1D1D' }]}>
+          <Text style={[styles.errorText, isDark && { color: '#FCA5A5' }]}>{errorMsg}</Text>
         </View>
       )}
 
@@ -162,7 +176,9 @@ export default function ChangeRoleModal({ visible, member, onClose, onSave }: Ch
         accessibilityRole="button"
         accessibilityLabel="Save role change"
       >
-        <Text style={styles.saveBtnText}>{saving ? 'Saving…' : 'Save'}</Text>
+        <Text style={styles.saveBtnText}>
+          {saving ? (isBangla ? 'সংরক্ষণ করা হচ্ছে…' : 'Saving…') : (isBangla ? 'সংরক্ষণ করুন' : 'Save')}
+        </Text>
       </TouchableOpacity>
     </FamilySheetModal>
   );

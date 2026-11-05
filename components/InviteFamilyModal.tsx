@@ -15,6 +15,8 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const SHEET_MAX_HEIGHT = 560;
 
@@ -27,13 +29,19 @@ interface InviteFamilyModalProps {
 
 export default function InviteFamilyModal({ visible, code, familyName, onClose }: InviteFamilyModalProps) {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const { language } = useLanguage();
+  const isBangla = language === 'bn';
+
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
 
   const translateY = useRef(new Animated.Value(SHEET_MAX_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
-  const inviteMessage = `Join my family group on FinAlert! Use my invite code: ${code} to connect.`;
+  const inviteMessage = isBangla
+    ? `FinAlert-এ আমার পারিবারিক গ্রুপে যুক্ত হন! কোডটি ব্যবহার করুন: ${code}`
+    : `Join my family group on FinAlert! Use my invite code: ${code} to connect.`;
 
   useEffect(() => {
     if (visible) {
@@ -123,39 +131,50 @@ export default function InviteFamilyModal({ visible, code, familyName, onClose }
         <Animated.View
           style={[
             styles.sheet,
-            { paddingBottom: Math.max(insets.bottom, 16), transform: [{ translateY }] },
+            {
+              backgroundColor: colors.card,
+              borderTopColor: colors.cardBorder,
+              paddingBottom: Math.max(insets.bottom, 16),
+              transform: [{ translateY }],
+            },
           ]}
         >
           {/* Drag handle */}
-          <View style={styles.handle} />
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerSide} />
             <View style={styles.headerCenter}>
-              <Text style={styles.title}>Invite to Family</Text>
+              <Text style={[styles.title, { color: colors.text }]}>
+                {isBangla ? 'পরিবারে আমন্ত্রণ জানান' : 'Invite to Family'}
+              </Text>
             </View>
             <View style={styles.headerSide}>
               <TouchableOpacity
-                style={styles.closeButton}
+                style={[styles.closeButton, isDark && { backgroundColor: colors.surfaceSubtle }]}
                 onPress={handleClose}
                 accessibilityRole="button"
                 accessibilityLabel="Close Invite to Family"
               >
-                <Ionicons name="close" size={22} color="#091E15" />
+                <Ionicons name="close" size={22} color={colors.text} />
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Description */}
-          <Text style={styles.description}>
-            Share this code with family members. Anyone with this code can join your family group.
+          <Text style={[styles.description, { color: colors.textSecondary }]}>
+            {isBangla
+              ? 'পরিবারের সদস্যদের সাথে এই কোডটি শেয়ার করুন। কোডটি দিয়ে যে কেউ আপনার গ্রুপে যুক্ত হতে পারবেন।'
+              : 'Share this code with family members. Anyone with this code can join your family group.'}
           </Text>
 
           {/* Code display box */}
-          <View style={styles.codeBox}>
-            <Text style={styles.codeBoxLabel}>{familyName} · Invite Code</Text>
-            <Text style={styles.codeText} selectable>
+          <View style={[styles.codeBox, { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.codeBoxLabel, { color: colors.textSecondary }]}>
+              {familyName} · {isBangla ? 'আমন্ত্রণ কোড' : 'Invite Code'}
+            </Text>
+            <Text style={[styles.codeText, { color: colors.text }]} selectable>
               {code}
             </Text>
             <TouchableOpacity
@@ -168,19 +187,21 @@ export default function InviteFamilyModal({ visible, code, familyName, onClose }
               {copied ? (
                 <>
                   <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
-                  <Text style={styles.copyButtonText}>Code copied!</Text>
+                  <Text style={styles.copyButtonText}>{isBangla ? 'কোড কপি হয়েছে!' : 'Code copied!'}</Text>
                 </>
               ) : (
                 <>
                   <Ionicons name="copy-outline" size={18} color="#FFFFFF" />
-                  <Text style={styles.copyButtonText}>Copy Code</Text>
+                  <Text style={styles.copyButtonText}>{isBangla ? 'কোড কপি করুন' : 'Copy Code'}</Text>
                 </>
               )}
             </TouchableOpacity>
           </View>
 
           {/* Share actions */}
-          <Text style={styles.shareTitle}>Share Invite</Text>
+          <Text style={[styles.shareTitle, { color: colors.text }]}>
+            {isBangla ? 'আমন্ত্রণ শেয়ার করুন' : 'Share Invite'}
+          </Text>
           <View style={styles.shareRow}>
             <TouchableOpacity
               style={styles.shareItem}
@@ -191,7 +212,7 @@ export default function InviteFamilyModal({ visible, code, familyName, onClose }
               <View style={[styles.shareIconCircle, { backgroundColor: '#25D366' }]}>
                 <Ionicons name="logo-whatsapp" size={22} color="#FFFFFF" />
               </View>
-              <Text style={styles.shareLabel}>WhatsApp</Text>
+              <Text style={[styles.shareLabel, { color: colors.textSecondary }]}>WhatsApp</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -203,7 +224,7 @@ export default function InviteFamilyModal({ visible, code, familyName, onClose }
               <View style={[styles.shareIconCircle, { backgroundColor: '#3B82F6' }]}>
                 <Ionicons name="chatbubbles" size={22} color="#FFFFFF" />
               </View>
-              <Text style={styles.shareLabel}>SMS</Text>
+              <Text style={[styles.shareLabel, { color: colors.textSecondary }]}>SMS</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -220,7 +241,7 @@ export default function InviteFamilyModal({ visible, code, familyName, onClose }
                   <Ionicons name="logo-facebook" size={22} color="#FFFFFF" />
                 )}
               </View>
-              <Text style={styles.shareLabel}>Facebook</Text>
+              <Text style={[styles.shareLabel, { color: colors.textSecondary }]}>Facebook</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>

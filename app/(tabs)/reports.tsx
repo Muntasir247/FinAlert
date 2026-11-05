@@ -12,6 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, G } from 'react-native-svg';
 import { useTransactions } from '../../context/TransactionsContext';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 import type { Transaction } from '../../lib/transactions';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -51,6 +53,8 @@ interface CatDatum {
 
 export default function ReportsScreen() {
   const { transactions, isLoading } = useTransactions();
+  const { colors, isDark } = useTheme();
+  const { t, isBangla, formatCurrency, translateCategory } = useLanguage();
   const [reportType, setReportType] = useState<'monthly' | 'weekly'>('monthly');
 
   const report = useMemo(() => {
@@ -219,15 +223,17 @@ export default function ReportsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* --- Header & Timeframe Toggle --- */}
-      <View style={styles.headerRow}>
-        <Text style={styles.headerTitle}>Reports</Text>
-        <View style={styles.toggleContainer}>
+      <View style={[styles.headerRow, { backgroundColor: colors.card, borderBottomColor: colors.cardBorder }]}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('reports.title', 'Reports')}</Text>
+        <View style={[styles.toggleContainer, { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}>
           <TouchableOpacity
             style={[
               styles.toggleButton,
-              reportType === 'monthly' ? styles.toggleActiveButton : styles.toggleInactiveButton,
+              reportType === 'monthly'
+                ? [styles.toggleActiveButton, { backgroundColor: isDark ? '#143D2E' : '#ECFDF5', borderColor: '#0FB384' }]
+                : styles.toggleInactiveButton,
             ]}
             onPress={() => setReportType('monthly')}
             activeOpacity={0.7}
@@ -235,16 +241,20 @@ export default function ReportsScreen() {
             <Text
               style={[
                 styles.toggleText,
-                reportType === 'monthly' ? styles.toggleActiveText : styles.toggleInactiveText,
+                reportType === 'monthly'
+                  ? [styles.toggleActiveText, { color: isDark ? '#A7F3D0' : '#047857' }]
+                  : [styles.toggleInactiveText, { color: colors.textSecondary }],
               ]}
             >
-              Monthly Report
+              {isBangla ? 'মাসিক রিপোর্ট' : 'Monthly Report'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.toggleButton,
-              reportType === 'weekly' ? styles.toggleActiveButton : styles.toggleInactiveButton,
+              reportType === 'weekly'
+                ? [styles.toggleActiveButton, { backgroundColor: isDark ? '#143D2E' : '#ECFDF5', borderColor: '#0FB384' }]
+                : styles.toggleInactiveButton,
             ]}
             onPress={() => setReportType('weekly')}
             activeOpacity={0.7}
@@ -252,10 +262,12 @@ export default function ReportsScreen() {
             <Text
               style={[
                 styles.toggleText,
-                reportType === 'weekly' ? styles.toggleActiveText : styles.toggleInactiveText,
+                reportType === 'weekly'
+                  ? [styles.toggleActiveText, { color: isDark ? '#A7F3D0' : '#047857' }]
+                  : [styles.toggleInactiveText, { color: colors.textSecondary }],
               ]}
             >
-              Weekly Report
+              {isBangla ? 'সাপ্তাহিক রিপোর্ট' : 'Weekly Report'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -269,31 +281,39 @@ export default function ReportsScreen() {
         <View style={styles.gridContainer}>
           <View style={styles.gridRow}>
             {/* Total Income */}
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>Total Income</Text>
+            <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+                {isBangla ? 'মোট আয়' : 'Total Income'}
+              </Text>
               <Text style={[styles.metricValue, styles.incomeText]}>
-                {formatMoney(report.income)}
+                {formatCurrency(report.income)}
               </Text>
             </View>
             {/* Total Expense */}
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>Total Expense</Text>
+            <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+                {isBangla ? 'মোট খরচ' : 'Total Expense'}
+              </Text>
               <Text style={[styles.metricValue, styles.expenseText]}>
-                {formatMoney(report.expense)}
+                {formatCurrency(report.expense)}
               </Text>
             </View>
           </View>
           <View style={styles.gridRow}>
             {/* Savings */}
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>Savings</Text>
+            <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+                {isBangla ? 'সঞ্চয়' : 'Savings'}
+              </Text>
               <Text style={[styles.metricValue, report.savings >= 0 ? styles.incomeText : styles.expenseText]}>
-                {formatMoney(report.savings)}
+                {formatCurrency(report.savings)}
               </Text>
             </View>
             {/* Savings Rate */}
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>Savings Rate</Text>
+            <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+                {isBangla ? 'সঞ্চয়ের হার' : 'Savings Rate'}
+              </Text>
               <Text style={[styles.metricValue, styles.savingsRateText]}>
                 {Math.round(report.savingsRate)}%
               </Text>
@@ -302,8 +322,10 @@ export default function ReportsScreen() {
         </View>
 
         {/* --- Income vs Expense Chart Card --- */}
-        <View style={styles.cardContainer}>
-          <Text style={styles.cardTitle}>Income vs Expense</Text>
+        <View style={[styles.cardContainer, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>
+            {t('reports.income_vs_expense', 'Income vs Expense')}
+          </Text>
           <View style={styles.chartWrapper}>
             {/* Y-Axis Labels */}
             <View style={styles.yAxisContainer}>
@@ -311,7 +333,7 @@ export default function ReportsScreen() {
                 .slice()
                 .reverse()
                 .map((tick, i) => (
-                  <Text key={i} style={styles.yAxisText}>
+                  <Text key={i} style={[styles.yAxisText, { color: colors.textMuted }]}>
                     {tick}
                   </Text>
                 ))}
@@ -322,7 +344,7 @@ export default function ReportsScreen() {
               {/* Grid Lines */}
               <View style={styles.gridLinesContainer}>
                 {report.ticks.map((_, i) => (
-                  <View key={i} style={styles.gridLine} />
+                  <View key={i} style={[styles.gridLine, { backgroundColor: colors.divider }]} />
                 ))}
               </View>
 
@@ -351,7 +373,7 @@ export default function ReportsScreen() {
                           />
                         )}
                       </View>
-                      <Text style={styles.xAxisText}>{data.label}</Text>
+                      <Text style={[styles.xAxisText, { color: colors.textSecondary }]}>{data.label}</Text>
                     </View>
                   );
                 })}
@@ -363,18 +385,24 @@ export default function ReportsScreen() {
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: '#0FB384' }]} />
-              <Text style={styles.legendText}>Income</Text>
+              <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                {t('transactions.filter_income', 'Income')}
+              </Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
-              <Text style={styles.legendText}>Expense</Text>
+              <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+                {t('transactions.filter_expense', 'Expense')}
+              </Text>
             </View>
           </View>
         </View>
 
         {/* --- Expense by Category Card --- */}
-        <View style={styles.cardContainer}>
-          <Text style={styles.cardTitle}>Expense by Category</Text>
+        <View style={[styles.cardContainer, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>
+            {t('reports.category_breakdown', 'Expense by Category')}
+          </Text>
 
           {/* Donut Chart */}
           <View style={styles.donutWrapper}>
@@ -406,9 +434,9 @@ export default function ReportsScreen() {
               </Svg>
             ) : (
               <View style={styles.donutEmpty}>
-                <Ionicons name="receipt-outline" size={28} color="#94A3B8" />
-                <Text style={styles.donutEmptyText}>
-                  No expenses this {report.periodLabel}.
+                <Ionicons name="receipt-outline" size={28} color={colors.textMuted} />
+                <Text style={[styles.donutEmptyText, { color: colors.textSecondary }]}>
+                  {isBangla ? 'এই সময়ে কোনো খরচ নেই।' : `No expenses this ${report.periodLabel}.`}
                 </Text>
               </View>
             )}
@@ -417,17 +445,19 @@ export default function ReportsScreen() {
           {/* Category Legend Breakdown */}
           <View style={styles.categoryList}>
             {report.categoryData.length === 0 ? (
-              <Text style={styles.noCategoriesText}>No expense categories yet.</Text>
+              <Text style={[styles.noCategoriesText, { color: colors.textSecondary }]}>
+                {isBangla ? 'কোনো খরচের খাত নেই।' : 'No expense categories yet.'}
+              </Text>
             ) : (
               report.categoryData.map((item, index) => (
                 <View key={index} style={styles.categoryRow}>
                   <View style={styles.categoryLeft}>
                     <View style={[styles.categoryDot, { backgroundColor: item.color }]} />
-                    <Text style={styles.categoryName}>{item.name}</Text>
+                    <Text style={[styles.categoryName, { color: colors.text }]}>{translateCategory(item.name)}</Text>
                   </View>
                   <View style={styles.categoryRight}>
-                    <Text style={styles.categoryValue}>{formatMoney(item.value)}</Text>
-                    <Text style={styles.categoryPercentage}>
+                    <Text style={[styles.categoryValue, { color: colors.text }]}>{formatCurrency(item.value)}</Text>
+                    <Text style={[styles.categoryPercentage, { color: colors.textSecondary }]}>
                       {item.percentage >= 100 ? 100 : item.percentage.toFixed(0)}%
                     </Text>
                   </View>
@@ -438,12 +468,14 @@ export default function ReportsScreen() {
         </View>
 
         {/* --- AI Financial Insight Banner --- */}
-        <View style={styles.insightBanner}>
+        <View style={[styles.insightBanner, isDark && { backgroundColor: '#1E1236', borderColor: '#3B2366' }]}>
           <View style={styles.insightHeader}>
-            <Ionicons name="sparkles" size={16} color="#7C3AED" style={styles.insightIcon} />
-            <Text style={styles.insightTitle}>AI Financial Insight</Text>
+            <Ionicons name="sparkles" size={16} color={isDark ? '#DDD6FE' : '#7C3AED'} style={styles.insightIcon} />
+            <Text style={[styles.insightTitle, isDark && { color: '#DDD6FE' }]}>
+              {isBangla ? 'এআই আর্থিক পরামর্শ' : 'AI Financial Insight'}
+            </Text>
           </View>
-          <Text style={styles.insightSubtext}>{report.insightText}</Text>
+          <Text style={[styles.insightSubtext, isDark && { color: '#C4B5FD' }]}>{report.insightText}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

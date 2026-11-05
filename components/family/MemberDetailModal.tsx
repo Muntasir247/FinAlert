@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import FamilySheetModal from './FamilySheetModal';
 import { ROLE_BG, ROLE_TEXT_COLOR, expenseCategoryMeta, formatDateLabel, formatMoney, initialsOf } from './familyConstants';
 import type { FamilyFinanceApi, FamilyTransaction, FamilyTransactionType, MemberFinance } from './useFamilyFinance';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface MemberDetailModalProps {
   visible: boolean;
@@ -32,10 +34,15 @@ function groupByDate(txs: FamilyTransaction[]) {
 }
 
 export default function MemberDetailModal({ visible, member, finance, onClose }: MemberDetailModalProps) {
+  const { colors, isDark } = useTheme();
+  const { isBangla, translateCategory } = useLanguage();
+
   if (!member) {
     return (
-      <FamilySheetModal visible={visible} title="Member Activity" onClose={onClose}>
-        <Text style={styles.emptyText}>Select a member to view their activity.</Text>
+      <FamilySheetModal visible={visible} title={isBangla ? 'সদস্যের বিবরণ' : 'Member Activity'} onClose={onClose}>
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+          {isBangla ? 'কার্যকলাপ দেখতে একজন সদস্য নির্বাচন করুন।' : 'Select a member to view their activity.'}
+        </Text>
       </FamilySheetModal>
     );
   }
@@ -45,15 +52,15 @@ export default function MemberDetailModal({ visible, member, finance, onClose }:
   const grouped = groupByDate(logs);
 
   return (
-    <FamilySheetModal visible={visible} title="Member Activity" onClose={onClose}>
+    <FamilySheetModal visible={visible} title={isBangla ? 'সদস্যের বিবরণ' : 'Member Activity'} onClose={onClose}>
       {/* Member banner */}
-      <View style={styles.banner}>
+      <View style={[styles.banner, { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{initialsOf(member.name)}</Text>
         </View>
         <View style={styles.bannerInfo}>
-          <Text style={styles.name}>{member.name}</Text>
-          <View style={[styles.rolePill, { backgroundColor: ROLE_BG[member.role] }]}>
+          <Text style={[styles.name, { color: colors.text }]}>{member.name}</Text>
+          <View style={[styles.rolePill, { backgroundColor: isDark ? '#143D2E' : ROLE_BG[member.role] }]}>
             <Text style={[styles.rolePillText, { color: ROLE_TEXT_COLOR[member.role] }]}>
               {member.role}
             </Text>
@@ -63,42 +70,48 @@ export default function MemberDetailModal({ visible, member, finance, onClose }:
 
       {/* Totals */}
       <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Limit</Text>
-          <Text style={styles.statValue}>{formatMoney(member.limit)}</Text>
+        <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{isBangla ? 'সীমা' : 'Limit'}</Text>
+          <Text style={[styles.statValue, { color: colors.text }]}>{formatMoney(member.limit)}</Text>
         </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Paid</Text>
+        <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{isBangla ? 'পরিশোধিত' : 'Paid'}</Text>
           <Text style={[styles.statValue, { color: '#0FB384' }]}>{formatMoney(paid)}</Text>
         </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Extra</Text>
+        <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{isBangla ? 'অতিরিক্ত' : 'Extra'}</Text>
           <Text style={[styles.statValue, { color: '#3B82F6' }]}>{formatMoney(member.extra)}</Text>
         </View>
       </View>
 
       {/* Expense logs */}
-      <Text style={styles.sectionTitle}>Activity Log</Text>
+      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+        {isBangla ? 'কার্যকলাপের বিবরণ' : 'Activity Log'}
+      </Text>
       {grouped.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="time-outline" size={26} color="#94A3B8" />
-          <Text style={styles.emptyText}>No activity yet.</Text>
+          <Ionicons name="time-outline" size={26} color={colors.textMuted} />
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            {isBangla ? 'এখনও কোনো কার্যকলাপ নেই।' : 'No activity yet.'}
+          </Text>
         </View>
       ) : (
         grouped.map((group) => (
           <View key={group.date} style={styles.dateGroup}>
-            <Text style={styles.dateLabel}>{formatDateLabel(group.date)}</Text>
+            <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>{formatDateLabel(group.date)}</Text>
             {group.items.map((tx) => {
               const meta = TX_META[tx.type];
               const cat = expenseCategoryMeta(tx.expenseCategory);
               return (
-                <View key={tx.id} style={styles.logRow}>
+                <View key={tx.id} style={[styles.logRow, { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}>
                   <View style={[styles.logIcon, { backgroundColor: `${meta.tint}1A` }]}>
                     <Ionicons name={meta.icon} size={16} color={meta.tint} />
                   </View>
                   <View style={styles.logInfo}>
-                    <Text style={styles.logTitle}>{tx.note || meta.label}</Text>
-                    <Text style={styles.logSubtitle}>{tx.expenseCategory}</Text>
+                    <Text style={[styles.logTitle, { color: colors.text }]}>{tx.note || meta.label}</Text>
+                    <Text style={[styles.logSubtitle, { color: colors.textSecondary }]}>
+                      {translateCategory(tx.expenseCategory)}
+                    </Text>
                   </View>
                   <Text style={[styles.logAmount, { color: meta.tint }]}>
                     {tx.type === 'extra' ? '+' : ''}{formatMoney(tx.amount)}

@@ -18,6 +18,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTransactions } from '../context/TransactionsContext';
 import { parseReceiptFromImage } from '../services/receiptIntentService';
 import type { ReceiptData } from '../services/receiptIntentService';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 const CORNER_GREEN = '#0FB384';
 
@@ -87,6 +89,9 @@ export default function ScanInvoiceModal({
 }) {
   const insets = useSafeAreaInsets();
   const { addTransaction } = useTransactions();
+  const { colors, isDark } = useTheme();
+  const { language } = useLanguage();
+  const isBangla = language === 'bn';
 
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -373,22 +378,24 @@ export default function ScanInvoiceModal({
   const renderReview = () => {
     if (!receipt) return null;
     return (
-      <View style={styles.lightRoot}>
-        <View style={[styles.reviewHeader, { paddingTop: Math.max(insets.top, 12) }]}>
+      <View style={[styles.lightRoot, { backgroundColor: colors.background }]}>
+        <View style={[styles.reviewHeader, { backgroundColor: colors.card, borderBottomColor: colors.cardBorder, paddingTop: Math.max(insets.top, 12) }]}>
           <View style={styles.reviewHeaderText}>
-            <Text style={styles.reviewTitle}>Review Expenses</Text>
-            <Text style={styles.reviewSubtitle} numberOfLines={1}>
-              {receipt.merchant || 'Receipt'}
+            <Text style={[styles.reviewTitle, { color: colors.text }]}>
+              {isBangla ? 'খরচ পর্যালোচনা' : 'Review Expenses'}
+            </Text>
+            <Text style={[styles.reviewSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+              {receipt.merchant || (isBangla ? 'রসিদ' : 'Receipt')}
               {dateText ? ` · ${dateText}` : ''}
             </Text>
           </View>
           <TouchableOpacity
-            style={styles.reviewClose}
+            style={[styles.reviewClose, { backgroundColor: isDark ? colors.surfaceSubtle : '#F3F4F6' }]}
             onPress={handleClose}
             accessibilityRole="button"
             accessibilityLabel="Close Scan Invoice"
           >
-            <Ionicons name="close" size={22} color="#091E15" />
+            <Ionicons name="close" size={22} color={colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -397,27 +404,30 @@ export default function ScanInvoiceModal({
           contentContainerStyle={styles.reviewListContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.reviewSummaryRow}>
-            <Text style={styles.reviewSummaryLabel}>Total</Text>
-            <Text style={styles.reviewSummaryTotal}>৳{receipt.total.toLocaleString()}</Text>
+          <View style={[styles.reviewSummaryRow, { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.reviewSummaryLabel, { color: colors.textSecondary }]}>
+              {isBangla ? 'মোট' : 'Total'}
+            </Text>
+            <Text style={[styles.reviewSummaryTotal, { color: colors.text }]}>৳{receipt.total.toLocaleString()}</Text>
           </View>
 
-          {/* Editable date — lets the user correct an AI-extracted date so the
-              expenses are counted in the right budget month. */}
-          <View style={styles.dateRow}>
+          {/* Editable date */}
+          <View style={[styles.dateRow, { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}>
             <View style={styles.dateIconWrap}>
               <Ionicons name="calendar-outline" size={16} color={CORNER_GREEN} />
             </View>
-            <Text style={styles.dateLabel}>Date</Text>
+            <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>
+              {isBangla ? 'তারিখ' : 'Date'}
+            </Text>
             <TextInput
-              style={styles.dateInput}
+              style={[styles.dateInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
               value={dateText}
               onChangeText={(text) => {
                 setDateText(text);
                 setErrorMsg(null);
               }}
               placeholder="YYYY-MM-DD"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={colors.textMuted}
               autoCapitalize="none"
               autoCorrect={false}
               maxLength={10}
@@ -425,7 +435,7 @@ export default function ScanInvoiceModal({
               accessibilityLabel="Expense date"
             />
             <TouchableOpacity
-              style={styles.todayBtn}
+              style={[styles.todayBtn, isDark && { backgroundColor: '#143D2E' }]}
               onPress={() => {
                 setDateText(todayIso());
                 setErrorMsg(null);
@@ -434,7 +444,9 @@ export default function ScanInvoiceModal({
               accessibilityRole="button"
               accessibilityLabel="Set date to today"
             >
-              <Text style={styles.todayBtnText}>Today</Text>
+              <Text style={[styles.todayBtnText, isDark && { color: '#6EE7B7' }]}>
+                {isBangla ? 'আজ' : 'Today'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -443,7 +455,11 @@ export default function ScanInvoiceModal({
             return (
               <TouchableOpacity
                 key={`${index}-${item.name}`}
-                style={[styles.itemRow, isSelected && styles.itemRowSelected]}
+                style={[
+                  styles.itemRow,
+                  { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                  isSelected && [styles.itemRowSelected, isDark && { backgroundColor: '#14382A', borderColor: '#0FB384' }],
+                ]}
                 onPress={() => toggleItem(index)}
                 disabled={adding}
                 accessibilityRole="checkbox"
@@ -453,15 +469,15 @@ export default function ScanInvoiceModal({
                 <Ionicons
                   name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
                   size={24}
-                  color={isSelected ? CORNER_GREEN : '#CBD5E1'}
+                  color={isSelected ? CORNER_GREEN : isDark ? '#4B5563' : '#CBD5E1'}
                 />
                 <View style={styles.itemTextArea}>
-                  <Text style={styles.itemName} numberOfLines={2}>
+                  <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={2}>
                     {item.name}
                   </Text>
-                  <Text style={styles.itemCategory}>{receipt.category}</Text>
+                  <Text style={[styles.itemCategory, { color: colors.textSecondary }]}>{receipt.category}</Text>
                 </View>
-                <Text style={styles.itemPrice}>৳{item.price.toLocaleString()}</Text>
+                <Text style={[styles.itemPrice, { color: colors.text }]}>৳{item.price.toLocaleString()}</Text>
               </TouchableOpacity>
             );
           })}
@@ -473,16 +489,18 @@ export default function ScanInvoiceModal({
           </View>
         )}
 
-        <View style={[styles.reviewFooter, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <View style={[styles.reviewFooter, { backgroundColor: colors.card, borderTopColor: colors.cardBorder, paddingBottom: Math.max(insets.bottom, 16) }]}>
           <TouchableOpacity
-            style={styles.rescanButton}
+            style={[styles.rescanButton, isDark && { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}
             onPress={backToCamera}
             disabled={adding}
             accessibilityRole="button"
             accessibilityLabel="Scan another receipt"
           >
-            <Ionicons name="refresh" size={18} color="#334155" />
-            <Text style={styles.rescanButtonText}>Rescan</Text>
+            <Ionicons name="refresh" size={18} color={isDark ? colors.text : '#334155'} />
+            <Text style={[styles.rescanButtonText, isDark && { color: colors.text }]}>
+              {isBangla ? 'পুনরায় স্ক্যান' : 'Rescan'}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.addButton, selectedCount === 0 && styles.addButtonDisabled]}
@@ -496,7 +514,13 @@ export default function ScanInvoiceModal({
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <Text style={styles.addButtonText}>
-                {selectedCount > 0 ? `Add ${selectedCount} Expense${selectedCount > 1 ? 's' : ''}` : 'Select Items'}
+                {selectedCount > 0
+                  ? isBangla
+                    ? `${selectedCount}টি খরচ যোগ করুন`
+                    : `Add ${selectedCount} Expense${selectedCount > 1 ? 's' : ''}`
+                  : isBangla
+                  ? 'আইটেম নির্বাচন করুন'
+                  : 'Select Items'}
               </Text>
             )}
           </TouchableOpacity>
@@ -506,30 +530,36 @@ export default function ScanInvoiceModal({
   };
 
   const renderSuccess = () => (
-    <View style={styles.lightRoot}>
+    <View style={[styles.lightRoot, { backgroundColor: colors.background }]}>
       <View style={styles.successContent}>
         <View style={styles.successIconBox}>
           <Ionicons name="checkmark-circle" size={72} color={CORNER_GREEN} />
         </View>
-        <Text style={styles.successTitle}>
-          {addedCount} expense{addedCount > 1 ? 's' : ''} added
+        <Text style={[styles.successTitle, { color: colors.text }]}>
+          {isBangla
+            ? `${addedCount}টি খরচ যোগ হয়েছে`
+            : `${addedCount} expense${addedCount > 1 ? 's' : ''} added`}
         </Text>
-        <Text style={styles.successSubtitle}>Your scanned receipt has been saved.</Text>
+        <Text style={[styles.successSubtitle, { color: colors.textSecondary }]}>
+          {isBangla ? 'আপনার স্ক্যান করা রসিদ সংরক্ষিত হয়েছে।' : 'Your scanned receipt has been saved.'}
+        </Text>
         <TouchableOpacity
           style={styles.doneButton}
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel="Done"
         >
-          <Text style={styles.doneButtonText}>Done</Text>
+          <Text style={styles.doneButtonText}>{isBangla ? 'সম্পন্ন' : 'Done'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.scanAnotherButton}
+          style={[styles.scanAnotherButton, isDark && { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}
           onPress={backToCamera}
           accessibilityRole="button"
           accessibilityLabel="Scan another receipt"
         >
-          <Text style={styles.scanAnotherText}>Scan another receipt</Text>
+          <Text style={[styles.scanAnotherText, isDark && { color: colors.text }]}>
+            {isBangla ? 'আরেকটি রসিদ স্ক্যান করুন' : 'Scan another receipt'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

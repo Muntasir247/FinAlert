@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import FamilySheetModal from './FamilySheetModal';
 import { expenseCategoryMeta, formatMoney } from './familyConstants';
 import type { FamilyTransactionType, FamilyFinanceApi } from './useFamilyFinance';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface AddTransactionModalProps {
   visible: boolean;
@@ -18,6 +20,8 @@ const TYPES: { value: FamilyTransactionType; label: string; icon: 'card-outline'
 ];
 
 export default function AddTransactionModal({ visible, finance, onClose }: AddTransactionModalProps) {
+  const { colors, isDark } = useTheme();
+  const { isBangla, translateCategory } = useLanguage();
   const [type, setType] = useState<FamilyTransactionType>('payment');
   const [expenseId, setExpenseId] = useState<string | null>(null);
   const [amountText, setAmountText] = useState('');
@@ -69,16 +73,27 @@ export default function AddTransactionModal({ visible, finance, onClose }: AddTr
   };
 
   return (
-    <FamilySheetModal visible={visible} title="Family Transaction" onClose={handleClose} keyboardAvoiding>
+    <FamilySheetModal
+      visible={visible}
+      title={isBangla ? 'পারিবারিক লেনদেন' : 'Family Transaction'}
+      onClose={handleClose}
+      keyboardAvoiding
+    >
       {/* Transaction type */}
-      <Text style={styles.label}>Transaction Type</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>
+        {isBangla ? 'লেনদেনের ধরন' : 'Transaction Type'}
+      </Text>
       <View style={styles.segmented}>
         {TYPES.map((t) => {
           const selected = type === t.value;
           return (
             <TouchableOpacity
               key={t.value}
-              style={[styles.segment, selected && styles.segmentActive]}
+              style={[
+                styles.segment,
+                { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                selected && styles.segmentActive,
+              ]}
               onPress={() => setType(t.value)}
               accessibilityRole="button"
               accessibilityLabel={`Type ${t.label}`}
@@ -87,10 +102,12 @@ export default function AddTransactionModal({ visible, finance, onClose }: AddTr
               <Ionicons
                 name={t.icon}
                 size={16}
-                color={selected ? '#FFFFFF' : '#64748B'}
+                color={selected ? '#FFFFFF' : colors.textSecondary}
               />
-              <Text style={[styles.segmentText, selected && styles.segmentTextActive]}>
-                {t.label}
+              <Text style={[styles.segmentText, { color: colors.textSecondary }, selected && styles.segmentTextActive]}>
+                {isBangla
+                  ? (t.value === 'payment' ? 'পরিশোধ' : t.value === 'extra' ? 'অতিরিক্ত' : 'অসমর্থ')
+                  : t.label}
               </Text>
             </TouchableOpacity>
           );
@@ -98,9 +115,13 @@ export default function AddTransactionModal({ visible, finance, onClose }: AddTr
       </View>
 
       {/* Select expense */}
-      <Text style={styles.label}>Select Expense</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>
+        {isBangla ? 'খরচ নির্বাচন করুন' : 'Select Expense'}
+      </Text>
       {finance.expenses.length === 0 ? (
-        <Text style={styles.noExpenses}>No active expenses. Add a shared expense first.</Text>
+        <Text style={[styles.noExpenses, { color: colors.textSecondary }]}>
+          {isBangla ? 'কোনো সক্রিয় খরচ নেই। প্রথমে একটি যৌথ খরচ যোগ করুন।' : 'No active expenses. Add a shared expense first.'}
+        </Text>
       ) : (
         finance.expenses.map((expense) => {
           const meta = expenseCategoryMeta(expense.category);
@@ -109,7 +130,11 @@ export default function AddTransactionModal({ visible, finance, onClose }: AddTr
           return (
             <TouchableOpacity
               key={expense.id}
-              style={[styles.expenseOption, selected && styles.expenseOptionActive]}
+              style={[
+                styles.expenseOption,
+                { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                selected && [styles.expenseOptionActive, isDark && { backgroundColor: '#14382A', borderColor: '#0FB384' }],
+              ]}
               onPress={() => setExpenseId(expense.id)}
               accessibilityRole="button"
               accessibilityLabel={`Expense ${expense.category}`}
@@ -119,15 +144,15 @@ export default function AddTransactionModal({ visible, finance, onClose }: AddTr
                 <Ionicons name={meta.icon} size={18} color={meta.tint} />
               </View>
               <View style={styles.expenseInfo}>
-                <Text style={styles.expenseName}>{expense.category}</Text>
-                <Text style={styles.expenseShare}>
-                  Your share: {share > 0 ? formatMoney(share) : '—'}
+                <Text style={[styles.expenseName, { color: colors.text }]}>{translateCategory(expense.category)}</Text>
+                <Text style={[styles.expenseShare, { color: colors.textSecondary }]}>
+                  {isBangla ? 'আপনার অংশ:' : 'Your share:'} {share > 0 ? formatMoney(share) : '—'}
                 </Text>
               </View>
               <Ionicons
                 name={selected ? 'radio-button-on' : 'radio-button-off'}
                 size={20}
-                color={selected ? '#0FB384' : '#CBD5E1'}
+                color={selected ? '#0FB384' : isDark ? '#4B5563' : '#CBD5E1'}
               />
             </TouchableOpacity>
           );
@@ -135,56 +160,71 @@ export default function AddTransactionModal({ visible, finance, onClose }: AddTr
       )}
 
       {/* Amount */}
-      <Text style={styles.label}>Amount</Text>
-      <View style={styles.amountWrap}>
-        <Text style={styles.currencyPrefix}>৳</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>{isBangla ? 'পরিমাণ' : 'Amount'}</Text>
+      <View style={[styles.amountWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+        <Text style={[styles.currencyPrefix, { color: colors.text }]}>৳</Text>
         <TextInput
-          style={styles.amountInput}
+          style={[styles.amountInput, { color: colors.text }]}
           value={amountText}
           onChangeText={setAmountText}
           keyboardType="decimal-pad"
           placeholder="0"
-          placeholderTextColor="#A0ADB6"
+          placeholderTextColor={colors.textMuted}
           accessibilityLabel="Transaction amount"
         />
       </View>
 
       {/* Note */}
-      <Text style={styles.label}>Note (Optional)</Text>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>
+        {isBangla ? 'নোট (ঐচ্ছিক)' : 'Note (Optional)'}
+      </Text>
       <TextInput
-        style={styles.noteInput}
+        style={[styles.noteInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
         value={note}
         onChangeText={setNote}
-        placeholder={type === 'extra' ? 'e.g. Extra — medicine' : 'Add a note...'}
-        placeholderTextColor="#A0ADB6"
+        placeholder={
+          type === 'extra'
+            ? (isBangla ? 'যেমন: অতিরিক্ত — ওষুধ' : 'e.g. Extra — medicine')
+            : (isBangla ? 'একটি নোট যোগ করুন...' : 'Add a note...')
+        }
+        placeholderTextColor={colors.textMuted}
         accessibilityLabel="Transaction note"
       />
 
-      <Text style={styles.helperText}>
-        * Paying beyond your assigned amount increases your contribution
+      <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+        {isBangla
+          ? '* আপনার বরাদ্দকৃত পরিমাণের বেশি প্রদান করলে তা আপনার অবদান বৃদ্ধি করে'
+          : '* Paying beyond your assigned amount increases your contribution'}
       </Text>
 
       {type !== 'unable' && selectedExpense && (
         <Text style={[styles.remainingText, overpaying && styles.remainingTextError]}>
-          Remaining to pay: {formatMoney(remaining)}
+          {isBangla ? 'পরিশোধ বাকি:' : 'Remaining to pay:'} {formatMoney(remaining)}
         </Text>
       )}
 
       {errorMsg && (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{errorMsg}</Text>
+        <View style={[styles.errorBox, isDark && { backgroundColor: '#38161A', borderColor: '#7F1D1D' }]}>
+          <Text style={[styles.errorText, isDark && { color: '#FCA5A5' }]}>{errorMsg}</Text>
         </View>
       )}
 
       <TouchableOpacity
-        style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
+        style={[
+          styles.submitBtn,
+          !canSubmit && [styles.submitBtnDisabled, isDark && { backgroundColor: colors.surfaceSubtle }],
+        ]}
         onPress={handleSubmit}
         disabled={!canSubmit}
         accessibilityRole="button"
         accessibilityLabel="Submit transaction"
       >
         <Text style={styles.submitBtnText}>
-          {type === 'payment' ? 'Record Payment' : type === 'extra' ? 'Record Extra' : 'Record Unable'}
+          {type === 'payment'
+            ? (isBangla ? 'পরিশোধ রেকর্ড করুন' : 'Record Payment')
+            : type === 'extra'
+            ? (isBangla ? 'অতিরিক্ত রেকর্ড করুন' : 'Record Extra')
+            : (isBangla ? 'অসমর্থ রেকর্ড করুন' : 'Record Unable')}
         </Text>
       </TouchableOpacity>
     </FamilySheetModal>

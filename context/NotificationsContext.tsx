@@ -77,6 +77,10 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         const stored = await SecureStore.getItemAsync(PREF_NOTIFICATIONS_ENABLED);
         if (stored !== null) {
           setNotificationsEnabledState(stored === 'true');
+        } else {
+          // If no explicit preference stored yet, check current system permission
+          const granted = await checkDeviceNotificationPermissions();
+          setNotificationsEnabledState(granted);
         }
       } catch (err) {
         console.warn('[NotificationsContext] Failed to load notification preference:', err);
@@ -135,6 +139,13 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (!enabled) {
           await dismissAllDeviceNotifications();
+        } else {
+          // Send a test device notification so user sees immediate feedback that alerts are active
+          await presentDeviceNotification({
+            title: 'FinAlert Notifications Enabled',
+            body: 'You will now receive timely alerts for budgets, transactions, and goals.',
+            data: { action_type: 'notifications_enabled' },
+          });
         }
         return true;
       } catch (error) {

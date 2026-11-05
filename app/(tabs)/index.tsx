@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   AppState,
+  ActivityIndicator,
   type AppStateStatus,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +17,8 @@ import { useTransactions } from '../../context/TransactionsContext';
 import { useBudgets } from '../../context/BudgetsContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import { useSavingsGoals } from '../../context/SavingsGoalsContext';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 import AddTransactionModal from '../../components/AddTransactionModal';
 import CircularProgress from '../../components/CircularProgress';
 import SavingsGoalsManager from '../../components/SavingsGoalsManager';
@@ -25,6 +28,8 @@ import BKashDetectedBanner from '../../components/BKashDetectedBanner';
 import BKashSimulatorModal from '../../components/BKashSimulatorModal';
 import BKashBatchReviewModal from '../../components/BKashBatchReviewModal';
 import BankStatementReviewModal from '../../components/BankStatementReviewModal';
+import FinancialInsightModal from '../../components/FinancialInsightModal';
+import { getFinancialInsight, type FinancialInsight } from '../../services/aiInsightService';
 import {
   subscribeToBkashTransactions,
   subscribeToPendingTransactions,
@@ -56,39 +61,56 @@ function ProgressBar({ pct, color = '#0FB384' }: { pct: number; color?: string }
 
 // ── Savings Goal Card ───────────────────────────────────────────────────
 
-function SavingsGoalCard({ goal }: { goal: SavingsGoal }) {
+function SavingsGoalCard({
+  goal,
+  onPress,
+}: {
+  goal: SavingsGoal;
+  onPress?: () => void;
+}) {
+  const { colors } = useTheme();
+  const { isBangla, formatCurrency } = useLanguage();
   const pct = goal.target_amount > 0 ? (goal.current_amount / goal.target_amount) * 100 : 0;
   const barPct = Math.min(pct, 100) / 100;
   const color = goal.color;
   return (
-    <View style={styles.savingsCard}>
+    <TouchableOpacity
+      style={[styles.savingsCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+      onPress={onPress}
+      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={`View ${goal.name} savings goal`}
+    >
       <View style={[styles.savingsIconBox, { backgroundColor: savingsGoalTint(color) }]}>
         <Ionicons name={savingsGoalIconName(goal.icon) as IoniconName} size={20} color={color} />
       </View>
-      <Text style={styles.savingsTitle} numberOfLines={1}>
+      <Text style={[styles.savingsTitle, { color: colors.text }]} numberOfLines={1}>
         {goal.name}
       </Text>
       <View style={styles.savingsPctRow}>
         <Text style={[styles.savingsPct, { color }]}>{Math.round(pct)}%</Text>
-        <Text style={styles.savingsPctLabel}>saved</Text>
+        <Text style={[styles.savingsPctLabel, { color: colors.textMuted }]}>
+          {isBangla ? 'সঞ্চিত' : 'saved'}
+        </Text>
       </View>
       <ProgressBar pct={barPct} color={color} />
-      <Text style={styles.savingsAmount}>
-        ৳{Math.round(goal.current_amount).toLocaleString()} of ৳
-        {Math.round(goal.target_amount).toLocaleString()}
+      <Text style={[styles.savingsAmount, { color: colors.textSecondary }]}>
+        {formatCurrency(goal.current_amount)} / {formatCurrency(goal.target_amount)}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 // ── Home Screen ─────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const { transactions, requestTransactionsTab } = useTransactions();
   const { budget, categoryBudgets, openBudgetModal, requestBudgetTab } = useBudgets();
   const { unreadCount } = useNotifications();
   const { goals: savingsGoals } = useSavingsGoals();
+  const { colors, isDark } = useTheme();
+  const { t, isBangla, formatCurrency, translateCategory } = useLanguage();
   const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
   const [savingsSheetVisible, setSavingsSheetVisible] = useState(false);
@@ -102,6 +124,65 @@ export default function HomeScreen() {
   const [isBkashBatchModalOpen, setIsBkashBatchModalOpen] = useState(false);
   const [txPrefill, setTxPrefill] = useState<AddTransactionPrefill | null>(null);
   const [savingsPrefill, setSavingsPrefill] = useState<SavingsGoalsPrefill | null>(null);
+  const [aiInsight, setAiInsight] = useState<FinancialInsight | null>(null);
+  const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
+  const [isInsightRefreshing, setIsInsightRefreshing] = useState(false);
+  const [isInsightLoading, setIsInsightLoading] = useState(true);
+
+  const effectiveUserId = user?.id || profile?.id || null;
+
+  // Proactive Financial Insight (Zero-credit waste: loads from SecureStore or fresh if signature changed)
+  useEffect(() => {
+    let active = true;
+    setIsInsightLoading(true);
+
+    // Safety timeout: Ensure banner never stays stuck in loading under any circumstance
+    const safetyTimer = setTimeout(() => {
+      if (active) {
+        setIsInsightLoading(false);
+      }
+    }, 3500);
+
+    getFinancialInsight(effectiveUserId, {
+      inMemoryTransactions: transactions,
+      inMemoryGoals: savingsGoals,
+    })
+      .then((res) => {
+        if (active) {
+          setAiInsight(res);
+          setIsInsightLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.warn('[HomeScreen] Failed to load AI insight:', err);
+        if (active) setIsInsightLoading(false);
+      })
+      .finally(() => {
+        clearTimeout(safetyTimer);
+        if (active) setIsInsightLoading(false);
+      });
+
+    return () => {
+      active = false;
+      clearTimeout(safetyTimer);
+    };
+  }, [effectiveUserId, transactions.length]);
+
+  const handleRefreshInsight = async () => {
+    setIsInsightRefreshing(true);
+    try {
+      const updated = await getFinancialInsight(effectiveUserId, {
+        forceRefresh: true,
+        inMemoryTransactions: transactions,
+        inMemoryGoals: savingsGoals,
+      });
+      setAiInsight(updated);
+    } catch (err) {
+      console.warn('[HomeScreen] Refresh insight error:', err);
+    } finally {
+      setIsInsightRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     const unsub = subscribeToPendingTransactions((txs) => {
@@ -236,7 +317,7 @@ export default function HomeScreen() {
   const available = budgetTotal - spent;
   const spentPct = budgetTotal > 0 ? Math.min(spent / budgetTotal, 1) : 0;
 
-  const formatMoney = (n: number) => `৳${Math.round(n).toLocaleString()}`;
+  const formatMoney = (n: number) => formatCurrency(n);
 
   const handleSeeAllBudgets = () => {
     requestBudgetTab();
@@ -249,7 +330,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -257,34 +338,36 @@ export default function HomeScreen() {
         {/* ── Header Row ── */}
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.greetingText}>Good morning,</Text>
-            <Text style={styles.nameText}>{profile?.full_name || 'Name'} 👋</Text>
+            <Text style={[styles.greetingText, { color: colors.textSecondary }]}>
+              {t('home.greeting', 'Hello,')}
+            </Text>
+            <Text style={[styles.nameText, { color: colors.text }]}>{profile?.full_name || 'FinAlert User'} 👋</Text>
           </View>
           <View style={styles.iconRow}>
             <TouchableOpacity
-              style={styles.iconButton}
+              style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
               onPress={() => setIsVoiceModalOpen(true)}
               accessibilityRole="button"
               accessibilityLabel="Voice entry"
             >
-              <Feather name="mic" size={20} color="#091E15" />
+              <Feather name="mic" size={20} color={colors.text} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.iconButton}
+              style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
               onPress={() => setIsScanModalOpen(true)}
               accessibilityRole="button"
               accessibilityLabel="Scan invoice"
             >
-              <Feather name="aperture" size={20} color="#091E15" />
+              <Feather name="aperture" size={20} color={colors.text} />
             </TouchableOpacity>
             <View>
               <TouchableOpacity
-                style={styles.iconButton}
+                style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
                 onPress={() => router.push('/notifications')}
                 accessibilityRole="button"
                 accessibilityLabel="Notifications"
               >
-                <Ionicons name="notifications-outline" size={20} color="#091E15" />
+                <Ionicons name="notifications-outline" size={20} color={colors.text} />
               </TouchableOpacity>
               {unreadCount > 0 && (
                 <View style={styles.badgeContainer}>
@@ -313,14 +396,19 @@ export default function HomeScreen() {
         />
 
         {/* ── Available Balance Card ── */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
           <View style={styles.cardRow}>
             <CircularProgress pct={spentPct} />
             <View style={styles.cardTextStack}>
-              <Text style={styles.availableLabel}>Available this month</Text>
-              <Text style={styles.balanceAmount}>{formatMoney(available)}</Text>
-              <Text style={styles.balanceDetail}>
-                of {formatMoney(budgetTotal)} · <Text style={styles.spentText}>{formatMoney(spent)} spent</Text>
+              <Text style={[styles.availableLabel, { color: colors.textSecondary }]}>
+                {isBangla ? 'এই মাসে অবশিষ্ট' : 'Available this month'}
+              </Text>
+              <Text style={[styles.balanceAmount, { color: colors.text }]}>{formatMoney(available)}</Text>
+              <Text style={[styles.balanceDetail, { color: colors.textSecondary }]}>
+                {isBangla ? `${formatMoney(budgetTotal)} এর মধ্যে · ` : `of ${formatMoney(budgetTotal)} · `}
+                <Text style={styles.spentText}>
+                  {formatMoney(spent)} {isBangla ? 'খরচ হয়েছে' : 'spent'}
+                </Text>
               </Text>
             </View>
             <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)} accessibilityRole="button" accessibilityLabel="Add transaction">
@@ -332,33 +420,53 @@ export default function HomeScreen() {
         {/* ── Quick Actions ── */}
         <View style={styles.ingestionBar}>
           <TouchableOpacity
-            style={styles.ingestionCardBkash}
+            style={[
+              styles.ingestionCardBkash,
+              {
+                backgroundColor: colors.card,
+                borderColor: isDark ? '#4A1D34' : '#FCE7F3',
+              },
+            ]}
             onPress={() => setIsBkashSimModalOpen(true)}
             accessibilityRole="button"
             accessibilityLabel="bKash SMS Detection"
           >
-            <View style={styles.ingestionIconBkash}>
+            <View style={[styles.ingestionIconBkash, { backgroundColor: isDark ? '#4A1D34' : '#FCE7F3' }]}>
               <Ionicons name="phone-portrait-outline" size={18} color="#BE185D" />
             </View>
             <View style={styles.ingestionTextCol}>
-              <Text style={styles.ingestionTitleBkash}>bKash Detection</Text>
-              <Text style={styles.ingestionSubtitle}>Auto SMS reader</Text>
+              <Text style={styles.ingestionTitleBkash}>
+                {isBangla ? 'বিকাশ ডিটেকশন' : 'bKash Detection'}
+              </Text>
+              <Text style={[styles.ingestionSubtitle, { color: colors.textSecondary }]}>
+                {isBangla ? 'অটো এসএমএস রিডার' : 'Auto SMS reader'}
+              </Text>
             </View>
             <Feather name="chevron-right" size={16} color="#BE185D" />
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.ingestionCardPdf}
+            style={[
+              styles.ingestionCardPdf,
+              {
+                backgroundColor: colors.card,
+                borderColor: isDark ? '#143D2E' : '#D1FAE5',
+              },
+            ]}
             onPress={() => setIsPdfModalOpen(true)}
             accessibilityRole="button"
             accessibilityLabel="Bank Statement PDF Import"
           >
-            <View style={styles.ingestionIconPdf}>
+            <View style={[styles.ingestionIconPdf, { backgroundColor: isDark ? '#143D2E' : '#E8F7F1' }]}>
               <Ionicons name="document-text-outline" size={18} color="#059669" />
             </View>
             <View style={styles.ingestionTextCol}>
-              <Text style={styles.ingestionTitlePdf}>Bank Statement</Text>
-              <Text style={styles.ingestionSubtitle}>PDF statement parser</Text>
+              <Text style={styles.ingestionTitlePdf}>
+                {isBangla ? 'ব্যাংক স্টেটমেন্ট' : 'Bank Statement'}
+              </Text>
+              <Text style={[styles.ingestionSubtitle, { color: colors.textSecondary }]}>
+                {isBangla ? 'পিডিএফ স্টেটমেন্ট পার্সার' : 'PDF statement parser'}
+              </Text>
             </View>
             <Feather name="chevron-right" size={16} color="#059669" />
           </TouchableOpacity>
@@ -366,13 +474,17 @@ export default function HomeScreen() {
 
         {/* ── Budgets Section ── */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Budgets</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {t('transactions.tab_budget', 'Budgets')}
+          </Text>
           <TouchableOpacity
             onPress={handleSeeAllBudgets}
             accessibilityRole="button"
             accessibilityLabel="See all budgets"
           >
-            <Text style={styles.seeAllText}>See all</Text>
+            <Text style={[styles.seeAllText, { color: colors.primary }]}>
+              {t('home.view_all', 'See all')}
+            </Text>
           </TouchableOpacity>
         </View>
         {budget ? (
@@ -384,7 +496,7 @@ export default function HomeScreen() {
               return (
                 <TouchableOpacity
                   key={cb.category}
-                  style={styles.budgetCard}
+                  style={[styles.budgetCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
                   onPress={openBudgetModal}
                   accessibilityRole="button"
                   accessibilityLabel={`Edit budget for ${cb.category}`}
@@ -394,17 +506,17 @@ export default function HomeScreen() {
                   </View>
                   <View style={styles.budgetCardInfo}>
                     <View style={styles.budgetCardHeader}>
-                      <Text style={styles.budgetCardName} numberOfLines={1}>
-                        {cb.category}
+                      <Text style={[styles.budgetCardName, { color: colors.text }]} numberOfLines={1}>
+                        {translateCategory(cb.category)}
                       </Text>
                       <Text style={[styles.budgetCardPct, { color: barColor }]}>
                         {Math.round(cb.percentage_used)}%
                       </Text>
                     </View>
-                    <Text style={styles.budgetCardAmounts}>
+                    <Text style={[styles.budgetCardAmounts, { color: colors.textSecondary }]}>
                       {formatMoney(cb.spent)} / {formatMoney(cb.limit)}
                     </Text>
-                    <View style={styles.budgetCardBar}>
+                    <View style={[styles.budgetCardBar, { backgroundColor: colors.divider }]}>
                       <View
                         style={[
                           styles.budgetCardBarFill,
@@ -421,8 +533,8 @@ export default function HomeScreen() {
             })}
           </View>
         ) : (
-          <View style={styles.dashedBox}>
-            <Ionicons name="pie-chart-outline" size={32} color="#9CA3AF" />
+          <View style={[styles.dashedBox, { borderColor: colors.border }]}>
+            <Ionicons name="pie-chart-outline" size={32} color={colors.textMuted} />
             <TouchableOpacity
               onPress={openBudgetModal}
               accessibilityRole="button"
@@ -434,25 +546,116 @@ export default function HomeScreen() {
         )}
 
         {/* ── AI Financial Insight Banner ── */}
-        <View style={styles.aiBanner}>
-          <View style={styles.aiHeaderRow}>
-            <Ionicons name="sparkles" size={18} color="#7C3AED" />
-            <Text style={styles.aiHeaderText}>AI financial insight</Text>
-          </View>
-          <Text style={styles.aiBodyText}>
-            Spending up 23% on food this week. Tap for advice.
-          </Text>
-        </View>
+        <TouchableOpacity
+          style={[
+            styles.aiBanner,
+            isDark && { backgroundColor: '#1E1236', borderColor: '#3B2366' },
+            aiInsight?.severity === 'warning' && (isDark ? { backgroundColor: '#33230A', borderColor: '#5C3E14' } : styles.aiBannerWarning),
+            aiInsight?.severity === 'positive' && (isDark ? { backgroundColor: '#0B291E', borderColor: '#164E3A' } : styles.aiBannerPositive),
+            (isInsightLoading || isInsightRefreshing) && styles.aiBannerDisabled,
+          ]}
+          onPress={() => setIsInsightModalOpen(true)}
+          disabled={isInsightLoading || isInsightRefreshing}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="FinAlert AI advisor. Tap to chat about your spending and budgets."
+        >
+          {isInsightLoading || isInsightRefreshing ? (
+            <View style={styles.aiLoadingContainer}>
+              <ActivityIndicator size="small" color="#A78BFA" />
+              <Text style={[styles.aiLoadingText, { color: isDark ? '#C4B5FD' : '#7C3AED' }]}>
+                {isInsightRefreshing
+                  ? (isBangla ? 'আর্থিক বিশ্লেষণ রিফ্রেশ করা হচ্ছে...' : 'Refreshing financial analysis...')
+                  : (isBangla ? 'এআই দিয়ে খরচের অভ্যাস বিশ্লেষণ করা হচ্ছে...' : 'Analyzing spending habits with AI...')}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.aiBannerRow}>
+              {/* Left icon badge */}
+              <View
+                style={[
+                  styles.aiIconBadge,
+                  isDark && { backgroundColor: '#2E1D52' },
+                  aiInsight?.severity === 'warning' && (isDark ? { backgroundColor: '#4D3610' } : styles.aiIconBadgeWarning),
+                  aiInsight?.severity === 'positive' && (isDark ? { backgroundColor: '#144633' } : styles.aiIconBadgePositive),
+                ]}
+              >
+                <Ionicons
+                  name={
+                    aiInsight?.severity === 'warning'
+                      ? 'alert-circle'
+                      : aiInsight?.severity === 'positive'
+                      ? 'trending-up'
+                      : 'sparkles'
+                  }
+                  size={18}
+                  color={
+                    aiInsight?.severity === 'warning'
+                      ? '#F59E0B'
+                      : aiInsight?.severity === 'positive'
+                      ? '#10B981'
+                      : '#A78BFA'
+                  }
+                />
+              </View>
+
+              {/* Center text container */}
+              <View style={styles.aiTextContainer}>
+                <Text
+                  style={[
+                    styles.aiHeaderText,
+                    isDark && { color: '#DDD6FE' },
+                    aiInsight?.severity === 'warning' && (isDark ? { color: '#FCD34D' } : styles.aiHeaderTextWarning),
+                    aiInsight?.severity === 'positive' && (isDark ? { color: '#6EE7B7' } : styles.aiHeaderTextPositive),
+                  ]}
+                  numberOfLines={1}
+                >
+                  {aiInsight?.headline || (isBangla ? 'এআই আর্থিক পরামর্শ' : 'AI Financial Insight')}
+                </Text>
+                <Text
+                  style={[
+                    styles.aiBodyText,
+                    isDark && { color: '#C4B5FD' },
+                    aiInsight?.severity === 'warning' && (isDark ? { color: '#FDE68A' } : styles.aiBodyTextWarning),
+                    aiInsight?.severity === 'positive' && (isDark ? { color: '#A7F3D0' } : styles.aiBodyTextPositive),
+                  ]}
+                  numberOfLines={2}
+                >
+                  {aiInsight?.short_summary || (isBangla ? 'আপনার খরচ ও বাজেট সম্পর্কে এআই-এর সাথে কথা বলতে ট্যাপ করুন।' : 'Tap to chat with AI about your spending and budgets.')}
+                </Text>
+              </View>
+
+              {/* Right chevron box */}
+              <View style={styles.aiChevronBox}>
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={
+                    aiInsight?.severity === 'warning'
+                      ? '#F59E0B'
+                      : aiInsight?.severity === 'positive'
+                      ? '#10B981'
+                      : '#A78BFA'
+                  }
+                />
+              </View>
+            </View>
+          )}
+        </TouchableOpacity>
 
         {/* ── Savings Goals Section ── */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Savings Goals</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {t('home.savings_goals', 'Savings Goals')}
+          </Text>
           <TouchableOpacity
             onPress={() => openSavingsSheet('list')}
             accessibilityRole="button"
             accessibilityLabel="See all savings goals"
           >
-            <Text style={styles.seeAllText}>See all</Text>
+            <Text style={[styles.seeAllText, { color: colors.primary }]}>
+              {t('home.view_all', 'See all')}
+            </Text>
           </TouchableOpacity>
         </View>
         <ScrollView
@@ -461,37 +664,53 @@ export default function HomeScreen() {
           contentContainerStyle={styles.carouselContent}
         >
           {savingsGoals.map((goal) => (
-            <SavingsGoalCard key={goal.id} goal={goal} />
+            <SavingsGoalCard
+              key={goal.id}
+              goal={goal}
+              onPress={() => {
+                setSavingsPrefill({ goalId: goal.id });
+                setSavingsSheetView('add');
+                setSavingsSheetVisible(true);
+              }}
+            />
           ))}
           <TouchableOpacity
-            style={styles.newGoalCard}
+            style={[styles.newGoalCard, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => openSavingsSheet('create')}
             accessibilityRole="button"
             accessibilityLabel="Create new savings goal"
           >
-            <View style={styles.newGoalIconBox}>
+            <View style={[styles.newGoalIconBox, { backgroundColor: colors.surfaceSubtle }]}>
               <Text style={styles.newGoalEmoji}>🎯</Text>
             </View>
-            <Text style={styles.newGoalText}>New Goal</Text>
+            <Text style={[styles.newGoalText, { color: colors.textSecondary }]}>
+              {t('home.add_goal', 'New Goal')}
+            </Text>
           </TouchableOpacity>
         </ScrollView>
 
         {/* ── Recent Transactions Feed ── */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {t('home.recent_transactions', 'Recent Transactions')}
+          </Text>
           <TouchableOpacity
             onPress={handleSeeAllTransactions}
             accessibilityRole="button"
             accessibilityLabel="See all transactions"
           >
-            <Text style={styles.seeAllText}>See all &gt;</Text>
+            <Text style={[styles.seeAllText, { color: colors.primary }]}>
+              {t('home.view_all', 'See all')} &gt;
+            </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.transactionSection}>
           {recentTransactions.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No transactions yet. Tap + to add one.</Text>
+              <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                {t('home.no_transactions', 'No transactions recorded yet')}
+              </Text>
             </View>
           ) : (
             recentTransactions.map((tx, index) => {
@@ -501,19 +720,23 @@ export default function HomeScreen() {
               return (
                 <View
                   key={tx.id}
-                  style={[styles.transactionRow, isLast && styles.transactionRowLast]}
+                  style={[
+                    styles.transactionRow,
+                    isLast && styles.transactionRowLast,
+                    { borderBottomColor: colors.divider },
+                  ]}
                 >
                   <View style={[styles.txIconBase, { backgroundColor: meta.bg }]}>
                     <Text style={styles.txIconEmoji}>{meta.emoji}</Text>
                   </View>
                   <View style={styles.txTextArea}>
-                    <Text style={styles.txName}>{tx.description || tx.category}</Text>
-                    <Text style={styles.txMeta}>
-                      {tx.category.toLowerCase()} · {tx.date}
+                    <Text style={[styles.txName, { color: colors.text }]}>{tx.description || translateCategory(tx.category)}</Text>
+                    <Text style={[styles.txMeta, { color: colors.textSecondary }]}>
+                      {translateCategory(tx.category)} · {tx.date}
                     </Text>
                   </View>
                   <Text style={isIncome ? styles.amountGreen : styles.amountRed}>
-                    {isIncome ? '+' : '-'}৳{tx.amount.toLocaleString()}
+                    {isIncome ? '+' : '-'}{formatMoney(tx.amount)}
                   </Text>
                 </View>
               );
@@ -565,6 +788,13 @@ export default function HomeScreen() {
       <BankStatementReviewModal
         visible={isPdfModalOpen}
         onClose={() => setIsPdfModalOpen(false)}
+      />
+      <FinancialInsightModal
+        visible={isInsightModalOpen}
+        insight={aiInsight}
+        onClose={() => setIsInsightModalOpen(false)}
+        onRefresh={handleRefreshInsight}
+        isRefreshing={isInsightRefreshing}
       />
     </SafeAreaView>
   );
@@ -874,27 +1104,89 @@ const styles = StyleSheet.create({
   aiBanner: {
     width: '100%',
     backgroundColor: '#EDE9FE',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
   },
-  aiHeaderRow: {
+  aiBannerWarning: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
+  aiBannerPositive: {
+    backgroundColor: '#E6FBF5',
+    borderColor: '#A7F3D0',
+  },
+  aiBannerDisabled: {
+    opacity: 0.85,
+  },
+  aiLoadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  aiLoadingText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#7C3AED',
+  },
+  aiBannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  aiIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#DDD6FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  aiIconBadgeWarning: {
+    backgroundColor: '#FDE68A',
+  },
+  aiIconBadgePositive: {
+    backgroundColor: '#A7F3D0',
+  },
+  aiTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    marginRight: 10,
   },
   aiHeaderText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#7C3AED',
+    marginBottom: 3,
+  },
+  aiHeaderTextWarning: {
+    color: '#D97706',
+  },
+  aiHeaderTextPositive: {
+    color: '#0FB384',
   },
   aiBodyText: {
     fontSize: 13,
-    lineHeight: 15,
+    lineHeight: 18,
     fontWeight: '400',
-    color: '#7C3AED',
-    marginLeft: 28,
+    color: '#6D28D9',
+  },
+  aiBodyTextWarning: {
+    color: '#92400E',
+  },
+  aiBodyTextPositive: {
+    color: '#065F46',
+  },
+  aiChevronBox: {
+    paddingLeft: 4,
+    paddingRight: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Savings Carousel

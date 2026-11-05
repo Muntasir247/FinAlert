@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   requestSmsPermissions,
   checkSmsPermissions,
@@ -25,6 +27,8 @@ interface BKashSimulatorModalProps {
 
 export default function BKashSimulatorModal({ visible, onClose }: BKashSimulatorModalProps) {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const { isBangla } = useLanguage();
   const [permissionStatus, setPermissionStatus] = useState<string | null>(null);
   const [isGranted, setIsGranted] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
@@ -75,46 +79,54 @@ export default function BKashSimulatorModal({ visible, onClose }: BKashSimulator
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.overlay}
       >
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 20) }]}>
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}>
             <View style={styles.headerTitleRow}>
-              <View style={styles.badge}>
+              <View style={[styles.badge, isDark && { backgroundColor: '#4A1D34' }]}>
                 <Ionicons name="phone-portrait-outline" size={18} color="#BE185D" />
               </View>
               <View>
-                <Text style={styles.title}>bKash SMS Detection</Text>
-                <Text style={styles.subtitle}>Automatic transaction detection</Text>
+                <Text style={[styles.title, { color: colors.text }]}>
+                  {isBangla ? 'বিকাশ এসএমএস ডিটেকশন' : 'bKash SMS Detection'}
+                </Text>
+                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                  {isBangla ? 'স্বয়ংক্রিয় লেনদেন শনাক্তকরণ' : 'Automatic transaction detection'}
+                </Text>
               </View>
             </View>
             <TouchableOpacity
               onPress={onClose}
-              style={styles.closeBtn}
+              style={[styles.closeBtn, { backgroundColor: isDark ? colors.surfaceSubtle : '#F3F4F6' }]}
               accessibilityRole="button"
               accessibilityLabel="Close bKash detection setup"
             >
-              <Feather name="x" size={20} color="#6B7280" />
+              <Feather name="x" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
             {/* Top Green Box */}
-            <View style={styles.permCard}>
+            <View style={[styles.permCard, isDark && { backgroundColor: '#14382A', borderColor: '#1F5A42' }]}>
               <View style={styles.permHeader}>
                 <Ionicons
                   name={isGranted ? 'shield-checkmark' : 'shield-outline'}
                   size={20}
                   color="#059669"
                 />
-                <Text style={styles.permDesc}>
-                  {isGranted ? 'Permission granted. FinAlert is active.' : 'Grant access to the permission needed.'}
+                <Text style={[styles.permDesc, isDark && { color: '#A7F3D0' }]}>
+                  {isGranted
+                    ? (isBangla ? 'অনুমতি সক্রিয় আছে। ফিনঅ্যালার্ট প্রস্তুত।' : 'Permission granted. FinAlert is active.')
+                    : (isBangla ? 'প্রয়োজনীয় অনুমতি প্রদান করুন।' : 'Grant access to the permission needed.')}
                 </Text>
               </View>
 
               {isGranted ? (
-                <View style={styles.grantedBadge}>
+                <View style={[styles.grantedBadge, isDark && { backgroundColor: '#0D2D20' }]}>
                   <Ionicons name="checkmark-circle" size={18} color="#059669" />
-                  <Text style={styles.grantedBadgeText}>Permission Active (Granted)</Text>
+                  <Text style={[styles.grantedBadgeText, isDark && { color: '#6EE7B7' }]}>
+                    {isBangla ? 'অনুমতি সক্রিয় (অনুমোদিত)' : 'Permission Active (Granted)'}
+                  </Text>
                 </View>
               ) : (
                 <TouchableOpacity
@@ -125,7 +137,9 @@ export default function BKashSimulatorModal({ visible, onClose }: BKashSimulator
                   accessibilityLabel="Grant Android SMS permission"
                 >
                   <Text style={styles.permBtnText}>
-                    {isChecking ? 'Checking...' : 'Grant Permission'}
+                    {isChecking
+                      ? (isBangla ? 'যাচাই করা হচ্ছে...' : 'Checking...')
+                      : (isBangla ? 'অনুমতি দিন' : 'Grant Permission')}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -134,24 +148,40 @@ export default function BKashSimulatorModal({ visible, onClose }: BKashSimulator
             </View>
 
             {/* How It Works */}
-            <View style={styles.infoCard}>
-              <Text style={styles.infoTitle}>How it works</Text>
+            <View
+              style={[
+                styles.infoCard,
+                {
+                  backgroundColor: isDark ? colors.surfaceSubtle : '#F8FAFC',
+                  borderColor: colors.cardBorder,
+                },
+              ]}
+            >
+              <Text style={[styles.infoTitle, { color: colors.text }]}>
+                {isBangla ? 'এটি যেভাবে কাজ করে' : 'How it works'}
+              </Text>
               <View style={styles.infoRow}>
                 <Ionicons name="notifications-outline" size={18} color="#0FB384" style={styles.infoIcon} />
-                <Text style={styles.infoText}>
-                  FinAlert automatically listens for official bKash transaction SMS messages on your phone.
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                  {isBangla
+                    ? 'ফিনঅ্যালার্ট আপনার ফোনের বিকাশ অফিসিয়াল ট্রানজ্যাকশন এসএমএস স্বয়ংক্রিয়ভাবে ট্র্যাক করে।'
+                    : 'FinAlert automatically listens for official bKash transaction SMS messages on your phone.'}
                 </Text>
               </View>
               <View style={styles.infoRow}>
                 <Ionicons name="checkmark-circle-outline" size={18} color="#0FB384" style={styles.infoIcon} />
-                <Text style={styles.infoText}>
-                  A detection prompt lets you verify the counterparty, amount, and category before anything is saved.
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                  {isBangla
+                    ? 'লেনদেন সেভ করার আগে আপনি প্রাপক, পরিমাণ ও খরচের খাত যাচাই করতে পারবেন।'
+                    : 'A detection prompt lets you verify the counterparty, amount, and category before anything is saved.'}
                 </Text>
               </View>
               <View style={styles.infoRow}>
                 <Ionicons name="lock-closed-outline" size={18} color="#0FB384" style={styles.infoIcon} />
-                <Text style={styles.infoText}>
-                  Transactions are never saved automatically. Your financial data stays private on your device.
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                  {isBangla
+                    ? 'কোনো লেনদেন কখনোই আপনার অনুমতি ছাড়া সংরক্ষণ করা হয় না। আপনার ডাটা আপনার ফোনে নিরাপদ থাকে।'
+                    : 'Transactions are never saved automatically. Your financial data stays private on your device.'}
                 </Text>
               </View>
             </View>
@@ -159,7 +189,10 @@ export default function BKashSimulatorModal({ visible, onClose }: BKashSimulator
             {/* Scan Recent SMS Button */}
             {isGranted && (
               <TouchableOpacity
-                style={styles.syncBtn}
+                style={[
+                  styles.syncBtn,
+                  isDark && { backgroundColor: '#361523', borderColor: '#831843' },
+                ]}
                 onPress={async () => {
                   await syncRecentSms();
                   onClose();
@@ -168,18 +201,22 @@ export default function BKashSimulatorModal({ visible, onClose }: BKashSimulator
                 accessibilityLabel="Scan SMS inbox now"
               >
                 <Ionicons name="refresh-outline" size={18} color="#BE185D" />
-                <Text style={styles.syncBtnText}>Scan SMS Inbox Now</Text>
+                <Text style={[styles.syncBtnText, isDark && { color: '#F472B6' }]}>
+                  {isBangla ? 'এখনই এসএমএস ইনবক্স স্ক্যান করুন' : 'Scan SMS Inbox Now'}
+                </Text>
               </TouchableOpacity>
             )}
 
             {/* Done Action Button */}
             <TouchableOpacity
-              style={styles.doneBtn}
+              style={[styles.doneBtn, { backgroundColor: colors.primary }]}
               onPress={onClose}
               accessibilityRole="button"
               accessibilityLabel="Done"
             >
-              <Text style={styles.doneBtnText}>Done</Text>
+              <Text style={styles.doneBtnText}>
+                {isBangla ? 'সম্পন্ন' : 'Done'}
+              </Text>
             </TouchableOpacity>
           </ScrollView>
         </View>

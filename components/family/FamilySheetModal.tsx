@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
 
 const SHEET_MAX_HEIGHT = 600;
 const SCROLL_MAX_HEIGHT = 480;
@@ -32,6 +33,7 @@ export default function FamilySheetModal({
   keyboardAvoiding = false,
 }: FamilySheetModalProps) {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const translateY = useRef(new Animated.Value(SHEET_MAX_HEIGHT)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
@@ -79,22 +81,27 @@ export default function FamilySheetModal({
         <Animated.View
           style={[
             styles.sheet,
-            { paddingBottom: Math.max(insets.bottom, 16), transform: [{ translateY }] },
+            {
+              backgroundColor: colors.card,
+              borderTopColor: colors.cardBorder,
+              paddingBottom: Math.max(insets.bottom, 16),
+              transform: [{ translateY }],
+            },
           ]}
         >
-          <View style={styles.handle} />
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
           <View style={styles.header}>
             <View style={styles.headerSide} />
-            <Text style={styles.title}>{title}</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
             <View style={styles.headerSide}>
               <TouchableOpacity
-                style={styles.closeButton}
+                style={[styles.closeButton, isDark && { backgroundColor: colors.surfaceSubtle }]}
                 onPress={handleClose}
                 accessibilityRole="button"
                 accessibilityLabel={`Close ${title}`}
               >
-                <Ionicons name="close" size={22} color="#091E15" />
+                <Ionicons name="close" size={22} color={colors.text} />
               </TouchableOpacity>
             </View>
           </View>

@@ -1,5 +1,7 @@
 import { TRANSACTION_CATEGORIES, INCOME_CATEGORIES } from '../lib/transactionCategories';
-import { generateGeminiContent, GeminiAllRateLimitedError } from './geminiClient';
+import { generateGeminiContent, GeminiAllRateLimitedError, DEFAULT_GEMINI_MODELS } from './geminiClient';
+import { isGroqConfigured, generateGroqJsonContent } from './groqClient';
+import { AiErrorCode, classifyAiError, formatAiErrorString } from './aiError';
 
 export type VoiceIntentAction =
   | 'ADD_EXPENSE'
@@ -17,18 +19,6 @@ export interface VoiceIntent {
   description?: string;
   target_amount?: number;
 }
-
-/**
- * Models tried in order. Flash-Lite offers higher free-tier rate limits, so it
- * is preferred; if it is rate limited (429) the next model is tried
- * automatically.
- */
-const GEMINI_MODELS = [
-  'gemini-3.1-flash-lite',
-  'gemini-3.1-flash-lite-preview',
-  'gemini-3.5-flash-lite',
-  'gemini-3.5-flash',
-];
 
 const MAX_AMOUNT = 1_000_000_000;
 
@@ -75,7 +65,16 @@ const RESPONSE_SCHEMA = {
   required: ['action'],
 };
 
-export class VoiceIntentError extends Error {}
+export class VoiceIntentError extends Error {
+  public code: AiErrorCode;
+
+  constructor(message: string, code: AiErrorCode = 'AI_ERR_UNKNOWN') {
+    const formatted = message.startsWith('[AI_ERR_') ? message : formatAiErrorString(code, message);
+    super(formatted);
+    this.name = 'VoiceIntentError';
+    this.code = code;
+  }
+}
 
 const isValidAction = (value: unknown): value is VoiceIntentAction =>
   typeof value === 'string' &&
@@ -119,25 +118,77 @@ const sanitizeCategory = (value: unknown, action: VoiceIntentAction): string | u
 };
 
 /**
- * Sends the transcribed text to Gemini Flash-Lite and returns a structured
- * VoiceIntent. Throws VoiceIntentError with a user-friendly message when the
- * key is missing, the network fails, or the model output cannot be parsed.
+ * Validates, normalizes, and sanitizes the parsed raw JSON from the AI engine.
+ */
+function buildVoiceIntentFromParsed(parsed: Record<string, unknown>): VoiceIntent {
+  if (!isValidAction(parsed.action)) {
+    throw new VoiceIntentError('Could not understand that command. Please try again.');
+  }
+
+  return {
+    action: parsed.action,
+    amount: toNumber(parsed.amount),
+    category: sanitizeCategory(parsed.category, parsed.action),
+    goal_name:
+      typeof parsed.goal_name === 'string' && parsed.goal_name.trim()
+        ? parsed.goal_name.trim()
+        : undefined,
+    description:
+      typeof parsed.description === 'string' && parsed.description.trim()
+        ? parsed.description.trim()
+        : undefined,
+    target_amount: toNumber(parsed.target_amount),
+  };
+}
+
+/**
+ * Sends the transcribed text to Groq (if configured) or Gemini, returning a structured VoiceIntent.
+ * Leverages Groq for ultra-low-latency (~200ms) parsing with automatic fallback to Gemini.
  */
 export async function parseVoiceIntent(
   text: string,
   timeoutMs = 25000
 ): Promise<VoiceIntent> {
-  const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-  if (!apiKey) {
+  const geminiApiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+  const groqAvailable = isGroqConfigured();
+
+  if (!geminiApiKey && !groqAvailable) {
     throw new VoiceIntentError(
-      'Voice assistant is not configured yet. Add EXPO_PUBLIC_GEMINI_API_KEY to your .env file.'
+      'Voice assistant is not configured yet. Add EXPO_PUBLIC_GEMINI_API_KEY or EXPO_PUBLIC_GROQ_API_KEY to your .env file.',
+      'AI_ERR_NO_KEY'
+    );
+  }
+
+  // 1. Try Groq fast path first if configured (~200ms response time)
+  if (groqAvailable) {
+    try {
+      const { data } = await generateGroqJsonContent<Record<string, unknown>>({
+        systemPrompt: SYSTEM_INSTRUCTION,
+        userPrompt: text,
+        timeoutMs: Math.min(8000, timeoutMs),
+        perModelTimeoutMs: 4000,
+      });
+
+      if (data && typeof data === 'object') {
+        return buildVoiceIntentFromParsed(data);
+      }
+    } catch (groqErr) {
+      console.warn('[voiceIntentService] Groq fast-path failed or rate-limited, falling back to Gemini:', groqErr);
+    }
+  }
+
+  // 2. Fall back to Gemini API
+  if (!geminiApiKey) {
+    throw new VoiceIntentError(
+      'Voice AI failed on Groq and Gemini API key is not configured.',
+      'AI_ERR_NO_KEY'
     );
   }
 
   try {
     const { response } = await generateGeminiContent({
-      apiKey,
-      models: GEMINI_MODELS,
+      apiKey: geminiApiKey,
+      models: DEFAULT_GEMINI_MODELS,
       timeoutMs,
       perModelTimeoutMs: 7000,
       body: {
@@ -160,7 +211,8 @@ export async function parseVoiceIntent(
     if (!response.ok) {
       const body = await response.text();
       console.error('Gemini error:', response.status, body);
-      throw new VoiceIntentError('The voice assistant could not reach its AI backend.');
+      const classified = classifyAiError(`Gemini error ${response.status}: ${body}`, 'gemini');
+      throw new VoiceIntentError(classified.message, classified.code);
     }
 
     const data = await response.json();
@@ -168,35 +220,11 @@ export async function parseVoiceIntent(
     const raw = Array.isArray(parts) ? parts.map((p: { text?: string }) => p.text ?? '').join('') : '';
     const parsed = JSON.parse(raw) as Record<string, unknown>;
 
-    if (!isValidAction(parsed.action)) {
-      throw new VoiceIntentError('Could not understand that command. Please try again.');
-    }
-
-    return {
-      action: parsed.action,
-      amount: toNumber(parsed.amount),
-      category: sanitizeCategory(parsed.category, parsed.action),
-      goal_name:
-        typeof parsed.goal_name === 'string' && parsed.goal_name.trim()
-          ? parsed.goal_name.trim()
-          : undefined,
-      description:
-        typeof parsed.description === 'string' && parsed.description.trim()
-          ? parsed.description.trim()
-          : undefined,
-      target_amount: toNumber(parsed.target_amount),
-    };
+    return buildVoiceIntentFromParsed(parsed);
   } catch (error) {
     if (error instanceof VoiceIntentError) throw error;
-    if (error instanceof GeminiAllRateLimitedError) {
-      throw new VoiceIntentError(
-        'Voice AI limit reached. Please try again later or check your API quota.'
-      );
-    }
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new VoiceIntentError('The voice assistant took too long. Please try again.');
-    }
-    console.error('parseVoiceIntent failed:', error);
-    throw new VoiceIntentError('Could not process that request. Please try again.');
+    const classified = classifyAiError(error, 'all');
+    console.error(`[voiceIntentService] [${classified.code}] Voice parsing failed:`, error);
+    throw new VoiceIntentError(classified.message, classified.code);
   }
 }

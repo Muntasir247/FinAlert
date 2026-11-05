@@ -5,6 +5,7 @@ import {
   fetchSavingsGoals,
   insertSavingsGoal,
   addSavingsContribution,
+  deleteSavingsGoal,
   seedDemoSavingsGoalsIfEmpty,
 } from '../lib/savingsGoals';
 import type { SavingsGoal, NewSavingsGoal } from '../lib/savingsGoals';
@@ -16,6 +17,7 @@ interface SavingsGoalsContextType {
   refreshGoals: () => Promise<void>;
   addContribution: (goalId: string, amount: number) => Promise<{ error: any }>;
   createGoal: (input: NewSavingsGoal) => Promise<{ error: any }>;
+  deleteGoal: (goalId: string) => Promise<{ error: any }>;
 }
 
 const SavingsGoalsContext = createContext<SavingsGoalsContextType | undefined>(undefined);
@@ -131,6 +133,23 @@ export const SavingsGoalsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     [user]
   );
 
+  const deleteGoal = useCallback(
+    async (goalId: string): Promise<{ error: any }> => {
+      if (!user) {
+        return { error: { message: 'You must be signed in to delete a savings goal.' } };
+      }
+      try {
+        await deleteSavingsGoal(goalId);
+        setGoals((prev) => prev.filter((g) => g.id !== goalId));
+        return { error: null };
+      } catch (error) {
+        console.error('Error deleting savings goal:', error);
+        return { error };
+      }
+    },
+    [user]
+  );
+
   return (
     <SavingsGoalsContext.Provider
       value={{
@@ -140,6 +159,7 @@ export const SavingsGoalsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         refreshGoals,
         addContribution,
         createGoal,
+        deleteGoal,
       }}
     >
       {children}

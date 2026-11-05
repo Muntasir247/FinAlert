@@ -43,32 +43,85 @@ export interface SpendingAnalyticsSummary {
 const ALL_CATEGORY_LABELS = TRANSACTION_CATEGORIES.map((c) => c.label);
 
 /**
+ * Returns an instant zero-data analytics object for brand-new users.
+ */
+export function buildEmptySpendingAnalytics(days: number = 90): SpendingAnalyticsSummary {
+  const monthsCount = Math.max(1, Math.round((days / 30) * 10) / 10);
+  const categories: CategorySpendingMetric[] = ALL_CATEGORY_LABELS.map((label) => ({
+    category: label,
+    totalSpent: 0,
+    monthlyAverage: 0,
+    percentageOfTotalExpense: 0,
+    transactionCount: 0,
+  }));
+
+  return {
+    daysAnalyzed: days,
+    monthsCount,
+    totalIncome: 0,
+    averageMonthlyIncome: 0,
+    totalExpense: 0,
+    averageMonthlyExpense: 0,
+    estimatedMonthlyBurnRate: 0,
+    netSavingsRate: 0,
+    categories,
+    topCategories: [],
+    savingsGoals: {
+      totalTarget: 0,
+      totalSaved: 0,
+      goalsCount: 0,
+      goals: [],
+    },
+    hasHistoricalData: false,
+    transactionCount: 0,
+  };
+}
+
+/**
  * Aggregates user's transactions over the last 30 to 90 days,
  * calculating per-category spending, average monthly burn rate,
  * recent income, and savings goal progress.
  */
 export async function getSpendingAnalytics(
-  userId: string,
-  days: number = 90
+  userId?: string | null,
+  days: number = 90,
+  preloadedTransactions?: Transaction[],
+  preloadedGoals?: SavingsGoal[]
 ): Promise<SpendingAnalyticsSummary> {
   const monthsCount = Math.max(1, Math.round((days / 30) * 10) / 10);
 
-  // 1. Fetch historical transactions (centralized in lib)
-  let transactions: Transaction[] = [];
-  try {
-    transactions = await fetchHistoricalTransactions(userId, days);
-  } catch (err) {
-    console.warn('[spendingAnalyticsService] Failed to fetch transactions:', err);
-    transactions = [];
+  // If no userId and no in-memory transactions, return empty immediately
+  if (!userId && (!preloadedTransactions || preloadedTransactions.length === 0)) {
+    return buildEmptySpendingAnalytics(days);
   }
 
-  // 2. Fetch savings goals (centralized in lib)
+  // 1. Fetch or use historical transactions (in-memory first for 0ms speed)
+  let transactions: Transaction[] = [];
+  if (preloadedTransactions && preloadedTransactions.length >= 0) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffIso = cutoff.toISOString().slice(0, 10);
+    transactions = preloadedTransactions.filter((tx) => !tx.date || tx.date >= cutoffIso);
+  } else if (userId) {
+    try {
+      transactions = await fetchHistoricalTransactions(userId, days);
+    } catch (err) {
+      console.warn('[spendingAnalyticsService] Failed to fetch transactions:', err);
+      transactions = [];
+    }
+  }
+
+  // 2. Fetch or use savings goals
   let savingsGoalsData: SavingsGoal[] = [];
-  try {
-    savingsGoalsData = await fetchSavingsGoals(userId);
-  } catch (err) {
-    console.warn('[spendingAnalyticsService] Failed to fetch savings goals:', err);
-    savingsGoalsData = [];
+  if (preloadedGoals) {
+    savingsGoalsData = preloadedGoals;
+  } else if (userId) {
+    try {
+      savingsGoalsData = await fetchSavingsGoals(userId);
+    } catch (err) {
+      console.warn('[spendingAnalyticsService] Failed to fetch savings goals:', err);
+      savingsGoalsData = [];
+    }
   }
 
   // 3. Process transactions
@@ -138,7 +191,7 @@ export async function getSpendingAnalytics(
   const totalTarget = goals.reduce((acc, cur) => acc + cur.target, 0);
   const totalSaved = goals.reduce((acc, cur) => acc + cur.current, 0);
 
-  const hasHistoricalData = transactions.filter((t) => t.type === 'expense').length >= 3 && totalExpense > 0;
+  const hasHistoricalData = transactions.length > 0;
 
   return {
     daysAnalyzed: days,

@@ -6,12 +6,16 @@ import ContributionModal from './ContributionModal';
 import MemberDetailModal from './MemberDetailModal';
 import { ROLE_BG, ROLE_TEXT_COLOR, formatMoney, initialsOf } from './familyConstants';
 import type { FamilyFinanceApi, MemberFinance } from './useFamilyFinance';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface FamilyMembersPanelProps {
   finance: FamilyFinanceApi;
 }
 
 export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps) {
+  const { colors, isDark } = useTheme();
+  const { isBangla } = useLanguage();
   const [detailMember, setDetailMember] = useState<MemberFinance | null>(null);
   const [roleMember, setRoleMember] = useState<MemberFinance | null>(null);
   const [contribMember, setContribMember] = useState<MemberFinance | null>(null);
@@ -39,10 +43,14 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
   return (
     <View style={styles.list}>
       {finances.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Ionicons name="people-outline" size={32} color="#94A3B8" />
-          <Text style={styles.emptyTitle}>No members yet</Text>
-          <Text style={styles.emptyText}>Invite family members to start sharing expenses.</Text>
+        <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <Ionicons name="people-outline" size={32} color={colors.textMuted} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            {isBangla ? 'এখনও কোনো সদস্য নেই' : 'No members yet'}
+          </Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            {isBangla ? 'খরচ ভাগাভাগি করতে পরিবারের সদস্যদের আমন্ত্রণ জানান।' : 'Invite family members to start sharing expenses.'}
+          </Text>
         </View>
       ) : (
         finances.map((m) => {
@@ -50,7 +58,7 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
           const isSelf = me?.memberId === m.memberId;
           const confirmRemove = confirmRemoveId === m.memberId;
           return (
-            <View key={m.memberId} style={styles.card}>
+            <View key={m.memberId} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
               <TouchableOpacity
                 style={styles.cardMain}
                 onPress={() => setDetailMember(m)}
@@ -63,49 +71,55 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
                 </View>
                 <View style={styles.info}>
                   <View style={styles.nameRow}>
-                    <Text style={styles.name} numberOfLines={1}>
+                    <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
                       {m.name}
                     </Text>
-                    {isSelf && <Text style={styles.selfTag}>You</Text>}
-                    <View style={[styles.rolePill, { backgroundColor: ROLE_BG[m.role] }]}>
+                    {isSelf && <Text style={styles.selfTag}>{isBangla ? 'আপনি' : 'You'}</Text>}
+                    <View style={[styles.rolePill, { backgroundColor: isDark ? '#143D2E' : ROLE_BG[m.role] }]}>
                       <Text style={[styles.rolePillText, { color: ROLE_TEXT_COLOR[m.role] }]}>
                         {m.role}
                       </Text>
                     </View>
                   </View>
                   <View style={styles.tagsRow}>
-                    <View style={[styles.tag, styles.tagNeutral]}>
-                      <Text style={styles.tagText}>Limit {formatMoney(m.limit)}</Text>
+                    <View style={[styles.tag, styles.tagNeutral, isDark && { backgroundColor: colors.surfaceSubtle }]}>
+                      <Text style={[styles.tagText, isDark && { color: colors.textSecondary }]}>
+                        {isBangla ? 'সীমা' : 'Limit'} {formatMoney(m.limit)}
+                      </Text>
                     </View>
-                    <View style={[styles.tag, styles.tagNeutral]}>
-                      <Text style={styles.tagText}>Paid {formatMoney(paid)}</Text>
+                    <View style={[styles.tag, styles.tagNeutral, isDark && { backgroundColor: colors.surfaceSubtle }]}>
+                      <Text style={[styles.tagText, isDark && { color: colors.textSecondary }]}>
+                        {isBangla ? 'পরিশোধিত' : 'Paid'} {formatMoney(paid)}
+                      </Text>
                     </View>
                     {m.extra > 0 && (
-                      <View style={[styles.tag, styles.tagGreen]}>
-                        <Text style={styles.tagTextGreen}>+{formatMoney(m.extra)} extra</Text>
+                      <View style={[styles.tag, styles.tagGreen, isDark && { backgroundColor: '#14382A' }]}>
+                        <Text style={styles.tagTextGreen}>+{formatMoney(m.extra)} {isBangla ? 'অতিরিক্ত' : 'extra'}</Text>
                       </View>
                     )}
                     {m.unable > 0 && (
-                      <View style={[styles.tag, styles.tagRed]}>
-                        <Text style={styles.tagTextRed}>⚠️ Unable {formatMoney(m.unable)}</Text>
+                      <View style={[styles.tag, styles.tagRed, isDark && { backgroundColor: '#38161A' }]}>
+                        <Text style={styles.tagTextRed}>⚠️ {isBangla ? 'অসমর্থ' : 'Unable'} {formatMoney(m.unable)}</Text>
                       </View>
                     )}
                   </View>
                 </View>
-                <Feather name="chevron-right" size={18} color="#94A3B8" />
+                <Feather name="chevron-right" size={18} color={colors.textSecondary} />
               </TouchableOpacity>
 
               {isSelf && m.role !== 'Dependent' && !confirmRemove && (
                 <View style={styles.selfActionRow}>
                   <TouchableOpacity
-                    style={styles.selfActionBtn}
+                    style={[styles.selfActionBtn, isDark && { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}
                     onPress={() => setContribMember(m)}
                     accessibilityRole="button"
                     accessibilityLabel="Set my contribution"
                   >
                     <Ionicons name="wallet-outline" size={16} color="#0FB384" />
                     <Text style={styles.actionBtnText}>
-                      {m.limit > 0 ? 'Edit My Contribution' : 'Add My Contribution'}
+                      {m.limit > 0
+                        ? (isBangla ? 'আমার অবদান সম্পাদনা করুন' : 'Edit My Contribution')
+                        : (isBangla ? 'আমার অবদান যোগ করুন' : 'Add My Contribution')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -116,30 +130,32 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
                   {m.role !== 'Dependent' && (
                     <View style={styles.selfActionRow}>
                       <TouchableOpacity
-                        style={styles.selfActionBtn}
+                        style={[styles.selfActionBtn, isDark && { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}
                         onPress={() => setContribMember(m)}
                         accessibilityRole="button"
                         accessibilityLabel={`Set contribution for ${m.name}`}
                       >
                         <Ionicons name="wallet-outline" size={16} color="#0FB384" />
                         <Text style={styles.actionBtnText}>
-                          {m.limit > 0 ? 'Edit Contribution' : 'Add Contribution'}
+                          {m.limit > 0
+                            ? (isBangla ? 'অবদান সম্পাদনা করুন' : 'Edit Contribution')
+                            : (isBangla ? 'অবদান যোগ করুন' : 'Add Contribution')}
                         </Text>
                       </TouchableOpacity>
                     </View>
                   )}
                   <View style={styles.actionRow}>
                     <TouchableOpacity
-                      style={styles.actionBtn}
+                      style={[styles.actionBtn, isDark && { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}
                       onPress={() => setRoleMember(m)}
                       accessibilityRole="button"
                       accessibilityLabel={`Change role for ${m.name}`}
                     >
                       <Ionicons name="shield-checkmark-outline" size={16} color="#0FB384" />
-                      <Text style={styles.actionBtnText}>Change Role</Text>
+                      <Text style={styles.actionBtnText}>{isBangla ? 'ভূমিকা পরিবর্তন' : 'Change Role'}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.actionBtn, styles.removeBtn]}
+                      style={[styles.actionBtn, styles.removeBtn, isDark && { backgroundColor: '#38161A', borderColor: '#7F1D1D' }]}
                       onPress={() => {
                         setRemoveError(null);
                         setConfirmRemoveId(m.memberId);
@@ -148,24 +164,28 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
                       accessibilityLabel={`Remove ${m.name}`}
                     >
                       <Feather name="trash-2" size={16} color="#EF4444" />
-                      <Text style={styles.removeBtnText}>Remove</Text>
+                      <Text style={styles.removeBtnText}>{isBangla ? 'মুছুন' : 'Remove'}</Text>
                     </TouchableOpacity>
                   </View>
                 </>
               )}
 
               {confirmRemove && (
-                <View style={styles.confirmRow}>
+                <View style={[styles.confirmRow, isDark && { backgroundColor: '#38161A', borderTopColor: '#7F1D1D' }]}>
                   <View style={styles.confirmRowTop}>
-                    <Text style={styles.confirmText}>Remove member?</Text>
+                    <Text style={[styles.confirmText, isDark && { color: '#FCA5A5' }]}>
+                      {isBangla ? 'সদস্য অপসারণ করবেন?' : 'Remove member?'}
+                    </Text>
                     <View style={styles.confirmActions}>
                       <TouchableOpacity
-                        style={styles.cancelBtn}
+                        style={[styles.cancelBtn, isDark && { backgroundColor: colors.surfaceSubtle }]}
                         onPress={() => setConfirmRemoveId(null)}
                         accessibilityRole="button"
                         accessibilityLabel="Cancel remove"
                       >
-                        <Text style={styles.cancelBtnText}>Cancel</Text>
+                        <Text style={[styles.cancelBtnText, isDark && { color: colors.text }]}>
+                          {isBangla ? 'বাতিল' : 'Cancel'}
+                        </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.confirmBtn, removingId === m.memberId && styles.removeBtnDisabled]}
@@ -177,7 +197,7 @@ export default function FamilyMembersPanel({ finance }: FamilyMembersPanelProps)
                         {removingId === m.memberId ? (
                           <ActivityIndicator size="small" color="#FFFFFF" />
                         ) : (
-                          <Text style={styles.confirmBtnText}>Yes, Remove</Text>
+                          <Text style={styles.confirmBtnText}>{isBangla ? 'হ্যাঁ, মুছুন' : 'Yes, Remove'}</Text>
                         )}
                       </TouchableOpacity>
                     </View>

@@ -14,6 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useTransactions } from '../../context/TransactionsContext';
 import { useBudgets } from '../../context/BudgetsContext';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { TRANSACTION_CATEGORIES } from '../../lib/transactionCategories';
 import type { Transaction } from '../../lib/transactions';
 import AddTransactionModal from '../../components/AddTransactionModal';
@@ -61,6 +63,8 @@ export default function TransactionsScreen() {
     useTransactions();
   const { budget, categoryBudgets, monthlySpent, openBudgetModal, budgetTabRequested, clearBudgetTabRequest } =
     useBudgets();
+  const { colors, isDark } = useTheme();
+  const { t, isBangla, formatCurrency, translateCategory } = useLanguage();
   const [activeTab, setActiveTab] = useState<'transactions' | 'budget'>('transactions');
   const [activeFilter, setActiveFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -157,7 +161,7 @@ export default function TransactionsScreen() {
     if (tx.type === 'income') totalIncome += tx.amount;
     else totalExpense += tx.amount;
   }
-  const formatMoney = (n: number) => `৳${Math.round(n).toLocaleString()}`;
+  const formatMoney = (n: number) => formatCurrency(n);
 
   // ── Budget overview (bound to shared budget state) ──
   const monthlyBudgetTotal = budget?.total_spending_budget ?? 0;
@@ -180,12 +184,14 @@ export default function TransactionsScreen() {
 
   const handleDelete = (item: Transaction) => {
     Alert.alert(
-      'Delete transaction?',
-      `This will remove ${item.type === 'income' ? '+' : '-'}৳${item.amount.toLocaleString()} and update your balance.`,
+      t('transactions.delete_confirm', 'Delete transaction?'),
+      isBangla
+        ? `এটি আপনার ${item.type === 'income' ? '+' : '-'}${formatCurrency(item.amount)} লেনদেনটি মুছে ফেলবে এবং ব্যালেন্স আপডেট করবে।`
+        : `This will remove ${item.type === 'income' ? '+' : '-'}${formatCurrency(item.amount)} and update your balance.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('transactions.cancel', 'Cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('transactions.delete', 'Delete'),
           style: 'destructive',
           onPress: async () => {
             const { error } = await deleteTransaction(item.id);
@@ -206,17 +212,19 @@ export default function TransactionsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         {/* ── Header ── */}
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>Transactions</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {t('transactions.title', 'Transactions')}
+          </Text>
           <View style={styles.headerActions}>
             <TouchableOpacity
-              style={styles.headerBtn}
+              style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
               onPress={() => setIsPdfModalOpen(true)}
               accessibilityRole="button"
               accessibilityLabel="Bank statement PDF import"
@@ -224,7 +232,7 @@ export default function TransactionsScreen() {
               <Feather name="file-text" size={18} color="#059669" />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.headerBtn}
+              style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
               onPress={() => setIsBkashSimModalOpen(true)}
               accessibilityRole="button"
               accessibilityLabel="bKash SMS Detection"
@@ -232,12 +240,12 @@ export default function TransactionsScreen() {
               <Ionicons name="phone-portrait-outline" size={18} color="#BE185D" />
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.headerBtn}
+              style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
               onPress={openBudgetModal}
               accessibilityRole="button"
               accessibilityLabel="Set up or edit budget limits"
             >
-              <Feather name="sliders" size={18} color="#091E15" />
+              <Feather name="sliders" size={18} color={colors.text} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.headerBtn, styles.headerBtnPrimary]}
@@ -273,22 +281,28 @@ export default function TransactionsScreen() {
 
         {/* ── Stats Overview ── */}
         <View style={styles.statsRow}>
-          <View style={styles.statsCard}>
-            <Text style={styles.statsLabel}>Income</Text>
+          <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>
+              {t('transactions.filter_income', 'Income')}
+            </Text>
             <Text style={styles.statsIncome}>{formatMoney(totalIncome)}</Text>
           </View>
-          <View style={styles.statsCard}>
-            <Text style={styles.statsLabel}>Expense</Text>
+          <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>
+              {t('transactions.filter_expense', 'Expense')}
+            </Text>
             <Text style={styles.statsExpense}>{formatMoney(totalExpense)}</Text>
           </View>
-          <View style={styles.statsCard}>
-            <Text style={styles.statsLabel}>Remaining</Text>
+          <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>
+              {isBangla ? 'অবশিষ্ট' : 'Remaining'}
+            </Text>
             <Text style={styles.statsRemaining}>{formatMoney(totalIncome - totalExpense)}</Text>
           </View>
         </View>
 
         {/* ── Sub-Tab Navigation ── */}
-        <View style={styles.subTabBar}>
+        <View style={[styles.subTabBar, { borderBottomColor: colors.divider }]}>
           <TouchableOpacity
             style={styles.subTabItem}
             onPress={() => setActiveTab('transactions')}
@@ -296,10 +310,12 @@ export default function TransactionsScreen() {
             <Text
               style={[
                 styles.subTabLabel,
-                activeTab === 'transactions' ? styles.subTabLabelActive : styles.subTabLabelInactive,
+                activeTab === 'transactions'
+                  ? styles.subTabLabelActive
+                  : [styles.subTabLabelInactive, { color: colors.textSecondary }],
               ]}
             >
-              Transactions
+              {t('transactions.tab_transactions', 'Transactions')}
             </Text>
             {activeTab === 'transactions' && <View style={styles.subTabUnderline} />}
           </TouchableOpacity>
@@ -310,10 +326,12 @@ export default function TransactionsScreen() {
             <Text
               style={[
                 styles.subTabLabel,
-                activeTab === 'budget' ? styles.subTabLabelActive : styles.subTabLabelInactive,
+                activeTab === 'budget'
+                  ? styles.subTabLabelActive
+                  : [styles.subTabLabelInactive, { color: colors.textSecondary }],
               ]}
             >
-              Budget Limits
+              {t('transactions.tab_budget', 'Budget Limits')}
             </Text>
             {activeTab === 'budget' && <View style={styles.subTabUnderline} />}
           </TouchableOpacity>
@@ -322,12 +340,12 @@ export default function TransactionsScreen() {
         {activeTab === 'transactions' ? (
           <>
             {/* ── Search Bar ── */}
-            <View style={styles.searchContainer}>
-              <Feather name="search" size={16} color="#94A3B8" />
+            <View style={[styles.searchContainer, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+              <Feather name="search" size={16} color={colors.textMuted} />
               <TextInput
-                style={styles.searchInput}
-                placeholder="Search transactions..."
-                placeholderTextColor="#94A3B8"
+                style={[styles.searchInput, { color: colors.text }]}
+                placeholder={t('transactions.search_placeholder', 'Search transactions...')}
+                placeholderTextColor={colors.textMuted}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 autoCapitalize="none"
@@ -342,7 +360,7 @@ export default function TransactionsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Clear search"
                 >
-                  <Feather name="x" size={16} color="#94A3B8" />
+                  <Feather name="x" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
             </View>
@@ -351,22 +369,32 @@ export default function TransactionsScreen() {
             <View style={styles.filterRow}>
               {FILTERS.map((f) => {
                 const isActive = activeFilter === f;
+                const label =
+                  f === 'All'
+                    ? t('transactions.filter_all', 'All')
+                    : f === 'Income'
+                    ? t('transactions.filter_income', 'Income')
+                    : t('transactions.filter_expense', 'Expense');
                 return (
                   <TouchableOpacity
                     key={f}
                     style={[
                       styles.filterPill,
-                      isActive ? styles.filterPillActive : styles.filterPillInactive,
+                      isActive
+                        ? styles.filterPillActive
+                        : [styles.filterPillInactive, { backgroundColor: colors.card, borderColor: colors.cardBorder }],
                     ]}
                     onPress={() => setActiveFilter(f)}
                   >
                     <Text
                       style={[
                         styles.filterPillText,
-                        isActive ? styles.filterPillTextActive : styles.filterPillTextInactive,
+                        isActive
+                          ? styles.filterPillTextActive
+                          : [styles.filterPillTextInactive, { color: colors.textSecondary }],
                       ]}
                     >
-                      {f}
+                      {label}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -376,24 +404,24 @@ export default function TransactionsScreen() {
             {/* ── Grouped Transaction List ── */}
             {grouped.length === 0 ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyStateText}>
-                  {activeFilter !== 'All' || query
-                    ? 'No transactions match your search.'
-                    : 'No transactions yet.'}
+                <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                  {activeFilter !== 'All' || searchQuery
+                    ? t('transactions.empty_search', 'No transactions match your search.')
+                    : t('transactions.no_transactions_filter', 'No transactions yet.')}
                 </Text>
               </View>
             ) : (
               grouped.map((group) => (
                 <View key={group.date} style={styles.dateGroup}>
                   <View style={styles.dateBanner}>
-                    <Text style={styles.dateLabel}>{formatDateLabel(group.date)}</Text>
+                    <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>{formatDateLabel(group.date)}</Text>
                     <Text
                       style={[
                         styles.netDaily,
                         { color: group.netDaily >= 0 ? '#0FB384' : '#EF4444' },
                       ]}
                     >
-                      {group.netDaily >= 0 ? '+' : ''}৳{Math.abs(group.netDaily).toLocaleString()}
+                      {group.netDaily >= 0 ? '+' : ''}{formatMoney(group.netDaily)}
                     </Text>
                   </View>
 
@@ -405,7 +433,7 @@ export default function TransactionsScreen() {
                     return (
                       <View key={item.id}>
                         <TouchableOpacity
-                          style={styles.txCard}
+                          style={[styles.txCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
                           activeOpacity={0.7}
                           onPress={() => toggleExpanded(item.id)}
                           accessibilityRole="button"
@@ -416,8 +444,8 @@ export default function TransactionsScreen() {
                             <Text style={styles.txIconEmoji}>{meta.emoji}</Text>
                           </View>
                           <View style={styles.txCenter}>
-                            <Text style={styles.txTitle}>{item.description || item.category}</Text>
-                            <Text style={styles.txCategory}>{item.category}</Text>
+                            <Text style={[styles.txTitle, { color: colors.text }]}>{item.description || translateCategory(item.category)}</Text>
+                            <Text style={[styles.txCategory, { color: colors.textSecondary }]}>{translateCategory(item.category)}</Text>
                           </View>
                           <Text
                             style={[
@@ -425,10 +453,10 @@ export default function TransactionsScreen() {
                               { color: item.type === 'income' ? '#0FB384' : '#EF4444' },
                             ]}
                           >
-                            {item.type === 'income' ? '+' : ''}৳{item.amount.toLocaleString()}
+                            {item.type === 'income' ? '+' : '-'}{formatMoney(item.amount)}
                           </Text>
                           <TouchableOpacity
-                            style={styles.txDropdown}
+                            style={[styles.txDropdown, { backgroundColor: colors.surfaceSubtle, borderColor: colors.border }]}
                             onPress={() => toggleExpanded(item.id)}
                             accessibilityRole="button"
                             accessibilityLabel={isExpanded ? 'Collapse' : 'Expand'}
@@ -436,7 +464,7 @@ export default function TransactionsScreen() {
                             <Feather
                               name={isExpanded ? 'chevron-up' : 'chevron-down'}
                               size={16}
-                              color="#94A3B8"
+                              color={colors.textSecondary}
                             />
                           </TouchableOpacity>
                         </TouchableOpacity>
@@ -444,22 +472,22 @@ export default function TransactionsScreen() {
                         {isExpanded && (
                           <View style={styles.txActionsRow}>
                             <TouchableOpacity
-                              style={styles.txActionEdit}
+                              style={[styles.txActionEdit, isDark && { backgroundColor: '#143D2E', borderColor: '#0FB384' }]}
                               onPress={() => handleEdit(item)}
                               accessibilityRole="button"
                               accessibilityLabel={`Edit ${item.description || item.category} transaction`}
                             >
                               <Feather name="edit-2" size={16} color="#0FB384" />
-                              <Text style={styles.txActionEditText}>Edit</Text>
+                              <Text style={styles.txActionEditText}>{isBangla ? 'সম্পাদনা' : 'Edit'}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                              style={styles.txActionDelete}
+                              style={[styles.txActionDelete, isDark && { backgroundColor: '#2B1214', borderColor: '#7F1D1D' }]}
                               onPress={() => handleDelete(item)}
                               accessibilityRole="button"
                               accessibilityLabel={`Delete ${item.description || item.category} transaction`}
                             >
                               <Feather name="trash-2" size={16} color="#EF4444" />
-                              <Text style={styles.txActionDeleteText}>Delete</Text>
+                              <Text style={styles.txActionDeleteText}>{t('transactions.delete', 'Delete')}</Text>
                             </TouchableOpacity>
                           </View>
                         )}
@@ -473,21 +501,25 @@ export default function TransactionsScreen() {
         ) : budget ? (
           <>
             {/* ── Monthly Budget Used Overview ── */}
-            <View style={styles.budgetOverviewCard}>
-              <CircularProgress pct={Math.min(monthlyBudgetUsedPct / 100, 1)} label="used" />
+            <View style={[styles.budgetOverviewCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              <CircularProgress pct={Math.min(monthlyBudgetUsedPct / 100, 1)} label={isBangla ? 'ব্যবহৃত' : 'used'} />
               <View style={styles.budgetOverviewText}>
-                <Text style={styles.budgetOverviewLabel}>Monthly Budget Used</Text>
-                <Text style={[styles.budgetOverviewSpent, { color: budgetUsedColor }]}>
-                  Spent: {formatMoney(monthlySpent)}
+                <Text style={[styles.budgetOverviewLabel, { color: colors.textSecondary }]}>
+                  {isBangla ? 'মাসিক বাজেট ব্যবহার' : 'Monthly Budget Used'}
                 </Text>
-                <Text style={styles.budgetOverviewRemaining}>
-                  Remaining: {formatMoney(monthlyRemaining)}
+                <Text style={[styles.budgetOverviewSpent, { color: budgetUsedColor }]}>
+                  {isBangla ? 'খরচ: ' : 'Spent: '}{formatMoney(monthlySpent)}
+                </Text>
+                <Text style={[styles.budgetOverviewRemaining, { color: colors.textSecondary }]}>
+                  {isBangla ? 'অবশিষ্ট: ' : 'Remaining: '}{formatMoney(monthlyRemaining)}
                 </Text>
               </View>
             </View>
 
             {/* ── By Category ── */}
-            <Text style={styles.budgetSectionHeader}>BY CATEGORY</Text>
+            <Text style={[styles.budgetSectionHeader, { color: colors.textMuted }]}>
+              {isBangla ? 'খাতভিত্তিক বাজেট' : 'BY CATEGORY'}
+            </Text>
             {categoryBudgets.map((cb) => {
               const cat =
                 TRANSACTION_CATEGORIES.find((c) => c.label === cb.category) ??
@@ -495,21 +527,21 @@ export default function TransactionsScreen() {
               const overLimit = cb.percentage_used > 100;
               const barColor = overLimit ? '#EF4444' : '#0FB384';
               return (
-                <View key={cb.category} style={styles.catBudgetCard}>
+                <View key={cb.category} style={[styles.catBudgetCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
                   <View style={[styles.catBudgetIcon, { backgroundColor: cat.bg }]}>
                     <Text style={styles.catBudgetEmoji}>{cat.emoji}</Text>
                   </View>
                   <View style={styles.catBudgetInfo}>
                     <View style={styles.catBudgetHeader}>
-                      <Text style={styles.catBudgetName}>{cb.category}</Text>
+                      <Text style={[styles.catBudgetName, { color: colors.text }]}>{translateCategory(cb.category)}</Text>
                       <Text style={[styles.catBudgetPct, { color: barColor }]}>
                         {Math.round(cb.percentage_used)}%
                       </Text>
                     </View>
-                    <Text style={styles.catBudgetAmounts}>
+                    <Text style={[styles.catBudgetAmounts, { color: colors.textSecondary }]}>
                       {formatMoney(cb.spent)} / {formatMoney(cb.limit)}
                     </Text>
-                    <View style={styles.catBudgetBar}>
+                    <View style={[styles.catBudgetBar, { backgroundColor: colors.divider }]}>
                       <View
                         style={[
                           styles.catBudgetBarFill,
@@ -524,30 +556,34 @@ export default function TransactionsScreen() {
 
             {/* ── Edit Budget Plan ── */}
             <TouchableOpacity
-              style={styles.budgetBtn}
+              style={[styles.budgetBtn, isDark && { backgroundColor: '#143D2E', borderColor: '#0FB384' }]}
               onPress={openBudgetModal}
               accessibilityRole="button"
               accessibilityLabel="Edit Budget Plan"
             >
-              <Text style={styles.budgetBtnLabel}>Edit Budget Plan</Text>
+              <Text style={styles.budgetBtnLabel}>
+                {t('transactions.edit_budget', 'Edit Budget Plan')}
+              </Text>
             </TouchableOpacity>
           </>
         ) : (
-          <View style={styles.budgetCard}>
-            <View style={styles.budgetIconBox}>
+          <View style={[styles.budgetCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+            <View style={[styles.budgetIconBox, { backgroundColor: isDark ? '#143D2E' : '#E8F7F1' }]}>
               <Ionicons name="bar-chart-sharp" size={36} color="#0FB384" />
             </View>
-            <Text style={styles.budgetTitle}>Set Your Budget Limits</Text>
-            <Text style={styles.budgetParagraph}>
-              Enter your income and savings target to automatically calculate spending limits for each category.
+            <Text style={[styles.budgetTitle, { color: colors.text }]}>
+              {t('transactions.no_budget_title', 'Set Your Budget Limits')}
+            </Text>
+            <Text style={[styles.budgetParagraph, { color: colors.textSecondary }]}>
+              {t('transactions.no_budget_desc', 'Enter your income and savings target to automatically calculate spending limits for each category.')}
             </Text>
             <TouchableOpacity
-              style={styles.budgetBtn}
+              style={[styles.budgetBtn, isDark && { backgroundColor: '#143D2E', borderColor: '#0FB384' }]}
               onPress={openBudgetModal}
               accessibilityRole="button"
               accessibilityLabel="Set Up Budget"
             >
-              <Text style={styles.budgetBtnLabel}>+ Set Up Budget</Text>
+              <Text style={styles.budgetBtnLabel}>+ {t('transactions.setup_budget', 'Set Up Budget')}</Text>
             </TouchableOpacity>
           </View>
         )}

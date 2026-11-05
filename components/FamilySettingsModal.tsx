@@ -13,6 +13,8 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFamily } from '../context/FamilyContext';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { ROLE_BG, ROLE_TEXT_COLOR } from './family/familyConstants';
 
 interface FamilySettingsModalProps {
@@ -24,6 +26,9 @@ export default function FamilySettingsModal({ visible, onClose }: FamilySettings
   const insets = useSafeAreaInsets();
   const { family, members, leaveFamily, deleteFamily } = useFamily();
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
+  const { language } = useLanguage();
+  const isBangla = language === 'bn';
 
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -117,72 +122,75 @@ export default function FamilySettingsModal({ visible, onClose }: FamilySettings
         <View
           style={[
             styles.sheetCard,
-            { paddingBottom: Math.max(insets.bottom, 16) + 16 },
+            {
+              backgroundColor: colors.card,
+              borderTopColor: colors.cardBorder,
+              paddingBottom: Math.max(insets.bottom, 16) + 16,
+            },
           ]}
         >
           {/* Top Drag Handle */}
-          <View style={styles.dragHandle} />
+          <View style={[styles.dragHandle, { backgroundColor: colors.border }]} />
 
           {/* Header */}
           <View style={styles.modalHeader}>
             <View style={styles.modalHeaderLeft}>
-              <View style={styles.modalIconCircle}>
+              <View style={[styles.modalIconCircle, isDark && { backgroundColor: '#14382A' }]}>
                 <Ionicons name="settings-outline" size={22} color="#0FB384" />
               </View>
               <View style={styles.headerTextStack}>
-                {/* Title token: text-[20px] leading-[22px] font-bold */}
-                <Text style={styles.modalTitle}>Family Settings</Text>
-                {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
-                <Text style={styles.modalSubtext}>{family.name}</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  {isBangla ? 'পারিবারিক সেটিংস' : 'Family Settings'}
+                </Text>
+                <Text style={[styles.modalSubtext, { color: colors.textSecondary }]}>{family.name}</Text>
               </View>
             </View>
 
             <TouchableOpacity
               onPress={onClose}
-              style={styles.closeButton}
+              style={[styles.closeButton, isDark && { backgroundColor: colors.surfaceSubtle, borderRadius: 24 }]}
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel="Close family settings"
             >
-              <Ionicons name="close" size={20} color="#64748B" />
+              <Ionicons name="close" size={20} color={colors.text} />
             </TouchableOpacity>
           </View>
 
           {/* Error Message */}
           {errorMsg && (
-            <View style={styles.errorBox}>
-              {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
-              <Text style={styles.errorText}>{errorMsg}</Text>
+            <View style={[styles.errorBox, isDark && { backgroundColor: '#3B1828', borderColor: '#BE185D' }]}>
+              <Text style={[styles.errorText, isDark && { color: '#FCA5A5' }]}>{errorMsg}</Text>
             </View>
           )}
 
           {/* Family Info Card */}
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              {/* Subtext token: text-[14px] font-normal */}
-              <Text style={styles.infoLabel}>Invite Code</Text>
+          <View style={[styles.infoCard, { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}>
+            <View style={[styles.infoRow, { borderBottomColor: colors.cardBorder }]}>
+              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
+                {isBangla ? 'আমন্ত্রণ কোড' : 'Invite Code'}
+              </Text>
               <TouchableOpacity
-                style={styles.copyPill}
+                style={[styles.copyPill, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
                 onPress={handleCopyCode}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel="Copy invite code"
               >
-                {/* Subtext token: text-[14px] font-normal */}
-                <Text style={styles.codeText}>{family.invite_code}</Text>
+                <Text style={[styles.codeText, { color: colors.text }]}>{family.invite_code}</Text>
                 <Feather
                   name={copied ? 'check' : 'copy'}
                   size={14}
-                  color={copied ? '#0FB384' : '#64748B'}
+                  color={copied ? '#0FB384' : colors.textSecondary}
                 />
               </TouchableOpacity>
             </View>
 
             <View style={[styles.infoRow, styles.noBorder]}>
-              {/* Subtext token: text-[14px] font-normal */}
-              <Text style={styles.infoLabel}>Your Role</Text>
+              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
+                {isBangla ? 'আপনার ভূমিকা' : 'Your Role'}
+              </Text>
               <View style={[styles.rolePill, { backgroundColor: ROLE_BG[myRole] }]}>
-                {/* Paragraph token: text-[13px] leading-[15px] font-normal */}
                 <Text style={[styles.rolePillText, { color: ROLE_TEXT_COLOR[myRole] }]}>
                   {myRole}
                 </Text>
@@ -200,29 +208,31 @@ export default function FamilySettingsModal({ visible, onClose }: FamilySettings
               <>
                 {/* Leave Family Action */}
                 <TouchableOpacity
-                  style={styles.leaveButton}
+                  style={[styles.leaveButton, isDark && { backgroundColor: '#3B1828', borderColor: '#BE185D' }]}
                   onPress={handleLeave}
                   activeOpacity={0.7}
                   accessibilityRole="button"
                   accessibilityLabel="Leave Family"
                 >
                   <Ionicons name="exit-outline" size={18} color="#EF4444" />
-                  {/* Subtitle token: text-[16px] font-medium */}
-                  <Text style={styles.leaveButtonText}>Leave Family</Text>
+                  <Text style={styles.leaveButtonText}>
+                    {isBangla ? 'পরিবার ত্যাগ করুন' : 'Leave Family'}
+                  </Text>
                 </TouchableOpacity>
 
                 {/* Delete Family Action (Only for Admin / Creator) */}
                 {(isAdmin || isCreator) && (
                   <TouchableOpacity
-                    style={styles.deleteButton}
+                    style={[styles.deleteButton, isDark && { backgroundColor: '#3B1828', borderColor: '#BE185D' }]}
                     onPress={handleDelete}
                     activeOpacity={0.7}
                     accessibilityRole="button"
                     accessibilityLabel="Delete Family Group"
                   >
                     <Feather name="trash-2" size={18} color="#EF4444" />
-                    {/* Subtitle token: text-[16px] font-medium */}
-                    <Text style={styles.deleteButtonText}>Delete Family Group</Text>
+                    <Text style={styles.deleteButtonText}>
+                      {isBangla ? 'পারিবারিক গ্রুপ মুছুন' : 'Delete Family Group'}
+                    </Text>
                   </TouchableOpacity>
                 )}
               </>

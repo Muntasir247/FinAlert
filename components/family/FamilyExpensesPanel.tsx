@@ -4,12 +4,16 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import AddExpenseModal from './AddExpenseModal';
 import { expenseCategoryMeta, formatMoney, initialsOf } from './familyConstants';
 import type { FamilyFinanceApi, SharedExpense } from './useFamilyFinance';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface FamilyExpensesPanelProps {
   finance: FamilyFinanceApi;
 }
 
 export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProps) {
+  const { colors, isDark } = useTheme();
+  const { isBangla, translateCategory } = useLanguage();
   const [addVisible, setAddVisible] = useState(false);
   const [editingExpense, setEditingExpense] = useState<SharedExpense | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<SharedExpense | null>(null);
@@ -35,20 +39,24 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
   return (
     <View>
       <TouchableOpacity
-        style={styles.addBtn}
+        style={[styles.addBtn, isDark && { backgroundColor: '#143D2E', borderColor: '#0FB384' }]}
         onPress={() => setAddVisible(true)}
         accessibilityRole="button"
         accessibilityLabel="Add shared expense"
       >
         <Ionicons name="add" size={18} color="#0FB384" />
-        <Text style={styles.addBtnLabel}>Add Shared Expense</Text>
+        <Text style={styles.addBtnLabel}>{isBangla ? 'যৌথ খরচ যোগ করুন' : 'Add Shared Expense'}</Text>
       </TouchableOpacity>
 
       {expenses.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Ionicons name="receipt-outline" size={32} color="#94A3B8" />
-          <Text style={styles.emptyTitle}>No shared expenses yet</Text>
-          <Text style={styles.emptyText}>Shared family expenses will appear here once added.</Text>
+        <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <Ionicons name="receipt-outline" size={32} color={colors.textMuted} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            {isBangla ? 'এখনও কোনো যৌথ খরচ নেই' : 'No shared expenses yet'}
+          </Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            {isBangla ? 'যৌথ পারিবারিক খরচ যোগ করা হলে এখানে প্রদর্শিত হবে।' : 'Shared family expenses will appear here once added.'}
+          </Text>
         </View>
       ) : (
         expenses.map((expense) => {
@@ -58,19 +66,22 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
           const status = finance.expenseStatus(expense);
           const isPaid = status === 'Paid';
           return (
-            <View key={expense.id} style={styles.card}>
+            <View key={expense.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
               {/* Card header */}
               <View style={styles.cardHeader}>
                 <View style={[styles.iconBox, { backgroundColor: `${meta.tint}1A` }]}>
                   <Ionicons name={meta.icon} size={20} color={meta.tint} />
                 </View>
                 <View style={styles.cardTitleWrap}>
-                  <Text style={styles.cardTitle}>{expense.category}</Text>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{translateCategory(expense.category)}</Text>
                   <View
-                    style={[styles.statusPill, { backgroundColor: isPaid ? '#E8F7F1' : '#FEF3C7' }]}
+                    style={[
+                      styles.statusPill,
+                      { backgroundColor: isPaid ? (isDark ? '#143D2E' : '#E8F7F1') : (isDark ? '#38280B' : '#FEF3C7') },
+                    ]}
                   >
                     <Text style={[styles.statusText, { color: isPaid ? '#0FB384' : '#D97706' }]}>
-                      {status}
+                      {isBangla ? (isPaid ? 'পরিশোধিত' : 'বকেয়া') : status}
                     </Text>
                   </View>
                 </View>
@@ -97,21 +108,25 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
                       </TouchableOpacity>
                     </View>
                   )}
-                  <Text style={styles.totalAmount}>{formatMoney(expense.total)}</Text>
+                  <Text style={[styles.totalAmount, { color: colors.text }]}>{formatMoney(expense.total)}</Text>
                 </View>
               </View>
 
               {/* Progress */}
               <View style={styles.progressRow}>
-                <Text style={styles.progressLabel}>{formatMoney(paid)} paid</Text>
-                <Text style={styles.progressPct}>{pct}%</Text>
+                <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>
+                  {formatMoney(paid)} {isBangla ? 'পরিশোধিত' : 'paid'}
+                </Text>
+                <Text style={[styles.progressPct, { color: colors.textSecondary }]}>{pct}%</Text>
               </View>
-              <View style={styles.progressBg}>
+              <View style={[styles.progressBg, { backgroundColor: colors.divider }]}>
                 <View style={[styles.progressFill, { width: `${Math.min(pct, 100)}%` }]} />
               </View>
 
               {/* Contributors */}
-              <Text style={styles.contributorsTitle}>Contributors</Text>
+              <Text style={[styles.contributorsTitle, { color: colors.textSecondary }]}>
+                {isBangla ? 'অবদানকারীগণ' : 'Contributors'}
+              </Text>
               {expense.contributors.map((c) => {
                 const member = finances.find((m) => m.memberId === c.memberId);
                 const name = member?.name ?? 'Member';
@@ -121,14 +136,14 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
                     <View style={styles.contributorAvatar}>
                       <Text style={styles.contributorAvatarText}>{initialsOf(name)}</Text>
                     </View>
-                    <Text style={styles.contributorName} numberOfLines={1}>
+                    <Text style={[styles.contributorName, { color: colors.text }]} numberOfLines={1}>
                       {name}
                     </Text>
                     <View style={styles.contributorAmountWrap}>
                       {extra > 0.01 && (
                         <Text style={styles.contributorExtra}>+{formatMoney(extra)}</Text>
                       )}
-                      <Text style={styles.contributorAmount}>{formatMoney(c.paidAmount)}</Text>
+                      <Text style={[styles.contributorAmount, { color: colors.text }]}>{formatMoney(c.paidAmount)}</Text>
                     </View>
                     {c.paid ? (
                       <Ionicons name="checkmark-circle" size={20} color="#0FB384" />
@@ -166,26 +181,31 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
         onRequestClose={() => setConfirmDelete(null)}
       >
         <View style={styles.confirmOverlay}>
-          <View style={styles.confirmCard}>
+          <View style={[styles.confirmCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
             <View style={styles.confirmIconWrap}>
               <Feather name="alert-triangle" size={24} color="#EF4444" />
             </View>
-            <Text style={styles.confirmTitle}>Delete shared expense?</Text>
-            <Text style={styles.confirmText}>
-              This will remove "{confirmDelete?.category}" ({formatMoney(confirmDelete?.total ?? 0)}) and
-              all its payment records.
+            <Text style={[styles.confirmTitle, { color: colors.text }]}>
+              {isBangla ? 'যৌথ খরচ মুছবেন?' : 'Delete shared expense?'}
+            </Text>
+            <Text style={[styles.confirmText, { color: colors.textSecondary }]}>
+              {isBangla
+                ? `এটি "${confirmDelete?.category}" (${formatMoney(confirmDelete?.total ?? 0)}) এবং এর সমস্ত অর্থপ্রদানের রেকর্ড মুছে ফেলবে।`
+                : `This will remove "${confirmDelete?.category}" (${formatMoney(confirmDelete?.total ?? 0)}) and all its payment records.`}
             </Text>
             {deleteError && (
               <Text style={styles.confirmErrorText}>{deleteError}</Text>
             )}
             <View style={styles.confirmActions}>
               <TouchableOpacity
-                style={[styles.confirmBtn, styles.cancelBtn]}
+                style={[styles.confirmBtn, styles.cancelBtn, isDark && { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}
                 onPress={() => setConfirmDelete(null)}
                 disabled={busy}
                 accessibilityRole="button"
               >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={[styles.cancelBtnText, isDark && { color: colors.text }]}>
+                  {isBangla ? 'বাতিল' : 'Cancel'}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.confirmBtn, styles.deleteBtn]}
@@ -193,7 +213,9 @@ export default function FamilyExpensesPanel({ finance }: FamilyExpensesPanelProp
                 disabled={busy}
                 accessibilityRole="button"
               >
-                <Text style={styles.deleteBtnText}>{busy ? 'Deleting…' : 'Delete'}</Text>
+                <Text style={styles.deleteBtnText}>
+                  {busy ? (isBangla ? 'মুছছি…' : 'Deleting…') : (isBangla ? 'মুছুন' : 'Delete')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

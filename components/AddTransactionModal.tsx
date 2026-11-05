@@ -18,6 +18,8 @@ import DateTimePicker, {
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTransactions } from '../context/TransactionsContext';
+import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import { TRANSACTION_CATEGORIES, INCOME_CATEGORIES } from '../lib/transactionCategories';
 import type { Transaction, TransactionType } from '../lib/transactions';
 import { markTrxIdProcessed, removePendingTransaction } from '../services/smsReaderService';
@@ -47,6 +49,8 @@ export default function AddTransactionModal({
 }) {
   const insets = useSafeAreaInsets();
   const { addTransaction, updateTransaction } = useTransactions();
+  const { colors, isDark } = useTheme();
+  const { t, isBangla, translateCategory } = useLanguage();
 
   const [type, setType] = useState<TransactionType>('expense');
   const [amount, setAmount] = useState('');
@@ -224,23 +228,27 @@ export default function AddTransactionModal({
         <Animated.View
           style={[
             styles.sheet,
-            { paddingBottom: Math.max(insets.bottom, 16), transform: [{ translateY }] },
+            { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 16), transform: [{ translateY }] },
           ]}
         >
           {/* Drag handle */}
-          <View style={styles.handle} />
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>{editing ? 'Edit Transaction' : 'Add Transaction'}</Text>
+            <Text style={[styles.title, { color: colors.text }]}>
+              {editing
+                ? (isBangla ? 'লেনদেন সম্পাদনা' : 'Edit Transaction')
+                : (isBangla ? 'নতুন লেনদেন' : 'Add Transaction')}
+            </Text>
             <TouchableOpacity
-              style={styles.closeButton}
+              style={[styles.closeButton, { backgroundColor: isDark ? colors.surfaceSubtle : '#F3F4F6' }]}
               onPress={handleClose}
               disabled={submitting}
               accessibilityRole="button"
               accessibilityLabel="Close Add Transaction"
             >
-              <Ionicons name="close" size={22} color="#091E15" />
+              <Ionicons name="close" size={22} color={colors.text} />
             </TouchableOpacity>
           </View>
 
@@ -250,23 +258,26 @@ export default function AddTransactionModal({
             contentContainerStyle={styles.scrollContent}
           >
             {prefill?.source === 'bkash' && (
-              <View style={styles.bkashNoticeBox}>
+              <View style={[styles.bkashNoticeBox, isDark && { backgroundColor: '#3B1828', borderColor: '#BE185D' }]}>
                 <View style={styles.bkashNoticeIcon}>
                   <Ionicons name="phone-portrait-outline" size={16} color="#E2136E" />
                 </View>
                 <View style={styles.bkashNoticeContent}>
-                  <Text style={styles.bkashNoticeTitle}>bKash Transaction Detected</Text>
-                  <Text style={styles.bkashNoticeDesc}>
-                    Pre-filled from SMS. Please review details before confirming.
+                  <Text style={styles.bkashNoticeTitle}>
+                    {isBangla ? 'বিকাশ লেনদেন শনাক্ত হয়েছে' : 'bKash Transaction Detected'}
+                  </Text>
+                  <Text style={[styles.bkashNoticeDesc, isDark && { color: '#FBCFE8' }]}>
+                    {isBangla ? 'এসএমএস থেকে পূরণ করা হয়েছে। নিশ্চিত করার আগে বিবরণ পর্যালোচনা করুন।' : 'Pre-filled from SMS. Please review details before confirming.'}
                   </Text>
                 </View>
               </View>
             )}
 
             {/* Type toggle */}
-            <View style={styles.typeToggle}>
+            <View style={[styles.typeToggle, { backgroundColor: colors.surfaceSubtle }]}>
               {(['expense', 'income'] as const).map((t) => {
                 const isActive = type === t;
+                const typeLabel = t === 'expense' ? (isBangla ? 'ব্যয়' : 'Expense') : (isBangla ? 'আয়' : 'Income');
                 return (
                   <TouchableOpacity
                     key={t}
@@ -274,23 +285,25 @@ export default function AddTransactionModal({
                       styles.typeChip,
                       isActive
                         ? t === 'expense'
-                          ? styles.typeChipExpenseActive
-                          : styles.typeChipIncomeActive
-                        : styles.typeChipInactive,
+                          ? [styles.typeChipExpenseActive, isDark && { backgroundColor: 'rgba(239, 68, 68, 0.25)' }]
+                          : [styles.typeChipIncomeActive, isDark && { backgroundColor: 'rgba(15, 179, 132, 0.25)' }]
+                        : [styles.typeChipInactive, { backgroundColor: colors.surfaceSubtle }],
                     ]}
                     onPress={() => handleTypeChange(t)}
                     disabled={submitting}
                     accessibilityRole="button"
                     accessibilityState={{ selected: isActive }}
-                    accessibilityLabel={`${t === 'expense' ? 'Expense' : 'Income'}`}
+                    accessibilityLabel={typeLabel}
                   >
                     <Text
                       style={[
                         styles.typeChipText,
-                        isActive ? styles.typeChipTextActive : styles.typeChipTextInactive,
+                        isActive
+                          ? [styles.typeChipTextActive, { color: isDark ? (t === 'expense' ? '#FCA5A5' : '#6EE7B7') : '#091E15' }]
+                          : [styles.typeChipTextInactive, { color: colors.textSecondary }],
                       ]}
                     >
-                      {t === 'expense' ? 'Expense' : 'Income'}
+                      {typeLabel}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -299,16 +312,18 @@ export default function AddTransactionModal({
 
             {/* Amount */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Amount</Text>
-              <View style={styles.amountInputWrap}>
-                <Text style={styles.currencyPrefix}>৳</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                {isBangla ? 'পরিমাণ' : 'Amount'}
+              </Text>
+              <View style={[styles.amountInputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+                <Text style={[styles.currencyPrefix, { color: colors.text }]}>৳</Text>
                 <TextInput
-                  style={styles.amountInput}
+                  style={[styles.amountInput, { color: colors.text }]}
                   value={amount}
                   onChangeText={setAmount}
                   keyboardType="decimal-pad"
                   placeholder="0"
-                  placeholderTextColor="#A0ADB6"
+                  placeholderTextColor={colors.textMuted}
                   editable={!submitting}
                   accessibilityLabel="Transaction amount"
                 />
@@ -317,7 +332,9 @@ export default function AddTransactionModal({
 
             {/* Category grid */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Category</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                {isBangla ? 'খাত' : 'Category'}
+              </Text>
               <View style={styles.categoryGrid}>
                 {categoryOptions.map((cat) => {
                   const isSelected = category === cat.label;
@@ -326,7 +343,7 @@ export default function AddTransactionModal({
                       key={cat.label}
                       style={[
                         styles.categoryTile,
-                        { backgroundColor: cat.bg },
+                        { backgroundColor: isDark ? '#14382A' : cat.bg },
                         isSelected && styles.categoryTileSelected,
                       ]}
                       onPress={() => setCategory(cat.label)}
@@ -337,10 +354,10 @@ export default function AddTransactionModal({
                     >
                       <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
                       <Text
-                        style={[styles.categoryLabel, { color: cat.fg }]}
+                        style={[styles.categoryLabel, { color: isDark ? '#A7F3D0' : cat.fg }]}
                         numberOfLines={2}
                       >
-                        {cat.label}
+                        {translateCategory(cat.label)}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -350,13 +367,15 @@ export default function AddTransactionModal({
 
             {/* Description */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Description (Optional)</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                {isBangla ? 'বিবরণ (ঐচ্ছিক)' : 'Description (Optional)'}
+              </Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder, color: colors.text }]}
                 value={description}
                 onChangeText={setDescription}
-                placeholder="What was this for?"
-                placeholderTextColor="#A0ADB6"
+                placeholder={isBangla ? 'এটি কী উদ্দেশ্যে ছিল?' : 'What was this for?'}
+                placeholderTextColor={colors.textMuted}
                 editable={!submitting}
                 accessibilityLabel="Transaction description"
               />
@@ -364,17 +383,19 @@ export default function AddTransactionModal({
 
             {/* Date */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Date</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>
+                {isBangla ? 'তারিখ' : 'Date'}
+              </Text>
               <TouchableOpacity
-                style={styles.dateInputWrap}
+                style={[styles.dateInputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}
                 onPress={() => setShowPicker(true)}
                 disabled={submitting}
                 accessibilityRole="button"
                 accessibilityLabel="Select transaction date"
               >
-                <Ionicons name="calendar-outline" size={18} color="#6B7280" />
-                <Text style={styles.dateText}>{formatDisplayDate(date)}</Text>
-                <Feather name="chevron-down" size={16} color="#6B7280" />
+                <Ionicons name="calendar-outline" size={18} color={colors.textSecondary} />
+                <Text style={[styles.dateText, { color: colors.text }]}>{formatDisplayDate(date)}</Text>
+                <Feather name="chevron-down" size={16} color={colors.textSecondary} />
               </TouchableOpacity>
 
               {showPicker && (
@@ -396,7 +417,10 @@ export default function AddTransactionModal({
 
             {/* Submit */}
             <TouchableOpacity
-              style={[styles.submitButton, !isValid && styles.submitButtonDisabled]}
+              style={[
+                styles.submitButton,
+                !isValid && [styles.submitButtonDisabled, isDark && { backgroundColor: colors.surfaceSubtle }],
+              ]}
               onPress={handleSubmit}
               disabled={!isValid || submitting}
               accessibilityRole="button"
@@ -418,10 +442,10 @@ export default function AddTransactionModal({
                   ]}
                 >
                   {editing
-                    ? 'Save Changes'
+                    ? (isBangla ? 'পরিবর্তন সংরক্ষণ করুন' : 'Save Changes')
                     : prefill?.source === 'bkash'
-                    ? 'Confirm & Add Transaction'
-                    : 'Add Transaction'}
+                    ? (isBangla ? 'নিশ্চিত করুন ও লেনদেন যোগ করুন' : 'Confirm & Add Transaction')
+                    : (isBangla ? 'লেনদেন যোগ করুন' : 'Add Transaction')}
                 </Text>
               )}
             </TouchableOpacity>
