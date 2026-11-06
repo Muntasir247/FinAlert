@@ -16,6 +16,13 @@ import { useNotifications } from '../context/NotificationsContext';
 import { useBudgets } from '../context/BudgetsContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
+import {
+  translateNotification,
+  getLocalizedActionLabel,
+  getLocalizedTimeAgo,
+  deduplicateNotificationList,
+  toBengaliDigits,
+} from '../lib/notificationLocalization';
 import type {
   AppNotification,
   NotificationAccent,
@@ -89,7 +96,8 @@ function NotificationCard({
   const accent = ACCENT_META[notif.accent_color];
   const meta = CATEGORY_META[notif.category];
   const progress = notif.progress == null ? null : Math.max(0, Math.min(notif.progress, 1));
-  const ctaLabel = ACTION_LABELS[notif.action_type];
+  const ctaLabel = getLocalizedActionLabel(notif.action_type, isBangla);
+  const localized = translateNotification(notif, isBangla);
 
   const handleDismiss = () => {
     Animated.timing(opacity, {
@@ -109,10 +117,10 @@ function NotificationCard({
           </View>
           <View style={styles.cardTextStack}>
             <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>
-              {notif.title}
+              {localized.title}
             </Text>
             <Text style={[styles.cardMessage, { color: colors.textSecondary }]} numberOfLines={2}>
-              {notif.message}
+              {localized.message}
             </Text>
           </View>
           {!notif.is_read && <View style={styles.unreadDot} />}
@@ -130,7 +138,7 @@ function NotificationCard({
         )}
 
         <View style={styles.cardFooter}>
-          <Text style={[styles.timestamp, { color: colors.textMuted }]}>{timeAgo(notif.created_at)}</Text>
+          <Text style={[styles.timestamp, { color: colors.textMuted }]}>{getLocalizedTimeAgo(notif.created_at, isBangla)}</Text>
           <View style={styles.footerActions}>
             <TouchableOpacity
               style={styles.footerButton}
@@ -204,13 +212,13 @@ export default function NotificationsScreen() {
     );
   }, [notifications.length, clearAllNotifications, isBangla]);
 
-  const filtered = useMemo(
-    () =>
+  const filtered = useMemo(() => {
+    const list =
       activeFilter === 'All'
         ? notifications
-        : notifications.filter((n) => n.category === activeFilter.toLowerCase()),
-    [notifications, activeFilter]
-  );
+        : notifications.filter((n) => n.category === activeFilter.toLowerCase());
+    return deduplicateNotificationList(list);
+  }, [notifications, activeFilter]);
 
   const grouped = useMemo(() => {
     const today: AppNotification[] = [];
@@ -288,7 +296,7 @@ export default function NotificationsScreen() {
           {unreadCount > 0 && (
             <View style={styles.newBadge}>
               <Text style={styles.newBadgeText}>
-                {unreadCount} {isBangla ? 'নতুন' : 'new'}
+                {isBangla ? toBengaliDigits(unreadCount) : unreadCount} {isBangla ? 'নতুন' : 'new'}
               </Text>
             </View>
           )}
@@ -327,14 +335,14 @@ export default function NotificationsScreen() {
             const active = activeFilter === filter;
             const filterLabel =
               filter === 'All'
-                ? t('notifications.filter_all', 'All')
+                ? (isBangla ? 'সব' : t('notifications.filter_all', 'All'))
                 : filter === 'Budget'
-                ? t('notifications.filter_budget', 'Budget')
+                ? (isBangla ? 'বাজেট' : t('notifications.filter_budget', 'Budget'))
                 : filter === 'Bills'
-                ? t('notifications.filter_bills', 'Bills')
+                ? (isBangla ? 'বিল' : t('notifications.filter_bills', 'Bills'))
                 : filter === 'Savings'
-                ? t('notifications.filter_savings', 'Savings')
-                : t('notifications.filter_family', 'Family');
+                ? (isBangla ? 'সঞ্চয়' : t('notifications.filter_savings', 'Savings'))
+                : (isBangla ? 'পরিবার' : t('notifications.filter_family', 'Family'));
             return (
               <TouchableOpacity
                 key={filter}
@@ -377,16 +385,18 @@ export default function NotificationsScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="notifications-off-outline" size={40} color={colors.textMuted} />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              {t('notifications.empty_title', 'No alerts')}
+              {isBangla ? 'কোনো বিজ্ঞপ্তি নেই' : t('notifications.empty_title', 'No alerts')}
             </Text>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {t('notifications.empty_desc', "You're all caught up. New alerts will show up here.")}
+              {isBangla
+                ? 'আপনি সব দেখে নিয়েছেন। নতুন সতর্কতা এখানে প্রদর্শিত হবে।'
+                : t('notifications.empty_desc', "You're all caught up. New alerts will show up here.")}
             </Text>
           </View>
         ) : (
           <>
-            {renderSection(isBangla ? 'আজকের' : 'TODAY', grouped.today)}
-            {renderSection(isBangla ? 'পূর্ববর্তী' : 'EARLIER', grouped.earlier)}
+            {renderSection(isBangla ? 'আজ' : 'TODAY', grouped.today)}
+            {renderSection(isBangla ? 'পূর্বে' : 'EARLIER', grouped.earlier)}
             <View style={styles.clearAllSection}>
               <TouchableOpacity
                 style={styles.clearAllBtn}

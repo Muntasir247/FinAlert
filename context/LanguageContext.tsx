@@ -406,7 +406,7 @@ const BN: Translations = {
     subtab_members: 'সদস্য',
     subtab_expenses: 'খরচ',
     subtab_transactions: 'লেনদেন',
-    invite_member: 'সদস্য আমন্ত্রণ',
+    invite_member: 'আমন্ত্রণ',
     family_budget: 'পারিবারিক যৌথ বাজেট',
     settle_up: 'হিসাব সম্পন্ন',
     no_family: 'কোনো পরিবারে যুক্ত নন',

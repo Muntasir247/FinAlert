@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { getNotificationDedupeKey } from './notificationLocalization';
 
 export type NotificationCategory = 'budget' | 'bills' | 'savings' | 'family';
 export type NotificationAccent = 'red' | 'orange' | 'green' | 'blue';
@@ -52,24 +53,28 @@ export async function isDuplicateRecentNotification(
   userId: string,
   category: NotificationCategory,
   title: string,
+  message?: string,
   withinHours = 12
 ): Promise<boolean> {
   const cutoff = new Date(Date.now() - withinHours * 60 * 60 * 1000).toISOString();
 
   const { data, error } = await supabase
     .from('notifications')
-    .select('id')
+    .select('id, category, title, message, created_at')
     .eq('user_id', userId)
     .eq('category', category)
-    .eq('title', title)
-    .gte('created_at', cutoff)
-    .limit(1);
+    .gte('created_at', cutoff);
 
-  if (error || !data) {
+  if (error || !data || data.length === 0) {
     return false;
   }
 
-  return data.length > 0;
+  const targetKey = getNotificationDedupeKey({ category, title, message: message || '' });
+  return data.some((item) => {
+    if (item.title === title) return true;
+    const itemKey = getNotificationDedupeKey(item);
+    return itemKey === targetKey;
+  });
 }
 
 export async function insertNotification(
@@ -82,6 +87,7 @@ export async function insertNotification(
       userId,
       notif.category,
       notif.title,
+      notif.message,
       options?.dedupeHours ?? 12
     );
     if (isDupe) {

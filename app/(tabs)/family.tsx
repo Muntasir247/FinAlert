@@ -87,8 +87,13 @@ export default function FamilyScreen() {
       >
         {/* ── Header ── */}
         <View style={styles.headerRow}>
-          <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>
+          <View style={styles.headerTitleContainer}>
+            <Text
+              style={[styles.headerTitle, { color: colors.text }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               {isBangla ? 'পারিবারিক হিসাব' : 'Family Finance'}
             </Text>
             <Text style={[styles.headerSubtext, { color: colors.textSecondary }]}>
@@ -102,8 +107,8 @@ export default function FamilyScreen() {
               accessibilityRole="button"
               accessibilityLabel="Invite to family"
             >
-              <Feather name="user-plus" size={18} color="#0FB384" />
-              <Text style={styles.inviteBtnLabel}>{t('family.invite_member', 'Invite')}</Text>
+              <Feather name="user-plus" size={16} color="#0FB384" />
+              <Text style={styles.inviteBtnLabel}>{isBangla ? 'আমন্ত্রণ' : t('family.invite_member', 'Invite')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -333,17 +338,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    marginRight: 10,
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 20,
-    lineHeight: 22,
+    lineHeight: 28,
+    paddingTop: 2,
     fontWeight: '700',
     color: '#091E15',
   },
   headerSubtext: {
     fontSize: 14,
+    lineHeight: 18,
     fontWeight: '400',
     color: '#6B7280',
     marginTop: 2,
@@ -351,29 +363,31 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    flexShrink: 0,
   },
   inviteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    height: 40,
-    paddingHorizontal: 14,
-    borderRadius: 20,
+    gap: 4,
+    height: 38,
+    paddingHorizontal: 10,
+    borderRadius: 19,
     borderWidth: 1,
     borderColor: '#0FB384',
     backgroundColor: '#FFFFFF',
   },
   inviteBtnLabel: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
     color: '#0FB384',
   },
   settingsBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',

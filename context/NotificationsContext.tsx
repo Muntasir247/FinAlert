@@ -11,6 +11,12 @@ import { AppState, type AppStateStatus } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { useRouter } from 'expo-router';
 import { useAuth } from './AuthContext';
+import { useLanguage } from './LanguageContext';
+import {
+  translateNotification,
+  getNotificationDedupeKey,
+  deduplicateNotificationList,
+} from '../lib/notificationLocalization';
 import {
   fetchNotifications,
   insertNotification,
@@ -54,6 +60,7 @@ const NotificationsContext = createContext<NotificationsContextType | undefined>
 
 export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const { isBangla } = useLanguage();
   const router = useRouter();
 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -63,6 +70,48 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Keep a ref of current notifications to prevent duplicate insertions from realtime events
   const notifMapRef = useRef<Map<string, AppNotification>>(new Map());
+  // Ref of recently presented device notification keys/IDs to prevent double-firing alerts
+  const presentedDeviceKeysRef = useRef<Map<string, number>>(new Map());
+
+  const safePresentDevice = useCallback(
+    async (notif: {
+      id?: string;
+      title: string;
+      message: string;
+      category?: any;
+      action_type?: any;
+    }) => {
+      if (!notificationsEnabled) return;
+
+      const key = getNotificationDedupeKey(notif);
+      const now = Date.now();
+      const lastByKey = presentedDeviceKeysRef.current.get(key);
+      if (lastByKey && now - lastByKey < 60000) {
+        return;
+      }
+      if (notif.id) {
+        const lastById = presentedDeviceKeysRef.current.get(notif.id);
+        if (lastById && now - lastById < 60000) {
+          return;
+        }
+        presentedDeviceKeysRef.current.set(notif.id, now);
+      }
+      presentedDeviceKeysRef.current.set(key, now);
+
+      const localized = translateNotification(notif, isBangla);
+      await presentDeviceNotification({
+        id: notif.id,
+        title: localized.title,
+        body: localized.message,
+        data: {
+          id: notif.id,
+          action_type: notif.action_type,
+          category: notif.category,
+        },
+      });
+    },
+    [notificationsEnabled, isBangla]
+  );
 
   // ── 1. Setup Device Notifications Channel & Response Listener ─────────────
   useEffect(() => {
@@ -142,8 +191,10 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         } else {
           // Send a test device notification so user sees immediate feedback that alerts are active
           await presentDeviceNotification({
-            title: 'FinAlert Notifications Enabled',
-            body: 'You will now receive timely alerts for budgets, transactions, and goals.',
+            title: isBangla ? 'FinAlert বিজ্ঞপ্তি সক্রিয় হয়েছে' : 'FinAlert Notifications Enabled',
+            body: isBangla
+              ? 'আপনি এখন থেকে বাজেট, লেনদেন এবং সঞ্চয় লক্ষ্যের সময়োপযোগী বিজ্ঞপ্তি পাবেন।'
+              : 'You will now receive timely alerts for budgets, transactions, and goals.',
             data: { action_type: 'notifications_enabled' },
           });
         }
@@ -153,7 +204,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         return false;
       }
     },
-    []
+    [isBangla]
   );
 
   // ── 3. Load Notifications From Database ───────────────────────────────────
@@ -162,11 +213,12 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       if (!silent) setIsLoading(true);
       try {
         const data = await fetchNotifications(userId);
-        setNotifications(data);
+        const deduped = deduplicateNotificationList(data);
+        setNotifications(deduped);
 
         // Update lookup map
         const newMap = new Map<string, AppNotification>();
-        data.forEach((n) => newMap.set(n.id, n));
+        deduped.forEach((n) => newMap.set(n.id, n));
         notifMapRef.current = newMap;
 
         setHasLoaded(true);
@@ -217,25 +269,25 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
           return;
         }
 
-        notifMapRef.current.set(newNotif.id, newNotif);
-        setNotifications((prev) => {
-          if (prev.some((n) => n.id === newNotif.id)) return prev;
-          return [newNotif, ...prev];
+        const dedupeKey = getNotificationDedupeKey(newNotif);
+        const isDupe = notifications.some((n) => {
+          if (n.id === newNotif.id) return true;
+          const k = getNotificationDedupeKey(n);
+          const diffMs = Math.abs(
+            new Date(n.created_at).getTime() - new Date(newNotif.created_at).getTime()
+          );
+          return k === dedupeKey && diffMs < 12 * 60 * 60 * 1000;
         });
 
-        // Present native phone notification on dashboard/panel
-        if (notificationsEnabled) {
-          presentDeviceNotification({
-            id: newNotif.id,
-            title: newNotif.title,
-            body: newNotif.message,
-            data: {
-              id: newNotif.id,
-              action_type: newNotif.action_type,
-              category: newNotif.category,
-            },
-          });
+        if (isDupe) {
+          return;
         }
+
+        notifMapRef.current.set(newNotif.id, newNotif);
+        setNotifications((prev) => deduplicateNotificationList([newNotif, ...prev]));
+
+        // Present native phone notification on dashboard/panel
+        safePresentDevice(newNotif);
       },
       (err) => {
         console.warn('[NotificationsContext] Realtime subscription notice:', err);
@@ -245,7 +297,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => {
       unsubscribe();
     };
-  }, [user, notificationsEnabled]);
+  }, [user, notifications, safePresentDevice]);
 
   // ── 5. AppState Listener & Foreground Polling Fallback ────────────────────
   // When user returns to the app, sync notifications silently so any background events appear
@@ -355,16 +407,16 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         return { error: { message: 'You must be signed in to be notified.' } };
       }
 
-      // Check in-memory list first to avoid rapid duplicate triggers
+      // Check in-memory list first with semantic dedupe key to avoid rapid duplicate triggers
       if (!options?.skipDuplicateCheck) {
         const windowMs = (options?.dedupeHours ?? 12) * 60 * 60 * 1000;
         const now = Date.now();
-        const recentDupe = notifications.find(
-          (n) =>
-            n.category === notif.category &&
-            n.title === notif.title &&
-            now - new Date(n.created_at).getTime() < windowMs
-        );
+        const dedupeKey = getNotificationDedupeKey(notif);
+        const recentDupe = notifications.find((n) => {
+          const k = getNotificationDedupeKey(n);
+          const t = new Date(n.created_at).getTime();
+          return k === dedupeKey && now - t < windowMs;
+        });
         if (recentDupe) {
           // Already notified recently, skip duplicate
           return { error: null, notification: recentDupe };
@@ -379,21 +431,12 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         notifMapRef.current.set(created.id, created);
-        setNotifications((prev) => [created, ...prev.filter((n) => n.id !== created.id)]);
+        setNotifications((prev) =>
+          deduplicateNotificationList([created, ...prev.filter((n) => n.id !== created.id)])
+        );
 
-        // Display on device notification panel
-        if (notificationsEnabled) {
-          await presentDeviceNotification({
-            id: created.id,
-            title: created.title,
-            body: created.message,
-            data: {
-              id: created.id,
-              action_type: created.action_type,
-              category: created.category,
-            },
-          });
-        }
+        // Display on device notification panel with current language
+        await safePresentDevice(created);
 
         return { error: null, notification: created };
       } catch (error) {
@@ -401,7 +444,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         return { error };
       }
     },
-    [user, notifications, notificationsEnabled]
+    [user, notifications, safePresentDevice]
   );
 
   return (

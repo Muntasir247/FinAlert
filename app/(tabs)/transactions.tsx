@@ -297,7 +297,9 @@ export default function TransactionsScreen() {
             <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>
               {isBangla ? 'অবশিষ্ট' : 'Remaining'}
             </Text>
-            <Text style={styles.statsRemaining}>{formatMoney(totalIncome - totalExpense)}</Text>
+            <Text style={[styles.statsRemaining, isDark && { color: '#FFFFFF' }]}>
+              {formatMoney(totalIncome - totalExpense)}
+            </Text>
           </View>
         </View>
 
@@ -632,12 +634,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 8,
+    paddingTop: 12,
     paddingBottom: 20,
   },
   headerTitle: {
     fontSize: 20,
-    lineHeight: 22,
+    lineHeight: 28,
+    paddingTop: 2,
     fontWeight: '700',
     color: '#091E15',
   },

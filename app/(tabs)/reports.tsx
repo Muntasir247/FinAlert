@@ -226,7 +226,14 @@ export default function ReportsScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* --- Header & Timeframe Toggle --- */}
       <View style={[styles.headerRow, { backgroundColor: colors.card, borderBottomColor: colors.cardBorder }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('reports.title', 'Reports')}</Text>
+        <Text
+          style={[styles.headerTitle, { color: colors.text }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.85}
+        >
+          {t('reports.title', 'Reports')}
+        </Text>
         <View style={[styles.toggleContainer, { backgroundColor: colors.surfaceSubtle, borderColor: colors.cardBorder }]}>
           <TouchableOpacity
             style={[
@@ -246,7 +253,7 @@ export default function ReportsScreen() {
                   : [styles.toggleInactiveText, { color: colors.textSecondary }],
               ]}
             >
-              {isBangla ? 'মাসিক রিপোর্ট' : 'Monthly Report'}
+              {t('reports.monthly', 'Monthly')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -267,7 +274,7 @@ export default function ReportsScreen() {
                   : [styles.toggleInactiveText, { color: colors.textSecondary }],
               ]}
             >
-              {isBangla ? 'সাপ্তাহিক রিপোর্ট' : 'Weekly Report'}
+              {t('reports.weekly', 'Weekly')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -496,17 +503,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
   headerTitle: {
     fontSize: 20,
-    lineHeight: 22,
+    lineHeight: 28,
+    paddingTop: 2,
     fontWeight: '700',
     color: '#0F172A',
+    flexShrink: 1,
+    marginRight: 10,
   },
   toggleContainer: {
     flexDirection: 'row',
@@ -515,11 +526,12 @@ const styles = StyleSheet.create({
     padding: 2,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    flexShrink: 0,
   },
   toggleButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 18,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -535,7 +547,7 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontSize: 13,
-    lineHeight: 15,
+    lineHeight: 18,
     fontWeight: '500',
   },
   toggleActiveText: {
