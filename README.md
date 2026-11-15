@@ -1,117 +1,155 @@
 # FinAlert
 
-> FinAlert is a cross-platform mobile app for personal and family money management.
-> Log income and expenses (by form, voice, or receipt scan), set monthly budgets with
-> per-category limits, track savings goals, manage a shared family expense pool, and
-> receive smart real-time spending alerts.
+> **Smart Personal & Family Money Management**  
+> A high-performance cross-platform mobile application built with **React Native (Expo SDK 54)**, powered by **Supabase (PostgreSQL with RLS)**, and supercharged with **Google Gemini & Groq Multimodal AI**.
 
 ---
 
-## Features
+## 🌟 Key Features
 
-- **Multi-modal entry** — record a transaction three ways:
-  - **Form** — amount, category/source, date, optional description.
-  - **Voice** — say *"Spent 500 taka on groceries."* and the app opens the right form pre-filled.
-  - **Receipt scan** — photograph a receipt to extract merchant, date, total, category, and line items.
-- **Budget planner** — sets monthly income + savings % and auto-allocates per-category limits (fully editable).
-- **Live budget tracking** — per-category spent / limit / remaining / % used, updated live.
-- **Smart alerts** — monthly budget threshold, category overrun, month-over-month increase, and daily-spike rules, deduplicated in an in-app alert centre.
-- **Savings goals** — target amount + date, atomic contributions, milestone notifications.
-- **Reports** — monthly/weekly toggle, income vs expense bar chart, category donut chart, savings rate.
-- **Family Finance Module** — invite-code groups (Admin / Contributor / Dependent roles), shared expenses with per-member assigned amounts, settlement tracking, and contribution reports, with correctness enforced in the database.
-- **Bilingual input** — accepts Bangla, English, and mixed Banglish speech and Bangla numerals.
+### 1. Multi-Modal Expense & Income Ingestion
+* **Automated bKash SMS Ingestion (Android):** Custom native module (`modules/sms-reader`) reads official transaction SMS, extracts TrxID, counterparty, and amounts, deduplicates against SecureStore and database history, and stages them for human-in-the-loop confirmation. (Includes an in-app SMS simulator for development and Expo Go).
+* **Bank Statement PDF Parser & ISO 32000 Decryption:** Upload password-protected monthly bank statements (City Bank, BRAC, DBBL, EBL, SCB, etc.). Decrypts AES-128, AES-256, and RC4 encrypted PDFs on-device and extracts itemized debit/credit records via multimodal AI.
+* **Voice-to-Intent Entry:** Local speech recognition (`expo-speech-recognition`) in Bangla (`bn-BD`) and English (`en-US`). Natural phrases (e.g., *"আজকে রিকশা ভাড়া দিলাম ৫০ টাকা"* or *"Spent 700 taka on groceries"*) are classified into structured transactions and pre-fill entry forms.
+* **Receipt & Invoice Vision Scanner:** Snap a photo or choose from gallery. Google Gemini Vision extracts merchant names, dates, line items, and totals with per-item checkboxes.
+* **Manual Quick Forms:** Intuitive manual entry with custom category icons and notes.
 
-## Tech Stack
+### 2. Family Finance Module (Capstone Innovation)
+* **Invite-Code Households:** Create or join a family group via unique code (`FAMS-XXXX`).
+* **Role-Based Access Control:** Admin, Contributor, and Dependent roles.
+* **Collective Bill Splitting & Settlements:** Split shared expenses across members with individual contribution quotas and settlement tracking.
+* **PostgreSQL-Enforced Correctness:** Atomicity, overpayment protection (`OVERPAY_EXCEEDS_EXPENSE`), delete rollbacks, and admin-only privileges enforced directly in database RPC functions and triggers.
 
-| Layer | Technology |
-|---|---|
-| Framework | Expo SDK 54, React Native 0.81.5 (new architecture) |
-| Language / routing | TypeScript, Expo Router v6 (file-based) |
-| UI / styling | React 19.1.0, NativeWind v4 (Tailwind CSS ^3.4.17) |
-| Icons / charts / animation | @expo/vector-icons, react-native-svg, react-native-reanimated, expo-linear-gradient |
-| Speech / camera / storage | expo-speech-recognition, expo-camera, expo-image-picker, expo-secure-store |
-| Backend | Supabase — Auth, PostgREST, PostgreSQL with Row Level Security |
-| AI language / vision | Google Gemini Flash / Flash-Lite (via REST) |
-| Build | EAS (Android APK) |
+### 3. AI-Powered Smart Budgeting & Advisory
+* **Interactive FinAlert AI Assistant:** Ask questions about spending, budgets, and savings habits powered by Groq (Llama 3) and Google Gemini with token-optimized context aggregation.
+* **AI-Driven Budget Recommendations:** Analyzes 90-day spending history to generate a realistic monthly plan with category allocations summing to exactly 100%, accompanied by actionable financial advice for living in Bangladesh.
+* **Deterministic Fallback Engine:** Automatically falls back to the 50/30/20 budgeting rule if API quotas or network interruptions occur.
+* **Live Budget Usage:** Real-time tracking of per-category spend, limits, remaining balance, and percentage used.
 
-## Getting Started
+### 4. Smart Alerts, Savings Goals & Reports
+* **Smart Alert Engine:** In-app notification center flagging monthly budget milestones (80%/100%), per-category overruns, month-over-month surges, and daily spending velocity spikes.
+* **Savings Goals:** Create custom savings targets with target dates and track atomic progress with celebratory notifications at 20%, 40%, 60%, 80%, and 100% milestones.
+* **Visual Reports & Analytics:** Interactive income vs. expense bar charts (with dynamic scaling) and category spending donut charts built natively with `react-native-svg`.
+
+### 5. Personalization & Localization
+* **Full Bilingual Support:** Seamless live toggle between English and Bangla across all navigation tabs, dashboards, profile preferences, and modals.
+* **Dark / Light Theme:** Custom theme engine with high-contrast dark mode support.
+* **Password Recovery:** Self-service password reset with email OTP verification.
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technology | Description |
+|---|---|---|
+| **Framework** | Expo SDK 54 | React Native 0.81.5 (New Architecture enabled) |
+| **Language & Routing** | TypeScript ~5.9.2 | Expo Router v6 (File-based navigation) |
+| **Styling & UI** | NativeWind v4 / TailwindCSS 3.4 | Styled strictly according to `DESIGN.md` |
+| **Backend & Database** | Supabase | PostgreSQL 15+, GoTrue Auth, Row Level Security (RLS) |
+| **AI & Multimodal Vision** | Google Gemini & Groq | Flash/Flash-Lite models (REST) & Groq Llama 3 API |
+| **Speech Engine** | Expo Speech Recognition | On-device Google Speech / Apple Speech Recognition |
+| **PDF Processing** | pdf-lib & @pdfsmaller/pdf-decrypt | Client-side ISO 32000 AES/RC4 decryption |
+| **Native Modules** | Custom Expo Native Module | `modules/sms-reader` (Android ContentResolver) |
+| **Icons & Charts** | Vector Icons & react-native-svg | Feather, Ionicons, custom SVG visualization |
+| **Secure Storage** | Expo SecureStore | Hardware-backed encrypted key/cache storage |
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js
-- An Expo / React Native development setup (Android Studio or a device, or EAS for APK builds)
+* **Node.js**: v18.0.0 or higher
+* **npm**: v9+
+* **Expo Go** or **Android Studio & SDK** (for local emulator or native builds)
 
-### Setup
-
+### 1. Installation
 ```bash
+# Clone repository
+git clone https://github.com/Muntasir247/FinAlert.git
+cd FinAlert/finalert
+
+# Install dependencies (runs patch-package postinstall)
 npm install
 ```
 
-1. Copy the environment template and fill in your keys:
-   ```bash
-   cp .env.example .env
-   ```
-   Set these variables:
-   - `EXPO_PUBLIC_SUPABASE_URL`
-   - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-   - `EXPO_PUBLIC_GEMINI_API_KEY`
-
-2. Apply the database schema and functions from `supabase/migrations/` to your Supabase project.
-
-### Run
-
+### 2. Environment Configuration
+Copy `.env.example` to `.env`:
 ```bash
-npm run start        # start the Metro bundler
-npm run android      # open on Android
-npm run ios          # open on iOS
-npm run web          # open in a browser
+cp .env.example .env
+```
+Populate the following variables:
+```env
+# Supabase Configuration
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+
+# AI Services
+EXPO_PUBLIC_GEMINI_API_KEY=your-gemini-api-key
+EXPO_PUBLIC_GROQ_API_KEY=your-groq-api-key # Optional but recommended for ultra-fast chat/budget generation
 ```
 
-To build an Android APK via EAS:
+### 3. Database Setup
+Apply all 14 SQL migration scripts in `supabase/migrations/` sequentially to your Supabase PostgreSQL instance.
+
+### 4. Running Development Server
 ```bash
+# Start Metro bundler
+npx expo start
+
+# Run with cleared cache
+npx expo start -c
+```
+* **Expo Go:** Scan the QR code with the Expo Go app on your physical device. *(Note: For bKash SMS reading in Expo Go, use the built-in **bKash Simulator** on the Home screen).*
+* **Android Emulator / Device:** `npm run android`
+
+---
+
+## 📦 Building Standalone Android Release (APK)
+
+### Option A: Local Build via Gradle (Recommended)
+```powershell
+cd android
+
+# Set environment variables (adjust paths as needed)
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+
+# Build optimized release APK (~41MB for arm64-v8a)
+.\gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a
+```
+*Generated APK:* `android/app/build/outputs/apk/release/FinAlertv1.4.apk`
+
+### Option B: Cloud Build via EAS
+```bash
+npm install -g eas-cli
+eas login
 eas build --platform android --profile preview
 ```
 
-## Project Structure
+---
 
-```
-app/                 expo-router routes (screens)
-components/          UI components & entry-flow modals
-  family/            Family finance components + useFamilyFinance hook
-context/             React context providers (state + business flow)
-lib/                 Typed data-access layer (the only code that talks to Supabase)
-services/            Gemini client + voice/receipt intent services
-supabase/migrations/ SQL: schema, RLS policies, security-definer RPCs, triggers
-assets/              Images, icons, fonts
-```
+## 🏛️ Architecture & Portability Invariants
 
-## Architecture Notes
+FinAlert strictly enforces clean separation of concerns as mandated by `AGENTS.md`:
+1. **Centralized Backend:** `@supabase/supabase-js` is imported **only** in `lib/supabase.ts` and `context/AuthContext.tsx`. UI components consume domain hooks and functions from `context/` and `lib/`.
+2. **Zero SDK Leakage:** Screens and components strictly use application domain types (e.g., `Transaction`, `Budget`, `Profile`).
+3. **Invariants in SQL:** Atomicity, overpayment protection, and role permissions are enforced in PostgreSQL RPC functions and triggers, ensuring standard SQL migrations.
+4. **Defensive AI Pipeline:** All external AI outputs (voice, receipts, budgets) undergo strict client-side type-coercion, boundary clamping, and sanitization before hitting database layers.
 
-- **Provider-swappable backend.** The Supabase SDK is imported only in `lib/supabase.ts` and
-  `context/AuthContext.tsx`. Screens and components consume context hooks and typed helpers,
-  so the backend can be swapped without touching the UI. (See `AGENTS.md`.)
-- **Business rules in SQL.** Schema, RLS policies, security-definer functions, and triggers
-  live in `supabase/migrations/`. Multi-table guarantees (atomic expense creation, overpay
-  guard, rollback on delete, admin-only edits) are enforced in the database.
-- **Defensive AI pipeline.** Gemini output (voice intent / receipt extraction) is re-validated
-  and sanitized client-side before it reaches the database (amounts, categories, dates, actions).
-- **Model fallback.** Five Gemini Flash-tier models are chained so a rate-limited model falls
-  back to the next, keeping voice and scan features available.
+---
 
-## Documentation
+## 📚 Project Documentation
 
-- [`UNDERSTANDING.md`](./UNDERSTANDING.md) — full orientation: what it is, features, architecture, data model, algorithms, and how it works.
-- [`DESIGN.md`](../DESIGN.md) — UI/design-system tokens (text, color, gradient).
-- [`AGENTS.md`](./AGENTS.md) — backend portability rules.
-- Academic report: `report.md` / `report.txt` at the repository root.
+* [`UNDERSTANDING.md`](../UNDERSTANDING.md) — Comprehensive technical architecture, algorithms, and data dictionary.
+* [`DESIGN.md`](../DESIGN.md) — UI/UX design tokens, typography rules, and color palettes.
+* [`AGENTS.md`](./AGENTS.md) — Architectural invariants and backend portability directives.
+* [`Capstone_final_report.md`](../Capstone_final_report.md) — Academic capstone final report, test catalogue (29 test cases), and defect registers.
 
-## Known Boundaries
+---
 
-- The "AI Financial Assistant" and "Financial Health Score" are planned, not yet built.
-- "AI" insight text is deterministic rule logic, not a predictive model.
-- The Profile language row is cosmetic/non-functional; the app is light-mode only.
-- The family budget is computed as the sum of per-member limits (`create_family` takes a name only).
+## 👥 Contributors & Academic Context
 
-## License
-
-Private / academic project — East West University CSE capstone. No license is implied for
-external use.
+**FinAlert** is developed as a Computer Science & Engineering Capstone Project at **East West University, Dhaka, Bangladesh (2026)**:
+* **Students:** Md. Malek Hossain Jim, Sumaiya Jannat Arpa, Tasmia Rahman, Muntasir Hossain
+* **Supervisor:** Dr. Taskeed Jabid
