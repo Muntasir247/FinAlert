@@ -45,7 +45,7 @@ Rules:
 5. "headline": Punchy, maximum 7 words (e.g., "Dining Out Spiked This Month", "Great Savings Rate in Grocery").
 6. "short_summary": Maximum 16 words tailored for a mobile dashboard banner (e.g., "Food took 42% of total expenses. Tap for ways to optimize.").
 7. "detailed_advice": 2-3 friendly, constructive sentences explaining the impact on their monthly finances and future savings goals.
-8. "actionable_tips": Array of 2 to 3 hyper-practical, culturally relevant tips for Bangladesh (e.g. bKash grocery cashback deals, cook at home 2 days/week, bulk shopping in local bazaar, carpool/Pathao split).
+8. "actionable_tips": Array of 2 to 3 hyper-practical, culturally relevant tips for Bangladesh (e.g. bKash/Nagad/Rocket/Upay grocery cashback deals, cook at home 2 days/week, bulk shopping in local bazaar, carpool/Pathao split).
 
 Respond with valid JSON only.`;
 

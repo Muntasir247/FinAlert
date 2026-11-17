@@ -13,11 +13,14 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useMfsTracking } from '../context/MfsTrackingContext';
+import { useTransactions } from '../context/TransactionsContext';
 import {
   requestSmsPermissions,
   checkSmsPermissions,
   isSmsReadingSupported,
   syncRecentSms,
+  MFS_PROVIDER_CONFIG,
 } from '../services/smsReaderService';
 
 interface BKashSimulatorModalProps {
@@ -29,6 +32,8 @@ export default function BKashSimulatorModal({ visible, onClose }: BKashSimulator
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { isBangla } = useLanguage();
+  const { trackedProviders, openModal: openMfsModal } = useMfsTracking();
+  const { transactions } = useTransactions();
   const [permissionStatus, setPermissionStatus] = useState<string | null>(null);
   const [isGranted, setIsGranted] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
@@ -50,25 +55,36 @@ export default function BKashSimulatorModal({ visible, onClose }: BKashSimulator
           setIsGranted(granted);
           setIsChecking(false);
           if (granted) {
-            syncRecentSms();
+            syncRecentSms(transactions);
           }
         });
     }
     return () => {
       isMounted = false;
     };
-  }, [visible]);
+  }, [visible, transactions]);
 
   const handleRequestAndroidPermission = async () => {
     if (!isSmsReadingSupported()) {
-      setPermissionStatus('SMS detection is only active on Android devices.');
+      setPermissionStatus(
+        isBangla
+          ? 'এসএমএস ডিটেকশন শুধুমাত্র অ্যান্ড্রয়েড ডিভাইসে সক্রিয়।'
+          : 'SMS detection is only active on Android devices.'
+      );
       return;
     }
     const granted = await requestSmsPermissions();
     setIsGranted(granted);
+    if (granted) {
+      await syncRecentSms(transactions);
+    }
     setPermissionStatus(
       granted
-        ? 'Permissions granted successfully! FinAlert is ready to detect bKash transactions.'
+        ? isBangla
+          ? 'অনুমতি দেওয়া হয়েছে! ফিনঅ্যালার্ট আপনার নির্বাচিত প্রোভাইডারের লেনদেন শনাক্ত করতে প্রস্তুত।'
+          : 'Permissions granted! FinAlert is ready to detect transactions from your selected providers.'
+        : isBangla
+        ? 'অনুমতি প্রত্যাখ্যাত হয়েছে। আপনি ডিভাইস সেটিংস থেকে এটি চালু করতে পারেন।'
         : 'Permission was denied. You can enable it in device Settings.'
     );
   };
@@ -83,12 +99,12 @@ export default function BKashSimulatorModal({ visible, onClose }: BKashSimulator
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}>
             <View style={styles.headerTitleRow}>
-              <View style={[styles.badge, isDark && { backgroundColor: '#4A1D34' }]}>
-                <Ionicons name="phone-portrait-outline" size={18} color="#BE185D" />
+              <View style={[styles.badge, isDark ? { backgroundColor: '#143D2E' } : { backgroundColor: '#E8F7F1' }]}>
+                <Ionicons name="phone-portrait-outline" size={18} color="#0FB384" />
               </View>
               <View>
                 <Text style={[styles.title, { color: colors.text }]}>
-                  {isBangla ? 'বিকাশ এসএমএস ডিটেকশন' : 'bKash SMS Detection'}
+                  {isBangla ? 'এসএমএস ট্রানজ্যাকশন ডিটেকশন' : 'SMS Transaction Detection'}
                 </Text>
                 <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                   {isBangla ? 'স্বয়ংক্রিয় লেনদেন শনাক্তকরণ' : 'Automatic transaction detection'}
@@ -99,13 +115,47 @@ export default function BKashSimulatorModal({ visible, onClose }: BKashSimulator
               onPress={onClose}
               style={[styles.closeBtn, { backgroundColor: isDark ? colors.surfaceSubtle : '#F3F4F6' }]}
               accessibilityRole="button"
-              accessibilityLabel="Close bKash detection setup"
+              accessibilityLabel="Close detection setup"
             >
               <Feather name="x" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+            {/* Tracked Providers Section */}
+            <View
+              style={[
+                styles.infoCard,
+                {
+                  backgroundColor: isDark ? colors.surfaceSubtle : '#F8FAFC',
+                  borderColor: colors.cardBorder,
+                },
+              ]}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={[styles.infoTitle, { color: colors.text, marginBottom: 0 }]}>
+                  {isBangla ? 'ট্র্যাককৃত প্রোভাইডার' : 'Tracked Providers'}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    onClose();
+                    setTimeout(() => openMfsModal(), 200);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change tracked providers"
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: colors.primary }}>
+                    {isBangla ? 'পরিবর্তন করুন' : 'Change'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={{ fontSize: 13, color: colors.textSecondary }}>
+                {trackedProviders.length === 0
+                  ? (isBangla ? 'কোনো প্রোভাইডার নির্বাচিত নেই' : 'No providers selected')
+                  : trackedProviders.map((p) => (isBangla ? MFS_PROVIDER_CONFIG[p]?.nameBn : MFS_PROVIDER_CONFIG[p]?.name)).join(', ')}
+              </Text>
+            </View>
+
             {/* Top Green Box */}
             <View style={[styles.permCard, isDark && { backgroundColor: '#14382A', borderColor: '#1F5A42' }]}>
               <View style={styles.permHeader}>
@@ -164,8 +214,8 @@ export default function BKashSimulatorModal({ visible, onClose }: BKashSimulator
                 <Ionicons name="notifications-outline" size={18} color="#0FB384" style={styles.infoIcon} />
                 <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                   {isBangla
-                    ? 'ফিনঅ্যালার্ট আপনার ফোনের বিকাশ অফিসিয়াল ট্রানজ্যাকশন এসএমএস স্বয়ংক্রিয়ভাবে ট্র্যাক করে।'
-                    : 'FinAlert automatically listens for official bKash transaction SMS messages on your phone.'}
+                    ? 'ফিনঅ্যালার্ট আপনার নির্বাচিত প্রোভাইডারদের (বিকাশ, নগদ, রকেট, উপায়) অফিসিয়াল লেনদেন এসএমএস ট্র্যাক করে।'
+                    : 'FinAlert listens for official transaction SMS messages from your selected providers (bKash, Nagad, Rocket, Upay).'}
                 </Text>
               </View>
               <View style={styles.infoRow}>
@@ -191,17 +241,17 @@ export default function BKashSimulatorModal({ visible, onClose }: BKashSimulator
               <TouchableOpacity
                 style={[
                   styles.syncBtn,
-                  isDark && { backgroundColor: '#361523', borderColor: '#831843' },
+                  isDark && { backgroundColor: '#14382A', borderColor: '#1F5A42' },
                 ]}
                 onPress={async () => {
-                  await syncRecentSms();
+                  await syncRecentSms(transactions);
                   onClose();
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Scan SMS inbox now"
               >
-                <Ionicons name="refresh-outline" size={18} color="#BE185D" />
-                <Text style={[styles.syncBtnText, isDark && { color: '#F472B6' }]}>
+                <Ionicons name="refresh-outline" size={18} color="#0FB384" />
+                <Text style={[styles.syncBtnText, isDark && { color: '#6EE7B7' }]}>
                   {isBangla ? 'এখনই এসএমএস ইনবক্স স্ক্যান করুন' : 'Scan SMS Inbox Now'}
                 </Text>
               </TouchableOpacity>

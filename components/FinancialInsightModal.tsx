@@ -19,6 +19,7 @@ import { useSavingsGoals } from '../context/SavingsGoalsContext';
 import { useTransactions } from '../context/TransactionsContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useMfsTracking } from '../context/MfsTrackingContext';
 import {
   getSpendingAnalytics,
   type SpendingAnalyticsSummary,
@@ -51,7 +52,8 @@ export default function FinancialInsightModal({
   const { goals } = useSavingsGoals();
   const { transactions } = useTransactions();
   const { colors, isDark } = useTheme();
-  const { isBangla } = useLanguage();
+  const { isBangla, language } = useLanguage();
+  const { trackedProviders } = useMfsTracking();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -77,8 +79,8 @@ export default function FinancialInsightModal({
         console.warn('[FinancialInsightModal] Failed to load analytics:', err);
       });
 
-    // Set suggestions
-    setSuggestions(getQuickPromptSuggestions(insight));
+    // Set suggestions (bilingual)
+    setSuggestions(getQuickPromptSuggestions(insight, isBangla));
 
     // Initialize conversation with the pinned insight if empty
     setMessages((prev) => {
@@ -89,7 +91,9 @@ export default function FinancialInsightModal({
         role: 'assistant',
         content: insight
           ? insight.detailed_advice || insight.short_summary
-          : 'Welcome to FinAlert AI Advisor. Ask me anything about your spending, recent transactions, or category budgets.',
+          : isBangla
+          ? 'ফিনঅ্যালার্ট এআই অ্যাডভাইজারে স্বাগতম। আপনার খরচ, বাজেট অথবা বিকাশ, নগদ, রকেট ও উপায় এসএমএস ট্র্যাকিং সম্পর্কে যেকোনো প্রশ্ন করুন।'
+          : 'Welcome to FinAlert AI Advisor. Ask me about your spending, budgets, or bKash, Nagad, Rocket & Upay SMS tracking.',
         timestamp: insight?.timestamp || Date.now(),
         isInitialInsight: true,
         modelUsed: 'Groq LPU',
@@ -100,7 +104,7 @@ export default function FinancialInsightModal({
     return () => {
       isMounted = false;
     };
-  }, [visible, user?.id, insight]);
+  }, [visible, user?.id, insight, isBangla]);
 
   // Auto scroll to bottom when new messages arrive
   useEffect(() => {
@@ -144,7 +148,10 @@ export default function FinancialInsightModal({
         budgets: categoryBudgets,
         goals,
         recentTransactions: transactions.slice(0, 5),
+        allTransactions: transactions,
         insight,
+        trackedProviders,
+        language,
       });
 
       const assistantMsg: ChatMessage = {

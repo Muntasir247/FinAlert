@@ -2,7 +2,11 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import type { BKashTransaction } from '../services/smsReaderService';
-import { markTrxIdProcessed, removePendingTransaction } from '../services/smsReaderService';
+import {
+  markTrxIdProcessed,
+  removePendingTransaction,
+  MFS_PROVIDER_CONFIG,
+} from '../services/smsReaderService';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -31,6 +35,10 @@ export default function BKashDetectedBanner({
   const isMultiple = items.length > 1;
   const primaryTx = items[0];
 
+  const provider = primaryTx.provider || 'bkash';
+  const providerConfig = MFS_PROVIDER_CONFIG[provider] || MFS_PROVIDER_CONFIG.bkash;
+  const providerName = isBangla ? providerConfig.nameBn : providerConfig.name;
+
   const handleDismissAll = async () => {
     for (const item of items) {
       await markTrxIdProcessed(item.trxId);
@@ -53,54 +61,82 @@ export default function BKashDetectedBanner({
 
   return (
     <View style={styles.container}>
-      <View style={[styles.card, isDark && { backgroundColor: '#361523', borderColor: '#BE185D' }]}>
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: isDark ? providerConfig.badgeBgDark : colors.card,
+            borderColor: isDark ? providerConfig.brandColor : providerConfig.brandColor,
+          },
+        ]}
+      >
         {/* Top Header */}
         <View style={styles.headerRow}>
           <View style={styles.brandRow}>
-            <View style={styles.bkashLogoWrap}>
+            <View style={[styles.bkashLogoWrap, { backgroundColor: providerConfig.brandColor }]}>
               <Ionicons name="phone-portrait" size={14} color="#FFFFFF" />
             </View>
-            <Text style={[styles.brandTitle, isDark && { color: '#FCE7F3' }]}>
+            <Text style={[styles.brandTitle, { color: isDark ? '#FFFFFF' : providerConfig.brandColor }]}>
               {isMultiple
-                ? (isBangla ? `${items.length}টি বিকাশ লেনদেন শনাক্ত হয়েছে` : `${items.length} bKash Transactions Detected`)
-                : (isBangla ? 'বিকাশ লেনদেন শনাক্ত হয়েছে' : 'bKash Transaction Detected')}
+                ? (isBangla ? `${items.length}টি লেনদেন শনাক্ত হয়েছে` : `${items.length} Transactions Detected`)
+                : (isBangla ? `${providerName} লেনদেন শনাক্ত হয়েছে` : `${providerName} Transaction Detected`)}
             </Text>
           </View>
           <TouchableOpacity
             style={styles.closeBtn}
             onPress={handleDismissAll}
             accessibilityRole="button"
-            accessibilityLabel="Dismiss bKash detection"
+            accessibilityLabel="Dismiss transaction detection"
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Feather name="x" size={18} color={isDark ? '#F472B6' : '#6B7280'} />
+            <Feather name="x" size={18} color={isDark ? colors.textSecondary : '#6B7280'} />
           </TouchableOpacity>
         </View>
 
         {/* Transaction Content Details */}
         {isMultiple ? (
-          <View style={[styles.batchDetailBox, isDark && { backgroundColor: '#28101A', borderColor: '#831843' }]}>
-            <Text style={[styles.batchTitle, isDark && { color: '#FCE7F3' }]}>
+          <View
+            style={[
+              styles.batchDetailBox,
+              {
+                backgroundColor: isDark ? colors.surfaceSubtle : '#F8FAFC',
+                borderColor: colors.cardBorder,
+              },
+            ]}
+          >
+            <Text style={[styles.batchTitle, { color: colors.text }]}>
               {isBangla ? `${items.length}টি নতুন লেনদেন পাওয়া গেছে।` : `${items.length} new transactions detected since your last visit.`}
             </Text>
-            <Text style={[styles.batchSummary, isDark && { color: '#FBCFE8' }]}>
+            <Text style={[styles.batchSummary, { color: colors.textSecondary }]}>
               {isBangla ? 'সর্বশেষ: ' : 'Latest: '}{primaryTx.counterparty} · {formatCurrency(primaryTx.amount)} (+{items.length - 1} {isBangla ? 'আরও' : 'more'})
             </Text>
           </View>
         ) : (
           <View style={styles.detailRow}>
             <View style={styles.detailTextCol}>
-              <Text style={[styles.counterpartyText, isDark && { color: '#FCE7F3' }]} numberOfLines={1}>
+              <Text style={[styles.counterpartyText, { color: colors.textSecondary }]} numberOfLines={1}>
                 {isIncome ? (isBangla ? 'প্রেরক: ' : 'Received from: ') : (isBangla ? 'প্রাপক: ' : 'Paid to: ')}
-                <Text style={styles.counterpartyHighlight}>{primaryTx.counterparty}</Text>
+                <Text style={[styles.counterpartyHighlight, { color: colors.text }]}>{primaryTx.counterparty}</Text>
               </Text>
               <View style={styles.metaRow}>
-                <View style={[styles.trxPill, isDark && { backgroundColor: '#28101A' }]}>
-                  <Text style={[styles.trxPillText, isDark && { color: '#F472B6' }]}>TrxID: {primaryTx.trxId}</Text>
+                <View
+                  style={[
+                    styles.trxPill,
+                    {
+                      backgroundColor: isDark ? providerConfig.badgeBgDark : providerConfig.badgeBgLight,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.trxPillText, { color: providerConfig.brandColor }]}>
+                    {providerName}
+                  </Text>
+                </View>
+                <View style={[styles.trxPill, isDark && { backgroundColor: colors.surfaceSubtle }]}>
+                  <Text style={[styles.trxPillText, isDark && { color: colors.textSecondary }]}>TrxID: {primaryTx.trxId}</Text>
                 </View>
                 {primaryTx.reference ? (
-                  <View style={[styles.refPill, isDark && { backgroundColor: '#28101A' }]}>
-                    <Text style={[styles.refPillText, isDark && { color: '#F472B6' }]}>Ref: {primaryTx.reference}</Text>
+                  <View style={[styles.refPill, isDark && { backgroundColor: colors.surfaceSubtle }]}>
+                    <Text style={[styles.refPillText, isDark && { color: colors.textSecondary }]}>Ref: {primaryTx.reference}</Text>
                   </View>
                 ) : null}
                 <View style={[styles.catPill, isDark && { backgroundColor: '#14382A' }]}>
@@ -109,23 +145,23 @@ export default function BKashDetectedBanner({
               </View>
             </View>
             <View style={styles.amountCol}>
-              <Text style={[styles.amountText, isIncome ? styles.amountIncome : styles.amountExpense]}>
+              <Text style={[styles.amountText, isIncome ? styles.amountIncome : { color: providerConfig.brandColor }]}>
                 {isIncome ? '+' : '-'}{formatCurrency(primaryTx.amount)}
               </Text>
-              <Text style={[styles.dateText, isDark && { color: '#F472B6' }]}>{primaryTx.date}</Text>
+              <Text style={[styles.dateText, { color: colors.textMuted }]}>{primaryTx.date}</Text>
             </View>
           </View>
         )}
 
         {/* Human-In-The-Loop Action Buttons */}
-        <View style={styles.actionRow}>
+        <View style={[styles.actionRow, { borderTopColor: isDark ? colors.cardBorder : '#F3F4F6' }]}>
           <TouchableOpacity
-            style={[styles.dismissBtn, isDark && { backgroundColor: '#28101A', borderColor: '#831843' }]}
+            style={[styles.dismissBtn, isDark && { backgroundColor: colors.surfaceSubtle }]}
             onPress={handleDismissAll}
             accessibilityRole="button"
             accessibilityLabel="Ignore transactions"
           >
-            <Text style={[styles.dismissBtnText, isDark && { color: '#FBCFE8' }]}>
+            <Text style={[styles.dismissBtnText, { color: colors.textSecondary }]}>
               {isBangla ? 'উপেক্ষা করুন' : 'Ignore'}
             </Text>
           </TouchableOpacity>

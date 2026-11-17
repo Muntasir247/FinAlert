@@ -54,8 +54,20 @@ export interface Translations {
     notif_permission_msg: string;
     notif_enabled_title: string;
     notif_enabled_body: string;
+    tracked_providers: string;
+    select_providers_title: string;
+    select_providers_prompt: string;
+    save_selection: string;
+    all_providers: string;
+    none_selected: string;
+    provider_bkash: string;
+    provider_nagad: string;
+    provider_rocket: string;
+    provider_upay: string;
   };
   home: {
+    sms_detection: string;
+    sms_detection_sub: string;
     greeting: string;
     total_balance: string;
     monthly_income: string;
@@ -197,8 +209,20 @@ const EN: Translations = {
     notif_permission_msg: 'FinAlert needs notification permission to show alerts on your phone dashboard. Please enable notifications in your device Settings.',
     notif_enabled_title: 'Notifications Enabled',
     notif_enabled_body: 'You will now receive timely alerts for budgets and transactions.',
+    tracked_providers: 'Tracked Providers',
+    select_providers_title: 'Transaction Providers',
+    select_providers_prompt: 'Choose providers to track expenses:',
+    save_selection: 'Save Selection',
+    all_providers: 'All Providers',
+    none_selected: 'None Selected',
+    provider_bkash: 'bKash',
+    provider_nagad: 'Nagad',
+    provider_rocket: 'Rocket',
+    provider_upay: 'Upay',
   },
   home: {
+    sms_detection: 'SMS Detection',
+    sms_detection_sub: 'bKash, Nagad, Rocket, Upay',
     greeting: 'Hello,',
     total_balance: 'Total Balance',
     monthly_income: 'Income',
@@ -354,8 +378,20 @@ const BN: Translations = {
     notif_permission_msg: 'আপনার ফোনের ড্যাশবোর্ডে অ্যালার্ট দেখাতে ফিনঅ্যালার্টের নোটিফিকেশন অনুমতি প্রয়োজন। অনুগ্রহ করে ডিভাইস সেটিংস থেকে নোটিফিকেশন চালু করুন।',
     notif_enabled_title: 'বিজ্ঞপ্তি চালু করা হয়েছে',
     notif_enabled_body: 'আপনি এখন বাজেট এবং লেনদেনের সময়োপযোগী বিজ্ঞপ্তি পাবেন।',
+    tracked_providers: 'ট্র্যাককৃত প্রোভাইডার',
+    select_providers_title: 'ট্রানজ্যাকশন প্রোভাইডার',
+    select_providers_prompt: 'খরচ ট্র্যাক করতে প্রোভাইডার নির্বাচন করুন:',
+    save_selection: 'সংরক্ষণ করুন',
+    all_providers: 'সব প্রোভাইডার',
+    none_selected: 'কোনোটি নির্বাচিত নয়',
+    provider_bkash: 'বিকাশ',
+    provider_nagad: 'নগদ',
+    provider_rocket: 'রকেট',
+    provider_upay: 'উপায়',
   },
   home: {
+    sms_detection: 'এসএমএস ডিটেকশন',
+    sms_detection_sub: 'বিকাশ, নগদ, রকেট, উপায়',
     greeting: 'হ্যালো,',
     total_balance: 'মোট ব্যালেন্স',
     monthly_income: 'আয়',

@@ -16,6 +16,7 @@ import { useTransactions } from '../../context/TransactionsContext';
 import { useBudgets } from '../../context/BudgetsContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useMfsTracking } from '../../context/MfsTrackingContext';
 import { TRANSACTION_CATEGORIES } from '../../lib/transactionCategories';
 import type { Transaction } from '../../lib/transactions';
 import AddTransactionModal from '../../components/AddTransactionModal';
@@ -31,6 +32,7 @@ import {
   removePendingTransaction,
   markTrxIdProcessed,
   syncRecentSms,
+  formatMfsTransactionDescription,
 } from '../../services/smsReaderService';
 import type { BKashTransaction } from '../../services/smsReaderService';
 import type { AddTransactionPrefill } from '../../components/AddTransactionModal';
@@ -65,6 +67,7 @@ export default function TransactionsScreen() {
     useBudgets();
   const { colors, isDark } = useTheme();
   const { t, isBangla, formatCurrency, translateCategory } = useLanguage();
+  const { trackedProviders } = useMfsTracking();
   const [activeTab, setActiveTab] = useState<'transactions' | 'budget'>('transactions');
   const [activeFilter, setActiveFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -100,14 +103,7 @@ export default function TransactionsScreen() {
       unsub();
       appStateSub.remove();
     };
-  }, [transactions]);
-
-  // Sync processed TrxIDs whenever transactions update
-  useEffect(() => {
-    if (transactions && transactions.length > 0) {
-      syncRecentSms(transactions);
-    }
-  }, [transactions]);
+  }, [transactions, trackedProviders]);
 
   const handleReviewBkashTx = (tx: BKashTransaction) => {
     markTrxIdProcessed(tx.trxId);
@@ -118,9 +114,9 @@ export default function TransactionsScreen() {
       type: tx.type,
       amount: tx.amount,
       category: tx.category,
-      description: `${tx.type === 'expense' ? 'Payment to' : 'Received from'} ${tx.counterparty}${tx.reference ? ` - ${tx.reference}` : ''} (TrxID: ${tx.trxId})`,
+      description: formatMfsTransactionDescription(tx),
       date: tx.date,
-      source: 'bkash',
+      source: tx.provider || 'bkash',
       trxId: tx.trxId,
     });
     setEditingTx(null);
@@ -235,9 +231,9 @@ export default function TransactionsScreen() {
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
               onPress={() => setIsBkashSimModalOpen(true)}
               accessibilityRole="button"
-              accessibilityLabel="bKash SMS Detection"
+              accessibilityLabel="SMS Detection"
             >
-              <Ionicons name="phone-portrait-outline" size={18} color="#BE185D" />
+              <Ionicons name="phone-portrait-outline" size={18} color="#0FB384" />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}

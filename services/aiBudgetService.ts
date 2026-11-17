@@ -55,7 +55,7 @@ Guidelines:
 3. "percentage_of_budget" across all 8 categories MUST sum to 100%.
 4. "allocated_amount" for each category must equal (total_spending_budget * percentage_of_budget / 100).
 5. The insight reasoning should be empathetic, specific, and directly cite their actual numbers (e.g., "You averaged ৳12,000 on Food & Dining. By trimming 15%, you save an extra ৳1,800/month towards your 'Trip to Cox's Bazar' goal while leaving ample room for groceries.").
-6. Include 2 to 3 actionable, high-impact tips suitable for life in Bangladesh (e.g., using bKash cashbacks, cooking at home on weekdays, rideshare pooling).
+6. Include 2 to 3 actionable, high-impact tips suitable for life in Bangladesh (e.g., using bKash/Nagad/Rocket/Upay cashbacks, cooking at home on weekdays, rideshare pooling).
 
 Respond with structured JSON strictly matching the response schema.`;
 
@@ -152,7 +152,7 @@ export function generateFallbackBudget(
     : 'Balanced 50/30/20 Starter Budget';
   const reasoning = errorCode
     ? `AI service was unavailable (${errorSnippet || errorCode}). Applied standard 50/30/20 budget framework so you can continue managing your expenses.`
-    : 'Based on the classic 50/30/20 rule (50% essentials, 30% lifestyle, 20% savings). As you track more expenses with bKash and receipt scanning, your recommendations will automatically personalize to your unique spending habits.';
+    : 'Based on the classic 50/30/20 rule (50% essentials, 30% lifestyle, 20% savings). As you track more expenses with bKash, Nagad, Rocket, Upay SMS sync and receipt scanning, your recommendations will automatically personalize to your unique spending habits.';
 
   return {
     monthly_income: income,
@@ -163,7 +163,7 @@ export function generateFallbackBudget(
       headline,
       reasoning,
       tips: [
-        'Track daily expenses quickly via voice entry or automated bKash SMS sync.',
+        'Track daily expenses quickly via voice entry or automated bKash, Nagad, Rocket & Upay SMS sync.',
         'Aim to automate your 20% savings at the start of each month.',
         'Review your category limits every month to adjust for changes in income or lifestyle.',
       ],

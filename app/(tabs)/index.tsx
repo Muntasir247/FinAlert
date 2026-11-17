@@ -19,6 +19,7 @@ import { useNotifications } from '../../context/NotificationsContext';
 import { useSavingsGoals } from '../../context/SavingsGoalsContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useMfsTracking } from '../../context/MfsTrackingContext';
 import AddTransactionModal from '../../components/AddTransactionModal';
 import CircularProgress from '../../components/CircularProgress';
 import SavingsGoalsManager from '../../components/SavingsGoalsManager';
@@ -37,6 +38,7 @@ import {
   removePendingTransaction,
   markTrxIdProcessed,
   syncRecentSms,
+  formatMfsTransactionDescription,
 } from '../../services/smsReaderService';
 import type { BKashTransaction } from '../../services/smsReaderService';
 import type { AddTransactionPrefill } from '../../components/AddTransactionModal';
@@ -111,6 +113,7 @@ export default function HomeScreen() {
   const { goals: savingsGoals } = useSavingsGoals();
   const { colors, isDark } = useTheme();
   const { t, isBangla, formatCurrency, translateCategory } = useLanguage();
+  const { trackedProviders } = useMfsTracking();
   const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
   const [savingsSheetVisible, setSavingsSheetVisible] = useState(false);
@@ -194,7 +197,7 @@ export default function HomeScreen() {
       }
     });
 
-    // Automatically scan recent SMS inbox on mount
+    // Automatically scan recent SMS inbox on mount / provider update
     syncRecentSms(transactions);
 
     // Automatically scan recent SMS whenever user returns to the app from background/sleep
@@ -204,18 +207,19 @@ export default function HomeScreen() {
       }
     });
 
+    // Periodically check inbox while app is active in foreground to catch incoming SMS immediately
+    const foregroundPoll = setInterval(() => {
+      if (AppState.currentState === 'active') {
+        syncRecentSms(transactions);
+      }
+    }, 15000);
+
     return () => {
       unsub();
       appStateSub.remove();
+      clearInterval(foregroundPoll);
     };
-  }, [transactions]);
-
-  // Keep processed TrxIDs in sync whenever user transactions load or update
-  useEffect(() => {
-    if (transactions && transactions.length > 0) {
-      syncRecentSms(transactions);
-    }
-  }, [transactions]);
+  }, [transactions, trackedProviders]);
 
   const handleReviewBkashTx = (tx: BKashTransaction) => {
     markTrxIdProcessed(tx.trxId);
@@ -226,9 +230,9 @@ export default function HomeScreen() {
       type: tx.type,
       amount: tx.amount,
       category: tx.category,
-      description: `${tx.type === 'expense' ? 'Payment to' : 'Received from'} ${tx.counterparty}${tx.reference ? ` - ${tx.reference}` : ''} (TrxID: ${tx.trxId})`,
+      description: formatMfsTransactionDescription(tx),
       date: tx.date,
-      source: 'bkash',
+      source: tx.provider || 'bkash',
       trxId: tx.trxId,
     });
     setModalVisible(true);
@@ -424,25 +428,25 @@ export default function HomeScreen() {
               styles.ingestionCardBkash,
               {
                 backgroundColor: colors.card,
-                borderColor: isDark ? '#4A1D34' : '#FCE7F3',
+                borderColor: isDark ? colors.cardBorder : '#E2E8F0',
               },
             ]}
             onPress={() => setIsBkashSimModalOpen(true)}
             accessibilityRole="button"
-            accessibilityLabel="bKash SMS Detection"
+            accessibilityLabel="SMS Detection"
           >
-            <View style={[styles.ingestionIconBkash, { backgroundColor: isDark ? '#4A1D34' : '#FCE7F3' }]}>
-              <Ionicons name="phone-portrait-outline" size={18} color="#BE185D" />
+            <View style={[styles.ingestionIconBkash, { backgroundColor: isDark ? '#143D2E' : '#E8F7F1' }]}>
+              <Ionicons name="phone-portrait-outline" size={18} color="#0FB384" />
             </View>
             <View style={styles.ingestionTextCol}>
-              <Text style={styles.ingestionTitleBkash}>
-                {isBangla ? 'বিকাশ ডিটেকশন' : 'bKash Detection'}
+              <Text style={[styles.ingestionTitleBkash, { color: colors.text }]}>
+                {isBangla ? 'এসএমএস ডিটেকশন' : 'SMS Detection'}
               </Text>
               <Text style={[styles.ingestionSubtitle, { color: colors.textSecondary }]}>
-                {isBangla ? 'অটো এসএমএস রিডার' : 'Auto SMS reader'}
+                {isBangla ? 'বিকাশ, নগদ, রকেট, উপায়' : 'bKash, Nagad, Rocket, Upay'}
               </Text>
             </View>
-            <Feather name="chevron-right" size={16} color="#BE185D" />
+            <Feather name="chevron-right" size={16} color={colors.primary} />
           </TouchableOpacity>
 
           <TouchableOpacity

@@ -17,6 +17,8 @@ import {
   markTrxIdProcessed,
   removePendingTransaction,
   clearPendingTransactions,
+  formatMfsTransactionDescription,
+  MFS_PROVIDER_CONFIG,
   type BKashTransaction,
 } from '../services/smsReaderService';
 import { TRANSACTION_CATEGORIES, INCOME_CATEGORIES } from '../lib/transactionCategories';
@@ -94,7 +96,7 @@ export default function BKashBatchReviewModal({
       type: tx.type,
       amount: tx.amount,
       category: tx.category,
-      description: `${tx.type === 'expense' ? 'Payment to' : 'Received from'} ${tx.counterparty}${tx.reference ? ` - ${tx.reference}` : ''} (TrxID: ${tx.trxId})`,
+      description: formatMfsTransactionDescription(tx),
       date: tx.date,
     }));
 
@@ -122,8 +124,10 @@ export default function BKashBatchReviewModal({
     onClose();
 
     Alert.alert(
-      'Transactions Added! 🎉',
-      `Successfully imported ${count} bKash transactions into your account.`
+      isBangla ? 'লেনদেন যোগ হয়েছে! 🎉' : 'Transactions Added! 🎉',
+      isBangla
+        ? `সফলভাবে ${count}টি লেনদেন অ্যাকাউন্টে যোগ করা হয়েছে।`
+        : `Successfully imported ${count} transactions into your account.`
     );
   };
 
@@ -143,7 +147,7 @@ export default function BKashBatchReviewModal({
               </View>
               <View>
                 <Text style={[styles.title, { color: colors.text }]}>
-                  {isBangla ? 'শনাক্তকৃত বিকাশ এসএমএস পর্যালোচনা' : 'Review Detected bKash SMS'}
+                  {isBangla ? 'শনাক্তকৃত এসএমএস পর্যালোচনা' : 'Review Detected Transactions'}
                 </Text>
                 <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                   {isBangla
@@ -248,6 +252,24 @@ export default function BKashBatchReviewModal({
                     </View>
 
                     <View style={styles.bottomRow}>
+                      {(() => {
+                        const pConfig = MFS_PROVIDER_CONFIG[tx.provider || 'bkash'] || MFS_PROVIDER_CONFIG.bkash;
+                        const pName = isBangla ? pConfig.nameBn : pConfig.name;
+                        return (
+                          <Text
+                            style={[
+                              styles.trxPill,
+                              {
+                                backgroundColor: isDark ? pConfig.badgeBgDark : pConfig.badgeBgLight,
+                                color: pConfig.brandColor,
+                                fontWeight: '700',
+                              },
+                            ]}
+                          >
+                            {pName}
+                          </Text>
+                        );
+                      })()}
                       <Text style={[styles.trxPill, isDark && { backgroundColor: '#14382A', color: '#A7F3D0' }]}>
                         TrxID: {tx.trxId}
                       </Text>

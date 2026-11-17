@@ -17,6 +17,7 @@ import { useTransactions } from '../../context/TransactionsContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage, type Language } from '../../context/LanguageContext';
+import { useMfsTracking } from '../../context/MfsTrackingContext';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -24,7 +25,8 @@ export default function ProfileScreen() {
   const { transactions } = useTransactions();
   const { notificationsEnabled, setNotificationsEnabled } = useNotifications();
   const { isDark, setTheme, colors } = useTheme();
-  const { language, setLanguage, t, formatCompactCurrency } = useLanguage();
+  const { language, setLanguage, t, formatCompactCurrency, isBangla } = useLanguage();
+  const { trackedProviders, openModal: openMfsModal } = useMfsTracking();
 
   // Bottom sheet modal state ('security' | 'support' | null)
   const [activeModal, setActiveModal] = useState<'security' | 'support' | null>(null);
@@ -142,6 +144,42 @@ export default function ProfileScreen() {
               <View style={styles.rowRight}>
                 <Text style={[styles.rowRightText, { color: colors.textSecondary }]}>
                   {language === 'bn' ? 'বাংলা' : 'English'}
+                </Text>
+                <Feather name="chevron-right" size={16} color={colors.textMuted} />
+              </View>
+            </TouchableOpacity>
+
+            {/* Tracked Providers Row */}
+            <TouchableOpacity
+              style={[styles.rowItem, { borderBottomColor: colors.divider }]}
+              activeOpacity={0.6}
+              onPress={openMfsModal}
+              accessibilityRole="button"
+              accessibilityLabel="Select transaction providers"
+            >
+              <View style={styles.rowLeft}>
+                <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#143D2E' : '#E8F7F1' }]}>
+                  <Ionicons name="phone-portrait-outline" size={18} color="#0FB384" />
+                </View>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>
+                  {t('profile.tracked_providers', 'Tracked Providers')}
+                </Text>
+              </View>
+              <View style={styles.rowRight}>
+                <Text style={[styles.rowRightText, { color: colors.textSecondary }]}>
+                  {trackedProviders.length === 0
+                    ? t('profile.none_selected', 'None Selected')
+                    : trackedProviders.length === 4
+                    ? t('profile.all_providers', 'All Providers')
+                    : trackedProviders
+                        .map((p) => {
+                          if (p === 'bkash') return isBangla ? 'বিকাশ' : 'bKash';
+                          if (p === 'nagad') return isBangla ? 'নগদ' : 'Nagad';
+                          if (p === 'rocket') return isBangla ? 'রকেট' : 'Rocket';
+                          if (p === 'upay') return isBangla ? 'উপায়' : 'Upay';
+                          return p;
+                        })
+                        .join(', ')}
                 </Text>
                 <Feather name="chevron-right" size={16} color={colors.textMuted} />
               </View>

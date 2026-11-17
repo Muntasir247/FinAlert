@@ -12,6 +12,7 @@ import { BudgetsProvider } from '../context/BudgetsContext';
 import { NotificationsProvider } from '../context/NotificationsContext';
 import { SavingsGoalsProvider } from '../context/SavingsGoalsContext';
 import { FamilyProvider } from '../context/FamilyContext';
+import { MfsTrackingProvider } from '../context/MfsTrackingContext';
 import BudgetSetupModal from '../components/BudgetSetupModal';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text } from 'react-native';
@@ -117,17 +118,19 @@ export default function RootLayout() {
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
-          <TransactionsProvider>
-            <NotificationsProvider>
-              <BudgetsProvider>
-                <SavingsGoalsProvider>
-                  <FamilyProvider>
-                    <AppContent />
-                  </FamilyProvider>
-                </SavingsGoalsProvider>
-              </BudgetsProvider>
-            </NotificationsProvider>
-          </TransactionsProvider>
+          <MfsTrackingProvider>
+            <TransactionsProvider>
+              <NotificationsProvider>
+                <BudgetsProvider>
+                  <SavingsGoalsProvider>
+                    <FamilyProvider>
+                      <AppContent />
+                    </FamilyProvider>
+                  </SavingsGoalsProvider>
+                </BudgetsProvider>
+              </NotificationsProvider>
+            </TransactionsProvider>
+          </MfsTrackingProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>
