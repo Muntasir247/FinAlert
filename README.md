@@ -8,11 +8,11 @@
 ## 🌟 Key Features
 
 ### 1. Multi-Modal Expense & Income Ingestion
-* **Automated bKash SMS Ingestion (Android):** Custom native module (`modules/sms-reader`) reads official transaction SMS, extracts TrxID, counterparty, and amounts, deduplicates against SecureStore and database history, and stages them for human-in-the-loop confirmation. (Includes an in-app SMS simulator for development and Expo Go).
-* **Bank Statement PDF Parser & ISO 32000 Decryption:** Upload password-protected monthly bank statements (City Bank, BRAC, DBBL, EBL, SCB, etc.). Decrypts AES-128, AES-256, and RC4 encrypted PDFs on-device and extracts itemized debit/credit records via multimodal AI.
-* **Voice-to-Intent Entry:** Local speech recognition (`expo-speech-recognition`) in Bangla (`bn-BD`) and English (`en-US`). Natural phrases (e.g., *"আজকে রিকশা ভাড়া দিলাম ৫০ টাকা"* or *"Spent 700 taka on groceries"*) are classified into structured transactions and pre-fill entry forms.
-* **Receipt & Invoice Vision Scanner:** Snap a photo or choose from gallery. Google Gemini Vision extracts merchant names, dates, line items, and totals with per-item checkboxes.
-* **Manual Quick Forms:** Intuitive manual entry with custom category icons and notes.
+* **Automated MFS & Bank Card SMS Ingestion (Android Native Module):** Custom native module (`modules/sms-reader`) reads official transaction SMS from all major Bangladeshi MFS providers (**bKash, Nagad, Rocket, Upay**) and **Credit/Debit Cards across 55+ Bangladeshi Banks** (SCB, City Bank AMEX/Visa, BRAC Bank, DBBL Nexus, EBL, MTB, UCB, Prime Bank, Bank Asia, Southeast Bank, HSBC, etc.). Automatically extracts TrxID, merchant/counterparty, amounts, card masks (`...1234`), and timestamps. Features deep historical SMS scanning (up to 2,500 messages) on-device and stages detected transactions for human-in-the-loop review. Includes an in-app SMS Simulator modal with multi-provider presets for testing in Expo Go or emulator environments.
+* **Bank Statement PDF Parser, ISO 32000 Decryption & Cross-Source Deduplication:** Upload password-protected monthly bank statements. Decrypts AES-128, AES-256, and RC4 encrypted PDFs on-device and extracts itemized debit/credit records via multimodal AI. Features intelligent **cross-source deduplication** that merges daily SMS card logs with end-of-month bank statement records using fuzzy date matching, amounts, and card masks to prevent duplicate expense entries.
+* **Voice-to-Intent Entry:** Local speech recognition (`expo-speech-recognition`) in Bangla (`bn-BD`) and English (`en-US`). Natural phrases (e.g., *"আজকে রিকশা ভাড়া দিলাম ৫০ টাকা"* or *"Spent 700 taka on groceries"*) are classified into structured transactions via Groq (Llama 3) and Gemini with sub-300ms latency.
+* **Receipt & Invoice Vision Scanner:** Snap a photo or choose from gallery. Google Gemini Vision extracts merchant names, dates, itemized line items, and totals with per-item checkboxes for partial claim.
+* **Manual Quick Forms:** Intuitive manual entry with custom category icons, notes, and full keyboard-avoiding inputs.
 
 ### 2. Family Finance Module (Capstone Innovation)
 * **Invite-Code Households:** Create or join a family group via unique code (`FAMS-XXXX`).
@@ -31,10 +31,12 @@
 * **Savings Goals:** Create custom savings targets with target dates and track atomic progress with celebratory notifications at 20%, 40%, 60%, 80%, and 100% milestones.
 * **Visual Reports & Analytics:** Interactive income vs. expense bar charts (with dynamic scaling) and category spending donut charts built natively with `react-native-svg`.
 
-### 5. Personalization & Localization
+### 5. Personalization, Localization & UX Polish
 * **Full Bilingual Support:** Seamless live toggle between English and Bangla across all navigation tabs, dashboards, profile preferences, and modals.
-* **Dark / Light Theme:** Custom theme engine with high-contrast dark mode support.
+* **Dark / Light Theme:** Custom theme engine with high-contrast dark mode support, optimized notification cards, and zero-overflow layout rendering.
 * **Password Recovery:** Self-service password reset with email OTP verification.
+* **Deferred Permission Gating:** Smooth first-run onboarding that defers camera, audio, and SMS permission requests until the user reaches the Home screen, prompting only once.
+* **Keyboard-Avoidance System:** Custom viewport-aware keyboard scrolling across all authentication and entry forms.
 
 ---
 
@@ -66,7 +68,7 @@
 ```bash
 # Clone repository
 git clone https://github.com/Muntasir247/FinAlert.git
-cd FinAlert/finalert
+cd FinAlert
 
 # Install dependencies (runs patch-package postinstall)
 npm install
@@ -141,10 +143,10 @@ FinAlert strictly enforces clean separation of concerns as mandated by `AGENTS.m
 
 ## 📚 Project Documentation
 
-* [`UNDERSTANDING.md`](../UNDERSTANDING.md) — Comprehensive technical architecture, algorithms, and data dictionary.
-* [`DESIGN.md`](../DESIGN.md) — UI/UX design tokens, typography rules, and color palettes.
+* [`UNDERSTANDING.md`](./UNDERSTANDING.md) — Comprehensive technical architecture, algorithms, and data dictionary.
+* [`DESIGN.md`](./DESIGN.md) — UI/UX design tokens, typography rules, and color palettes.
 * [`AGENTS.md`](./AGENTS.md) — Architectural invariants and backend portability directives.
-* [`Capstone_final_report.md`](../Capstone_final_report.md) — Academic capstone final report, test catalogue (29 test cases), and defect registers.
+* [`project.md`](./project.md) — Developer & engineering orientation guide.
 
 ---
 

@@ -35,7 +35,26 @@ yarn-error.*
 *.pem
 
 # local env files
-.env*.local
+.env
+.env.*
+!.env.example
+
+# credentials & keystores
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+
+# IDEs & OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
 
 # typescript
 *.tsbuildinfo
