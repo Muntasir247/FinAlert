@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,12 +14,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
+import { useKeyboard } from '../../lib/useKeyboard';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function SignupScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signUp } = useAuth();
+  const { keyboardHeight, keyboardPaddingBottom } = useKeyboard();
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const [activeField, setActiveField] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -28,6 +35,17 @@ export default function SignupScreen() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Automatically scroll when keyboard pops up or active input changes
+  useEffect(() => {
+    if (keyboardHeight > 0) {
+      if (activeField === 'password') {
+        setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 80);
+      } else if (activeField === 'email') {
+        setTimeout(() => scrollViewRef.current?.scrollTo({ y: 140, animated: true }), 80);
+      }
+    }
+  }, [keyboardHeight, activeField]);
 
   const handleSignup = async () => {
     if (!fullName.trim() || !email.trim() || !password.trim()) {
@@ -63,18 +81,20 @@ export default function SignupScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-green-white"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={0}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={{
           flexGrow: 1,
           paddingTop: insets.top + 16,
-          paddingBottom: insets.bottom + 16,
+          paddingBottom: Math.max(insets.bottom, 16) + (keyboardPaddingBottom || 48),
           paddingHorizontal: 20,
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets={true}
       >
         <View className="pt-2 pb-6">
           {/* Branding Block */}
@@ -156,6 +176,10 @@ export default function SignupScreen() {
                   onChangeText={setFullName}
                   editable={!loading}
                   accessibilityLabel="Full name input"
+                  returnKeyType="next"
+                  onSubmitEditing={() => emailRef.current?.focus()}
+                  onFocus={() => setActiveField('name')}
+                  onBlur={() => setActiveField(null)}
                 />
               </View>
             </View>
@@ -168,6 +192,7 @@ export default function SignupScreen() {
               </Text>
               <View className="flex-row items-center bg-white border border-light-green rounded-xl px-4 h-[52px]">
                 <TextInput
+                  ref={emailRef}
                   className="flex-1 text-[14px] font-normal text-light-bg-text h-full"
                   placeholder="Enter your email"
                   placeholderTextColor="#A0ADB6"
@@ -178,6 +203,13 @@ export default function SignupScreen() {
                   onChangeText={setEmail}
                   editable={!loading}
                   accessibilityLabel="Email input"
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  onFocus={() => {
+                    setActiveField('email');
+                    setTimeout(() => scrollViewRef.current?.scrollTo({ y: 140, animated: true }), 120);
+                  }}
+                  onBlur={() => setActiveField(null)}
                 />
               </View>
             </View>
@@ -190,6 +222,7 @@ export default function SignupScreen() {
               </Text>
               <View className="flex-row items-center bg-white border border-light-green rounded-xl px-4 h-[52px]">
                 <TextInput
+                  ref={passwordRef}
                   className="flex-1 text-[14px] font-normal text-light-bg-text h-full"
                   placeholder="Create a password"
                   placeholderTextColor="#A0ADB6"
@@ -200,6 +233,13 @@ export default function SignupScreen() {
                   onChangeText={setPassword}
                   editable={!loading}
                   accessibilityLabel="Password input"
+                  returnKeyType="done"
+                  onSubmitEditing={handleSignup}
+                  onFocus={() => {
+                    setActiveField('password');
+                    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
+                  }}
+                  onBlur={() => setActiveField(null)}
                 />
                 <TouchableOpacity
                   onPress={() => setPasswordVisible(!passwordVisible)}

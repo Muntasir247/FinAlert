@@ -15,7 +15,7 @@ class SmsReaderModule : Module() {
       try {
         val uri = Uri.parse("content://sms/inbox")
         val projection = arrayOf("_id", "address", "body", "date")
-        val safeLimit = if (limit in 1..100) limit else 50
+        val safeLimit = if (limit in 1..2500) limit else 250
         val sortOrder = "date DESC"
 
         val selection: String?

@@ -146,9 +146,13 @@ export default function MfsProviderModal({
                         },
                       ]}
                     >
-                      <Text style={[styles.providerBadgeText, { color: config.brandColor }]}>
-                        {config.name.charAt(0)}
-                      </Text>
+                      {provider === 'cards' ? (
+                        <Ionicons name="card-outline" size={16} color={config.brandColor} />
+                      ) : (
+                        <Text style={[styles.providerBadgeText, { color: config.brandColor }]}>
+                          {config.name.charAt(0)}
+                        </Text>
+                      )}
                     </View>
                     <Text style={[styles.providerName, { color: colors.text }]}>
                       {isBangla ? config.nameBn : config.name}

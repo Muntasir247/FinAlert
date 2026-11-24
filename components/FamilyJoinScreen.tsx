@@ -7,11 +7,13 @@ import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useFamily } from '../context/FamilyContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useKeyboard } from '../lib/useKeyboard';
 
 export default function FamilyJoinScreen() {
   const { joinFamily, createFamily } = useFamily();
@@ -65,11 +67,14 @@ export default function FamilyJoinScreen() {
     setErrorMsg(null);
   };
 
+  const { keyboardPaddingBottom } = useKeyboard();
+
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 + keyboardPaddingBottom }]}
       keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets={true}
     >
       <View style={[styles.iconCircle, isDark && { backgroundColor: '#14382A' }]}>
         <Ionicons name="people" size={32} color="#0FB384" />

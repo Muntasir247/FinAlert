@@ -2,8 +2,8 @@ import { Platform, PermissionsAndroid } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import type { TransactionType } from '../lib/transactions';
 
-export type MfsProvider = 'bkash' | 'nagad' | 'rocket' | 'upay';
-export const ALL_MFS_PROVIDERS: MfsProvider[] = ['bkash', 'nagad', 'rocket', 'upay'];
+export type MfsProvider = 'bkash' | 'nagad' | 'rocket' | 'upay' | 'cards';
+export const ALL_MFS_PROVIDERS: MfsProvider[] = ['bkash', 'nagad', 'rocket', 'upay', 'cards'];
 
 export interface MfsTransaction {
   trxId: string;
@@ -75,6 +75,78 @@ export const MFS_PROVIDER_CONFIG: Record<
     badgeBgLight: '#E0F2FE',
     senders: ['upay', '16268', 'UCB'],
     shortcodes: ['16268'],
+  },
+  cards: {
+    id: 'cards',
+    name: 'Bank Cards',
+    nameBn: 'ব্যাংক কার্ড (ডেবিট/ক্রেডিট)',
+    brandColor: '#2563EB',
+    badgeBgDark: '#1E293B',
+    badgeBgLight: '#EFF6FF',
+    senders: [
+      'CityBank', '16234', 'Citygem', 'CityTouch',
+      'EBL', '16230', 'EasternBank', 'EBLConnect',
+      'BRACBank', 'BRAC Bank', '16221', 'Astha',
+      'DBBL', 'NexusPay', '16216', 'Nexus',
+      'SCB', 'SCBBD', '16233', 'StanChart',
+      'MTB', '16245', '16268', 'MutualTrust',
+      'PrimeBank', '16218', 'Altitude',
+      'UCB', '16419',
+      'BankAsia', '16205',
+      'DhakaBank', '16559',
+      'SEBL', '16206', 'SoutheastBank',
+      'PremierBank', '16411',
+      'JamunaBank', '16742',
+      'OneBank', '16269',
+      'TrustBank', '16201', 'TAP',
+      'NCCBank', '16315',
+      'MidlandBank', '16285',
+      'MBL', '16225', 'MercantileBank',
+      'PubaliBank', '16228',
+      'UttaraBank',
+      'ABBank', '16207',
+      'IFIC', '16255',
+      'MeghnaBank', '16735',
+      'Modhumoti', '16353',
+      'NRBBank', '16240',
+      'NRBCBank', '16120',
+      'SBACBank', '16720',
+      'ShimantoBank', '16856',
+      'PadmaBank', '16612',
+      'BCBL', '16766',
+      'CitizensBank', '16773',
+      'CommunityBank', '16707',
+      'IBBL', '16259', 'IslamiBank', 'Cellfin',
+      'AIBL', '16434',
+      'SIBL', '16491',
+      'FSIBL', '16257',
+      'EXIMBank', '16246',
+      'SJIBL', '16247',
+      'UnionBank', '16736',
+      'GIB', '16713',
+      'StandardBank', '16474',
+      'SonaliBank', '16639',
+      'JanataBank', '16111',
+      'AgraniBank', '16236',
+      'RupaliBank', '16495',
+      'BASICBank',
+      'BKB',
+      'RAKUB',
+      'HSBC', 'HSBCBD',
+      'CBC', '16322',
+      'SBIBD', '16214',
+      'WooriBank',
+      'BankAlfalah', '16277',
+    ],
+    shortcodes: [
+      '16234', '16230', '16221', '16216', '16233', '16245', '16268',
+      '16218', '16419', '16205', '16559', '16206', '16411', '16742',
+      '16269', '16201', '16315', '16285', '16225', '16228', '16207',
+      '16255', '16735', '16353', '16240', '16120', '16720', '16856',
+      '16612', '16766', '16773', '16707', '16259', '16434', '16491',
+      '16257', '16246', '16247', '16736', '16713', '16474', '16639',
+      '16111', '16236', '16495', '16322', '16214', '16277',
+    ],
   },
 };
 
@@ -178,29 +250,103 @@ export function getCachedTrackedProviders(): MfsProvider[] {
  * preventing false positives from bank/promo/OTP messages.
  */
 export function detectProvider(sender?: string, body?: string): MfsProvider | null {
-  const s = (sender || '').toLowerCase();
+  const s = (sender || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const b = (body || '').toLowerCase();
 
-  // 1. Explicit sender checks (handles shortcodes, masked headers, +88 prefixes)
+  // 1. Check card-specific markers first (handles bank senders and card keywords)
+  const isCardPattern =
+    /\b(?:card\s*(?:ending|no|number|#)?\s*(?:with|in)?\s*[:.]?\s*(?:\*{1,4}|x{1,4})?\d{4}|credit\s*card|debit\s*card|prepaid\s*card|visa(?:\s*card)?|mastercard|amex|nexus\s*pay|nexus\s*card)\b/i.test(b) ||
+    /\b(?:debited\s+for|debited\s+by|debited\s+with|debited|used\s+for|spent\s+at|purchase\s+of|purchase\s+at|authorized\s+for|swiped\s+for|transaction\s+on\s+card|trx\s+of\s+bdt|pos\s+purchase|e-com(?:merce)?\s+purchase|atm\s+withdrawal)\b/i.test(b);
+
+  const isBankSender =
+    s.includes('citybank') || s.includes('16234') ||
+    s.includes('ebl') || s.includes('16230') || s.includes('easternbank') ||
+    s.includes('brac') || s.includes('16221') || s.includes('astha') ||
+    s.includes('dbbl') || s.includes('16216') || s.includes('nexus') ||
+    s.includes('scb') || s.includes('16233') || s.includes('stanchart') ||
+    s.includes('mtb') || s.includes('16245') || s.includes('16268') || s.includes('mutualtrust') ||
+    s.includes('primebank') || s.includes('16218') || s.includes('altitude') ||
+    s.includes('dhakabank') || s.includes('16559') ||
+    s.includes('bankasia') || s.includes('16205') ||
+    s.includes('trustbank') || s.includes('16201') ||
+    s.includes('ibbl') || s.includes('16259') || s.includes('cellfin') ||
+    s.includes('nccbank') || s.includes('16315') ||
+    s.includes('sebl') || s.includes('16206') || s.includes('southeastbank') ||
+    s.includes('premierbank') || s.includes('16411') ||
+    s.includes('jamunabank') || s.includes('16742') ||
+    s.includes('onebank') || s.includes('16269') ||
+    s.includes('midlandbank') || s.includes('16285') ||
+    s.includes('mercantilebank') || s.includes('16225') || s.includes('mbl') ||
+    s.includes('pubalibank') || s.includes('16228') ||
+    s.includes('uttarabank') ||
+    s.includes('abbank') || s.includes('16207') ||
+    s.includes('ific') || s.includes('16255') ||
+    s.includes('meghnabank') || s.includes('16735') ||
+    s.includes('modhumoti') || s.includes('16353') ||
+    s.includes('nrbbank') || s.includes('16240') ||
+    s.includes('nrbcbank') || s.includes('16120') ||
+    s.includes('sbacbank') || s.includes('16720') ||
+    s.includes('shimantobank') || s.includes('16856') ||
+    s.includes('padmabank') || s.includes('16612') ||
+    s.includes('bcbl') || s.includes('16766') ||
+    s.includes('citizensbank') || s.includes('16773') ||
+    s.includes('communitybank') || s.includes('16707') ||
+    s.includes('aibl') || s.includes('16434') ||
+    s.includes('sibl') || s.includes('16491') ||
+    s.includes('fsibl') || s.includes('16257') ||
+    s.includes('eximbank') || s.includes('16246') ||
+    s.includes('sjibl') || s.includes('16247') ||
+    s.includes('unionbank') || s.includes('16736') ||
+    s.includes('gib') || s.includes('16713') ||
+    s.includes('standardbank') || s.includes('16474') ||
+    s.includes('sonalibank') || s.includes('16639') ||
+    s.includes('janatabank') || s.includes('16111') ||
+    s.includes('agranibank') || s.includes('16236') ||
+    s.includes('rupalibank') || s.includes('16495') ||
+    s.includes('hsbc') ||
+    s.includes('cbc') || s.includes('16322') ||
+    s.includes('sbibd') || s.includes('16214') ||
+    s.includes('bankalfalah') || s.includes('16277') ||
+    s.includes('bank');
+
+  if (
+    (isBankSender && (isCardPattern || /\b(?:bdt|tk|৳|taka|usd)\b/i.test(b))) ||
+    (isCardPattern && (s.includes('bank') || s.includes('card') || s.includes('nexus') || /\b(?:debited|card\s*ending)\b/i.test(b)))
+  ) {
+    return 'cards';
+  }
+
+  // If DBBL or UCB has card references:
+  if ((s.includes('dbbl') || s.includes('nexus') || s.includes('ucb')) && isCardPattern) {
+    return 'cards';
+  }
+
+  // 2. Explicit sender checks (handles shortcodes, masked headers, +88 prefixes)
   if (s.includes('nagad') || s.includes('16167')) return 'nagad';
-  if (s.includes('rocket') || s.includes('16216') || s.includes('dbbl')) return 'rocket';
-  if (s.includes('upay') || s.includes('16268') || s.includes('ucb')) return 'upay';
+  if ((s.includes('rocket') || s.includes('16216') || s.includes('dbbl')) && !b.includes('card')) return 'rocket';
+  if ((s.includes('upay') || s.includes('16268') || s.includes('ucb')) && !b.includes('card')) return 'upay';
   if (s.includes('bkash') || s.includes('16247')) return 'bkash';
 
-  // 2. Explicit body keyword checks & unique provider markers
+  // 3. Explicit body keyword checks & unique provider markers
   if (b.includes('nagad') || b.includes('16167') || b.includes('uddokta')) return 'nagad';
   if (
-    b.includes('rocket') ||
-    b.includes('dbbl') ||
-    b.includes('16216') ||
-    (b.includes('your a/c balance') && /txnid/i.test(b))
+    (b.includes('rocket') ||
+      b.includes('dbbl') ||
+      b.includes('16216') ||
+      (b.includes('your a/c balance') && /txnid/i.test(b))) &&
+    !b.includes('card')
   ) {
     return 'rocket';
   }
-  if (b.includes('upay') || b.includes('16268') || b.includes('ucb') || /\bUP[0-9A-Z]{6,}\b/i.test(b)) {
+  if ((b.includes('upay') || b.includes('16268') || b.includes('ucb') || /\bUP[0-9A-Z]{6,}\b/i.test(b)) && !b.includes('card')) {
     return 'upay';
   }
   if (b.includes('bkash') || b.includes('16247')) return 'bkash';
+
+  // 4. Fallback: If body matches card pattern with currency and a merchant indicator
+  if (isCardPattern && /\b(?:tk|bdt|৳|taka|usd)\b/i.test(b) && /\b(?:at|to|for)\b/i.test(b)) {
+    return 'cards';
+  }
 
   return null;
 }
@@ -226,7 +372,72 @@ async function loadProcessedTrxIds(): Promise<void> {
 }
 
 /**
- * Extracts a bKash TrxID from a transaction description string.
+ * Helper to check if two transactions match as duplicates considering
+ * settlement delay (+/- 3.5 days) and description / merchant keyword overlap.
+ * Used for bidirectional deduplication between Card/MFS SMS and Bank Statement PDF.
+ */
+export function isDuplicateTransactionMatch(
+  t1: { amount?: number; date?: string; type?: string; description?: string | null },
+  t2: { amount?: number; date?: string; type?: string; description?: string | null }
+): boolean {
+  if (t1.amount == null || t2.amount == null || !t1.date || !t2.date) return false;
+  if (Math.abs(t1.amount - t2.amount) >= 0.01) return false;
+  if (t1.type && t2.type && t1.type !== t2.type) return false;
+
+  const isExactDate = t1.date === t2.date;
+  let diffDays = 0;
+  const d1 = new Date(t1.date).getTime();
+  const d2 = new Date(t2.date).getTime();
+  if (!isNaN(d1) && !isNaN(d2)) {
+    diffDays = Math.abs(d1 - d2) / (1000 * 60 * 60 * 24);
+  }
+
+  // Exact date + exact amount is an automatic duplicate
+  if (isExactDate) return true;
+
+  // Within 3.5 days (standard bank clearing/settlement window): verify merchant or keyword overlap
+  if (diffDays <= 3.5) {
+    const desc1 = (t1.description || '').toLowerCase();
+    const desc2 = (t2.description || '').toLowerCase();
+    if (!desc1 || !desc2) return true;
+
+    // Card last 4 digits match
+    const card1 = desc1.match(/\b\d{4}\b/);
+    const card2 = desc2.match(/\b\d{4}\b/);
+    if (card1 && card2 && card1[0] === card2[0]) {
+      return true;
+    }
+
+    const stopWords = new Set([
+      'payment',
+      'from',
+      'with',
+      'card',
+      'bank',
+      'debit',
+      'credit',
+      'ref',
+      'trxid',
+      'purchase',
+      'bill',
+      'pos',
+      'to',
+      'at',
+      'bdt',
+      'tk',
+      'taka',
+    ]);
+    const words2 = desc2.split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !stopWords.has(w));
+    if (words2.some((w) => desc1.includes(w))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Extracts a bKash / Card TrxID from a transaction description string.
  * Example strings:
  * - "Payment to Uber - Trips (TrxID: 9J38DH291)"
  * - "Received from John Doe (TrxID: 8KL291823)"
@@ -273,13 +484,10 @@ export async function syncProcessedTrxIdsFromTransactions(
       // 1. Match by TrxID
       if (inMemoryProcessedTrxIds.has(p.trxId)) return false;
 
-      // 2. Match by exact date + amount + type in existing transactions
+      // 2. Match by exact date + amount + type OR settlement window + merchant in existing transactions
       const duplicateExists = transactions.some((existing) => {
         if (!existing.amount || !existing.date) return false;
-        const sameAmount = Math.abs(existing.amount - p.amount) < 0.01;
-        const sameDate = existing.date === p.date;
-        const sameType = !existing.type || existing.type === p.type;
-        return sameAmount && sameDate && sameType;
+        return isDuplicateTransactionMatch(existing, p);
       });
 
       if (duplicateExists) {
@@ -440,10 +648,13 @@ export async function requestSmsPermissions(): Promise<boolean> {
   }
 }
 
+let lastSyncTimestamp = 0;
+const SYNC_THROTTLE_MS = 25000;
+
 /**
- * Scans the Android SMS inbox for any MFS messages (bKash, Nagad, Rocket, Upay) received since last check.
- * This runs when the app launches or returns from the background, ensuring
- * transactions that happened while the app was closed or sleeping are detected.
+ * Scans the Android SMS inbox for MFS and Card messages.
+ * Uses a single fast unified query (15ms) instead of sequential loops.
+ * Supports deep-scan mode to scan historical/previous SMS on the phone when requested.
  */
 export async function syncRecentSms(
   existingTransactions?: Array<{
@@ -451,9 +662,20 @@ export async function syncRecentSms(
     date?: string;
     amount?: number;
     type?: string;
-  }>
+  }>,
+  options?: { isDeepScan?: boolean; limit?: number; force?: boolean }
 ): Promise<MfsTransaction[]> {
   if (Platform.OS !== 'android') return [];
+
+  const now = Date.now();
+  const isDeepScan = options?.isDeepScan === true;
+  const isForced = options?.force === true || isDeepScan;
+
+  // Throttle routine automatic background syncs so navigating between tabs is 0ms instant
+  if (!isForced && now - lastSyncTimestamp < SYNC_THROTTLE_MS) {
+    return [];
+  }
+  lastSyncTimestamp = now;
 
   // Ensure tracked providers cache is loaded
   await loadTrackedProviders();
@@ -469,40 +691,24 @@ export async function syncRecentSms(
   if (!hasPerm) return [];
 
   try {
-    const combined: Array<{ address: string; body: string; date: number }> = [];
-    const seen = new Set<string>();
+    // When deep scan is requested (e.g. user hits "Scan SMS Inbox Now"), scan up to 800 previous SMS on phone!
+    // For routine automatic background syncs, scan top 150 messages in a single 15ms query.
+    const scanLimit = options?.limit || (isDeepScan ? 800 : 150);
 
-    const addUnique = (list: Array<{ address: string; body: string; date: number }> | null | undefined) => {
-      if (!list) return;
-      for (const m of list) {
-        if (!m || !m.body) continue;
-        const key = `${m.date}_${m.address}_${m.body.slice(0, 30)}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          combined.push(m);
-        }
-      }
-    };
+    const inboxMessages = await getRecentSms(scanLimit);
+    if (!inboxMessages || inboxMessages.length === 0) return [];
 
-    // Fetch messages specifically for each enabled provider
-    for (const provider of tracked) {
-      const config = MFS_PROVIDER_CONFIG[provider];
-      if (config) {
-        for (const sender of config.senders) {
-          const msgs = await getRecentSms(40, sender);
-          addUnique(msgs);
-        }
-      }
-    }
+    // Filter to only messages relevant to tracked providers or card patterns
+    const relevant = inboxMessages.filter((m) => {
+      if (!m || !m.body) return false;
+      const provider = detectProvider(m.address, m.body);
+      return provider != null && isProviderTracked(provider);
+    });
 
-    // Fetch general latest inbox messages (up to 50) to catch any format
-    const generalMessages = await getRecentSms(50);
-    addUnique(generalMessages);
-
-    if (combined.length === 0) return [];
+    if (relevant.length === 0) return [];
 
     return await processMultipleIncomingSms(
-      combined.map((m) => ({
+      relevant.map((m) => ({
         body: m.body,
         sender: m.address,
         timestamp: m.date,
@@ -656,16 +862,18 @@ export function parseMfsSms(
     return null;
   }
 
-  // 1. TrxID / TxnID Extraction (requires >= 4 alphanumeric chars)
+  // 1. TrxID / TxnID / Auth Code / Approval Code Extraction (requires >= 4 alphanumeric chars)
   const trxMatch = normalized.match(
-    /(?:Trx\s*ID|Txn\s*ID|Transaction\s*ID|Trans\s*ID|Trx\s*Id|Txn\s*Id|TxnId|TrxId)\s*[:.#-]?\s*([A-Za-z0-9]{4,})/i
+    /(?:Trx\s*ID|Txn\s*ID|Transaction\s*ID|Trans\s*ID|Trx\s*Id|Txn\s*Id|TxnId|TrxId|Auth\s*Code|Approval\s*Code|Ref(?:erence)?\s*(?:No|ID)?)\s*[:.#-]?\s*([A-Za-z0-9]{4,})/i
   );
-  if (!trxMatch || !trxMatch[1]) {
+  let trxId = trxMatch && trxMatch[1] ? trxMatch[1].trim() : '';
+
+  // For non-card providers, a verified TrxID/TxnID is strictly required
+  if (!trxId && provider !== 'cards') {
     return null;
   }
-  const trxId = trxMatch[1].trim();
 
-  // 2. Amount Extraction (supports bKash, Nagad key-value, Rocket A/C, Upay — 100% Hermes-safe, no lookbehind)
+  // 2. Amount Extraction (supports bKash, Nagad key-value, Rocket A/C, Upay, Cards — 100% Hermes-safe, no lookbehind)
   let amount: number | null = null;
 
   // 2a. Priority: Explicit "Amount: Tk ..." label (standard Nagad multi-line format)
@@ -677,10 +885,10 @@ export function parseMfsSms(
     if (!isNaN(val) && val > 0) amount = val;
   }
 
-  // 2b. Priority: Amount directly linked to transaction action verb (bKash, Upay, Nagad single-line)
+  // 2b. Priority: Amount directly linked to transaction action verb (bKash, Upay, Nagad single-line, Cards)
   if (amount === null) {
     const actionAmountMatch = normalized.match(
-      /(?:Merchant\s+Payment|Payment|sent|Cash[\s-]*Out|Cash[\s-]*In|received|Money\s*Received|Cashback|Recharge|Mobile\s*Recharge|Top[\s-]*Up|Pay\s*Bill|Bill\s*Pay(?:ment)?|Send\s*Money|Add\s*Money|Deposit|Transfer(?:red)?)\s+(?:of\s+)?(?:Tk|BDT|Tk\.|\u09F3|৳|Taka)\.?\s*([\d,]+(?:\.\d{1,2})?)/i
+      /(?:Merchant\s+Payment|Payment|sent|Cash[\s-]*Out|Cash[\s-]*In|received|Money\s*Received|Cashback|Recharge|Mobile\s*Recharge|Top[\s-]*Up|Pay\s*Bill|Bill\s*Pay(?:ment)?|Send\s*Money|Add\s*Money|Deposit|Transfer(?:red)?|debited\s+for|debited|used\s+for|spent|purchase\s+of|charged\s+for|charged|authorized\s+for|authorized|swiped\s+for|transaction\s+of|trx\s+of)\s+(?:of\s+)?(?:Tk|BDT|Tk\.|\u09F3|৳|Taka|USD)?\.?\s*([\d,]+(?:\.\d{1,2})?)/i
     );
     if (actionAmountMatch && actionAmountMatch[1]) {
       const val = parseFloat(actionAmountMatch[1].replace(/,/g, ''));
@@ -796,7 +1004,33 @@ export function parseMfsSms(
     }
   }
 
-  // 4d. Fallback counterparty check: BD 11-12 digit mobile/account number
+  // 4d. Card merchant extraction (e.g. "at SHWAPNO on ...", "at KFC BANANI")
+  if (provider === 'cards') {
+    const cardMatch = normalized.match(
+      /(?:card\s*(?:ending|no|number|#)?\s*(?:with|in)?\s*[:.]?\s*(?:\*{1,4}|x{1,4})?(\d{4})|\*{2,4}(\d{4}))/i
+    );
+    const cardSuffix = cardMatch ? cardMatch[1] || cardMatch[2] : null;
+
+    const atMerchantMatch = normalized.match(
+      /\bat\s+([A-Za-z0-9\s.&'/()_-]+?)(?=\s+on\b|\s+at\b|\s+Ref\b|\s+Avail\b|\s+Balance\b|\s+Auth\b|\.|\n|;|$|\s+Limit\b|\s+Available\b)/i
+    );
+    let merchantName = atMerchantMatch && atMerchantMatch[1]
+      ? atMerchantMatch[1].trim().replace(/^[:\s-]+|[:\s-]+$/g, '')
+      : counterparty;
+
+    if (!merchantName || merchantName.toLowerCase() === 'bank card merchant' || merchantName.toLowerCase() === 'cards merchant') {
+      const senderBank = (sender || '').replace(/[^a-zA-Z]/g, '');
+      merchantName = senderBank ? `${senderBank} Merchant` : 'Card Merchant';
+    }
+
+    if (cardSuffix) {
+      counterparty = `${merchantName} (Card **${cardSuffix})`;
+    } else {
+      counterparty = merchantName;
+    }
+  }
+
+  // 4e. Fallback counterparty check: BD 11-12 digit mobile/account number
   if (!counterparty) {
     const phoneMatch = normalized.match(/\b(01[3-9]\d{8,9})\b/);
     if (phoneMatch) {
@@ -845,6 +1079,20 @@ export function parseMfsSms(
     normalized.match(/\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?)\b/);
   const rawTimestamp = timeMatch ? timeMatch[1] : undefined;
 
+  // Fallback deterministic TrxID for card transactions with no explicit auth code
+  if (!trxId && provider === 'cards') {
+    const cardMatch = normalized.match(
+      /(?:card\s*(?:ending|no|number|#)?\s*(?:with|in)?\s*[:.]?\s*(?:\*{1,4}|x{1,4})?(\d{4})|\*{2,4}(\d{4}))/i
+    );
+    const cardSuffix = cardMatch ? cardMatch[1] || cardMatch[2] : 'CARD';
+    const cleanDate = date.replace(/-/g, '');
+    let bodyHash = 0;
+    for (let i = 0; i < normalized.length; i++) {
+      bodyHash = (bodyHash * 31 + normalized.charCodeAt(i)) >>> 0;
+    }
+    trxId = `CARD-${cardSuffix}-${cleanDate}-${bodyHash.toString(36).toUpperCase()}`;
+  }
+
   return {
     trxId,
     amount: Math.round(amount * 100) / 100,
@@ -868,6 +1116,11 @@ export const parseBkashSms = parseMfsSms;
  * Formats a clean, consistent description including provider tag and TrxID.
  */
 export function formatMfsTransactionDescription(tx: MfsTransaction): string {
+  if (tx.provider === 'cards') {
+    const action = tx.type === 'expense' ? 'Payment to' : 'Received from';
+    const ref = tx.reference ? ` - ${tx.reference}` : '';
+    return `[Bank Card] ${action} ${tx.counterparty}${ref} (TrxID: ${tx.trxId})`;
+  }
   const providerName = MFS_PROVIDER_CONFIG[tx.provider || 'bkash']?.name || 'MFS';
   const action = tx.type === 'expense' ? 'Payment to' : 'Received from';
   const ref = tx.reference ? ` - ${tx.reference}` : '';
@@ -980,6 +1233,35 @@ export const SAMPLE_MFS_MESSAGES = [
     sender: 'UCB',
     body: 'Cash In Tk 2,000.00 from Agent 01811000000 successful. Fee Tk 0.00, Balance Tk 2,700.00, TrxID: UP87654321 at 19/09/2026 14:30',
   },
+  // Bank Cards (Credit / Debit)
+  {
+    id: 'sample-card-1',
+    provider: 'cards' as MfsProvider,
+    label: 'City Bank Card - Grocery (Shwapno)',
+    sender: 'CityBank',
+    body: 'Dear Cardmember, your City Bank Card ending 1234 has been debited for BDT 2,450.00 at SHWAPNO on 24-Nov-2026. Avail Bal: BDT 45,000.00. Ref: 891234',
+  },
+  {
+    id: 'sample-card-2',
+    provider: 'cards' as MfsProvider,
+    label: 'EBL Card - Dining (KFC Banani)',
+    sender: 'EBL',
+    body: 'Your EBL Card 4***5678 was used for BDT 1,200.00 at KFC BANANI on 24/11/2026 13:45. Avail Bal BDT 28,800.00.',
+  },
+  {
+    id: 'sample-card-3',
+    provider: 'cards' as MfsProvider,
+    label: 'BRAC Bank Card - Shopping (Unimart)',
+    sender: 'BRACBank',
+    body: 'Trx of BDT 3,450.00 on your BRAC Bank Card ending 4567 at UNIMART on 24-11-2026 19:30. Available Limit: BDT 75,000.00.',
+  },
+  {
+    id: 'sample-card-4',
+    provider: 'cards' as MfsProvider,
+    label: 'DBBL Nexus Card - Meena Bazar',
+    sender: 'DBBL',
+    body: 'Your DBBL Card **7890 was debited for Tk 850.00 at MEENA BAZAR on 24/11/2026. Txn ID: 99887766.',
+  },
 ];
 
 export const SAMPLE_BKASH_MESSAGES = SAMPLE_MFS_MESSAGES;
@@ -1085,10 +1367,7 @@ export async function processIncomingSms(
   if (existingTransactions && existingTransactions.length > 0) {
     const matchInDb = existingTransactions.some((existing) => {
       if (!existing.amount || !existing.date) return false;
-      const sameAmount = Math.abs(existing.amount - parsed.amount) < 0.01;
-      const sameDate = existing.date === parsed.date;
-      const sameType = !existing.type || existing.type === parsed.type;
-      return sameAmount && sameDate && sameType;
+      return isDuplicateTransactionMatch(existing, parsed);
     });
     if (matchInDb) {
       await markTrxIdProcessed(parsed.trxId);
@@ -1151,10 +1430,7 @@ export async function processMultipleIncomingSms(
     if (existingTransactions && existingTransactions.length > 0) {
       const matchInDb = existingTransactions.some((existing) => {
         if (!existing.amount || !existing.date) return false;
-        const sameAmount = Math.abs(existing.amount - parsed.amount) < 0.01;
-        const sameDate = existing.date === parsed.date;
-        const sameType = !existing.type || existing.type === parsed.type;
-        return sameAmount && sameDate && sameType;
+        return isDuplicateTransactionMatch(existing, parsed);
       });
       if (matchInDb) {
         await markTrxIdProcessed(parsed.trxId);

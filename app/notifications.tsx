@@ -49,6 +49,13 @@ const ACCENT_META: Record<NotificationAccent, { line: string; bg: string; text: 
   blue: { line: '#3B82F6', bg: '#DBEAFE', text: '#3B82F6' },
 };
 
+const ACCENT_META_DARK: Record<NotificationAccent, { line: string; bg: string; text: string }> = {
+  red: { line: '#EF4444', bg: 'rgba(239, 68, 68, 0.16)', text: '#F87171' },
+  orange: { line: '#F59E0B', bg: 'rgba(245, 158, 11, 0.16)', text: '#FBBF24' },
+  green: { line: '#0FB384', bg: 'rgba(15, 179, 132, 0.16)', text: '#34D399' },
+  blue: { line: '#3B82F6', bg: 'rgba(59, 130, 246, 0.16)', text: '#60A5FA' },
+};
+
 const ACTION_LABELS: Record<NotificationActionType, string> = {
   review_spending: 'Review spending ↗',
   review_budget: 'Review budget ↗',
@@ -93,7 +100,7 @@ function NotificationCard({
   const { colors, isDark } = useTheme();
   const { isBangla } = useLanguage();
   const opacity = useRef(new Animated.Value(1)).current;
-  const accent = ACCENT_META[notif.accent_color];
+  const accent = isDark ? ACCENT_META_DARK[notif.accent_color] : ACCENT_META[notif.accent_color];
   const meta = CATEGORY_META[notif.category];
   const progress = notif.progress == null ? null : Math.max(0, Math.min(notif.progress, 1));
   const ctaLabel = getLocalizedActionLabel(notif.action_type, isBangla);
@@ -112,7 +119,7 @@ function NotificationCard({
       <View style={[styles.accentLine, { backgroundColor: accent.line }]} />
       <View style={styles.cardBody}>
         <View style={styles.cardTopRow}>
-          <View style={[styles.categoryIcon, { backgroundColor: isDark ? '#143D2E' : accent.bg }]}>
+          <View style={[styles.categoryIcon, { backgroundColor: accent.bg }]}>
             <Text style={styles.categoryEmoji}>{meta.emoji}</Text>
           </View>
           <View style={styles.cardTextStack}>
@@ -127,7 +134,7 @@ function NotificationCard({
         </View>
 
         {progress != null && (
-          <View style={[styles.progressTrack, { backgroundColor: colors.divider }]}>
+          <View style={[styles.progressTrack, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : colors.divider }]}>
             <View
               style={[
                 styles.progressFill,
@@ -279,7 +286,7 @@ export default function NotificationsScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* ── Header ── */}
-      <View style={[styles.header, { borderBottomColor: colors.divider }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.divider }]}>
         <TouchableOpacity
           style={styles.headerBtn}
           onPress={() => router.back()}
@@ -294,8 +301,8 @@ export default function NotificationsScreen() {
             {t('notifications.title', 'Notifications')}
           </Text>
           {unreadCount > 0 && (
-            <View style={styles.newBadge}>
-              <Text style={styles.newBadgeText}>
+            <View style={[styles.newBadge, isDark && { backgroundColor: 'rgba(239, 68, 68, 0.2)' }]}>
+              <Text style={[styles.newBadgeText, isDark && { color: '#FCA5A5' }]}>
                 {isBangla ? toBengaliDigits(unreadCount) : unreadCount} {isBangla ? 'নতুন' : 'new'}
               </Text>
             </View>
@@ -309,7 +316,12 @@ export default function NotificationsScreen() {
           accessibilityRole="button"
           accessibilityLabel="Mark all notifications as read"
         >
-          <Text style={[styles.markAllText, unreadCount === 0 && styles.markAllTextDisabled]}>
+          <Text
+            style={[
+              styles.markAllText,
+              { color: unreadCount === 0 ? (isDark ? '#064E3B' : '#A7F3D0') : colors.primary },
+            ]}
+          >
             {isBangla ? '✓ সব পঠিত' : '✓ Mark all'}
           </Text>
         </TouchableOpacity>
@@ -325,7 +337,7 @@ export default function NotificationsScreen() {
       </View>
 
       {/* ── Category Filter Bar ── */}
-      <View style={[styles.filterBar, { borderBottomColor: colors.divider }]}>
+      <View style={[styles.filterBar, { backgroundColor: colors.card, borderBottomColor: colors.divider }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -361,7 +373,7 @@ export default function NotificationsScreen() {
                 >
                   {active ? `${filterLabel} •` : filterLabel}
                 </Text>
-                {active && <View style={styles.filterUnderline} />}
+                {active && <View style={[styles.filterUnderline, { backgroundColor: colors.primary }]} />}
               </TouchableOpacity>
             );
           })}
@@ -434,7 +446,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
     gap: 4,
   },
   headerBtn: {
@@ -485,7 +496,6 @@ const styles = StyleSheet.create({
 
   // Filter bar
   filterBar: {
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
@@ -591,8 +601,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   progressTrack: {
-    height: 6,
-    borderRadius: 3,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: '#F1F5F9',
     overflow: 'hidden',
     marginTop: 12,

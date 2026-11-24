@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,18 +14,31 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
+import { useKeyboard } from '../../lib/useKeyboard';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signIn } = useAuth();
+  const { keyboardHeight, keyboardPaddingBottom } = useKeyboard();
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const [activeField, setActiveField] = useState<string | null>(null);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Automatically scroll when keyboard pops up or password input is focused
+  useEffect(() => {
+    if (keyboardHeight > 0 && activeField === 'password') {
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 80);
+    }
+  }, [keyboardHeight, activeField]);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -52,18 +65,20 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-green-white"
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={0}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={{
           flexGrow: 1,
           paddingTop: insets.top + 16,
-          paddingBottom: insets.bottom + 16,
+          paddingBottom: Math.max(insets.bottom, 16) + (keyboardPaddingBottom || 48),
           paddingHorizontal: 20,
         }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets={true}
       >
         <View className="pt-2 pb-6">
           {/* Branding Block */}
@@ -137,6 +152,10 @@ export default function LoginScreen() {
                   onChangeText={setEmail}
                   editable={!loading}
                   accessibilityLabel="Email input"
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  onFocus={() => setActiveField('email')}
+                  onBlur={() => setActiveField(null)}
                 />
               </View>
             </View>
@@ -149,6 +168,7 @@ export default function LoginScreen() {
               </Text>
               <View className="flex-row items-center bg-white border border-light-green rounded-xl px-4 h-[52px]">
                 <TextInput
+                  ref={passwordRef}
                   className="flex-1 text-[14px] font-normal text-light-bg-text h-full"
                   placeholder="Enter your password"
                   placeholderTextColor="#A0ADB6"
@@ -159,6 +179,13 @@ export default function LoginScreen() {
                   onChangeText={setPassword}
                   editable={!loading}
                   accessibilityLabel="Password input"
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
+                  onFocus={() => {
+                    setActiveField('password');
+                    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
+                  }}
+                  onBlur={() => setActiveField(null)}
                 />
                 <TouchableOpacity
                   onPress={() => setPasswordVisible(!passwordVisible)}

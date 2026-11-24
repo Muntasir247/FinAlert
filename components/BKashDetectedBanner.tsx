@@ -156,12 +156,16 @@ export default function BKashDetectedBanner({
         {/* Human-In-The-Loop Action Buttons */}
         <View style={[styles.actionRow, { borderTopColor: isDark ? colors.cardBorder : '#F3F4F6' }]}>
           <TouchableOpacity
-            style={[styles.dismissBtn, isDark && { backgroundColor: colors.surfaceSubtle }]}
+            style={[styles.dismissBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F3F4F6' }]}
             onPress={handleDismissAll}
             accessibilityRole="button"
             accessibilityLabel="Ignore transactions"
           >
-            <Text style={[styles.dismissBtnText, { color: colors.textSecondary }]}>
+            <Text
+              style={[styles.dismissBtnText, { color: isDark ? colors.textSecondary : '#4B5563' }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
               {isBangla ? 'উপেক্ষা করুন' : 'Ignore'}
             </Text>
           </TouchableOpacity>
@@ -172,8 +176,8 @@ export default function BKashDetectedBanner({
             accessibilityRole="button"
             accessibilityLabel={isMultiple ? `Review all ${items.length} transactions` : 'Review and add transaction'}
           >
-            <Feather name="check" size={16} color="#FFFFFF" style={styles.btnIcon} />
-            <Text style={styles.reviewBtnText}>
+            <Feather name="check" size={15} color="#FFFFFF" style={styles.btnIcon} />
+            <Text style={styles.reviewBtnText} numberOfLines={1} adjustsFontSizeToFit>
               {isMultiple
                 ? (isBangla ? `সব পর্যালোচনা (${items.length})` : `Review All (${items.length})`)
                 : (isBangla ? 'যাচাই ও যোগ' : 'Review & Add')}
@@ -201,6 +205,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#FCE7F3',
     padding: 14,
+    overflow: 'hidden',
   },
   headerRow: {
     flexDirection: 'row',
@@ -330,39 +335,43 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 10,
+    justifyContent: 'space-between',
+    gap: 8,
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
     paddingTop: 10,
   },
   dismissBtn: {
-    minHeight: 48,
-    paddingHorizontal: 16,
+    flex: 1,
+    minHeight: 44,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
   },
   dismissBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     color: '#6B7280',
+    textAlign: 'center',
   },
   reviewBtn: {
-    minHeight: 48,
+    flex: 1.35,
+    minHeight: 44,
     backgroundColor: '#0FB384',
-    paddingHorizontal: 18,
+    paddingHorizontal: 10,
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   btnIcon: {
-    marginRight: 6,
+    marginRight: 4,
   },
   reviewBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#FFFFFF',
+    textAlign: 'center',
   },
 });

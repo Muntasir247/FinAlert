@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSavingsGoals } from '../context/SavingsGoalsContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useKeyboard } from '../lib/useKeyboard';
 import {
   SAVINGS_GOAL_ICONS,
   SAVINGS_GOAL_COLORS,
@@ -58,6 +59,7 @@ export default function SavingsGoalsManager({
   const { goals, addContribution, createGoal, deleteGoal } = useSavingsGoals();
   const { colors, isDark } = useTheme();
   const { t, isBangla, formatCurrency } = useLanguage();
+  const { keyboardPaddingBottom } = useKeyboard();
 
   const [view, setView] = useState<SheetView>(initialView);
   const [selectedGoal, setSelectedGoal] = useState<SavingsGoal | null>(null);
@@ -318,7 +320,8 @@ export default function SavingsGoalsManager({
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.scrollContent}
+        automaticallyAdjustKeyboardInsets={true}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 + keyboardPaddingBottom }]}
       >
         {goals.length === 0 ? (
           <View style={styles.emptyBox}>
@@ -433,7 +436,8 @@ export default function SavingsGoalsManager({
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.scrollContent}
+          automaticallyAdjustKeyboardInsets={true}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 + keyboardPaddingBottom }]}
         >
           {/* Goal preview */}
           <View
@@ -606,7 +610,8 @@ export default function SavingsGoalsManager({
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.scrollContent}
+        automaticallyAdjustKeyboardInsets={true}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 + keyboardPaddingBottom }]}
       >
         {/* Choose icon */}
         <View style={styles.fieldGroup}>
@@ -814,7 +819,7 @@ export default function SavingsGoalsManager({
     >
       <KeyboardAvoidingView
         style={styles.root}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
           <TouchableOpacity
@@ -909,7 +914,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scrollContent: {
-    paddingBottom: 8,
+    paddingBottom: 48,
   },
   footer: {
     paddingTop: 8,

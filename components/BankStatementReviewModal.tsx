@@ -34,6 +34,7 @@ import type {
 } from '../services/pdfStatementService';
 import { TRANSACTION_CATEGORIES, INCOME_CATEGORIES } from '../lib/transactionCategories';
 import type { NewTransaction } from '../lib/transactions';
+import { isDuplicateTransactionMatch } from '../services/smsReaderService';
 
 interface BankStatementReviewModalProps {
   visible: boolean;
@@ -160,34 +161,10 @@ export default function BankStatementReviewModal({
       const base64 = await readPdfAsBase64(selectedFile.uri, selectedFile.base64);
       const res = await parseBankStatementPdf(base64, password.trim() || undefined);
 
-      // Deduplication check: cross-reference against user's existing account transactions
+      // Deduplication check: cross-reference against user's existing account transactions (MFS & Card SMS)
       const annotatedTransactions: ExtractedStatementTransaction[] = res.transactions.map((tx) => {
         const match = existingTransactions.find((existing) => {
-          if (existing.type !== tx.type) return false;
-          if (Math.abs(existing.amount - tx.amount) >= 0.01) return false;
-
-          // Date match (exact or within +/- 1 day for settlement/clearing date variance)
-          const isExactDate = existing.date === tx.date;
-          let isCloseDate = isExactDate;
-          if (!isCloseDate) {
-            const t1 = new Date(existing.date).getTime();
-            const t2 = new Date(tx.date).getTime();
-            if (!isNaN(t1) && !isNaN(t2)) {
-              const diffDays = Math.abs(t1 - t2) / (1000 * 60 * 60 * 24);
-              isCloseDate = diffDays <= 1;
-            }
-          }
-
-          if (!isCloseDate) return false;
-
-          // If exact date and exact amount, it is almost certainly a duplicate
-          if (isExactDate) return true;
-
-          // If +/- 1 day, verify at least one keyword match in description
-          const desc1 = (existing.description || '').toLowerCase();
-          const desc2 = tx.description.toLowerCase();
-          const words2 = desc2.split(/\s+/).filter((w) => w.length >= 4);
-          return words2.some((w) => desc1.includes(w));
+          return isDuplicateTransactionMatch(existing, tx);
         });
 
         if (match) {
@@ -803,12 +780,12 @@ export default function BankStatementReviewModal({
                             <Feather name="chevron-down" size={12} color={isDark ? '#A7F3D0' : '#059669'} />
                           </TouchableOpacity>
 
-                          {/* Already Added Indicator */}
+                          {/* Already Added / Duplicate Indicator */}
                           {tx.alreadyExists && (
                             <View style={[styles.alreadyAddedBadge, isDark && { backgroundColor: '#33230A' }]}>
-                              <Ionicons name="checkmark-done" size={12} color="#D97706" />
+                              <Ionicons name="copy-outline" size={12} color="#D97706" />
                               <Text style={[styles.alreadyAddedBadgeText, isDark && { color: '#FDE68A' }]}>
-                                {isBangla ? 'যুক্ত আছে' : 'Already Added'}
+                                {isBangla ? 'ডুপ্লিকেট (কার্ড এসএমএস/পূর্বের লেনদেন)' : 'Duplicate (Tracked from Card SMS)'}
                               </Text>
                             </View>
                           )}

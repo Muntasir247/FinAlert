@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTransactions } from '../../context/TransactionsContext';
 import { useBudgets } from '../../context/BudgetsContext';
@@ -20,6 +21,10 @@ import { useSavingsGoals } from '../../context/SavingsGoalsContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useMfsTracking } from '../../context/MfsTrackingContext';
+import {
+  hasRequestedAppPermissions,
+  requestAllAppPermissionsOnce,
+} from '../../lib/appPermissions';
 import AddTransactionModal from '../../components/AddTransactionModal';
 import CircularProgress from '../../components/CircularProgress';
 import SavingsGoalsManager from '../../components/SavingsGoalsManager';
@@ -113,7 +118,7 @@ export default function HomeScreen() {
   const { goals: savingsGoals } = useSavingsGoals();
   const { colors, isDark } = useTheme();
   const { t, isBangla, formatCurrency, translateCategory } = useLanguage();
-  const { trackedProviders } = useMfsTracking();
+  const { trackedProviders, isConfigured, openModal: openMfsModal } = useMfsTracking();
   const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
   const [savingsSheetVisible, setSavingsSheetVisible] = useState(false);
@@ -133,6 +138,34 @@ export default function HomeScreen() {
   const [isInsightLoading, setIsInsightLoading] = useState(true);
 
   const effectiveUserId = user?.id || profile?.id || null;
+  const segments = useSegments();
+  const segList = segments as string[];
+  const isFocused = useIsFocused();
+  const isHomeTab = segList[0] === '(tabs)' && (!segList[1] || segList[1] === 'index');
+
+  // Request all required app permissions once user reaches the Home screen (only once per user)
+  useEffect(() => {
+    const uid = effectiveUserId;
+    if (!uid || !isFocused || !isHomeTab) return;
+    let isMounted = true;
+
+    // 700ms grace period so transient tab mounts during auth redirects never trigger permissions
+    const timer = setTimeout(async () => {
+      if (!isMounted) return;
+      const alreadyAsked = await hasRequestedAppPermissions(uid);
+      if (!alreadyAsked && isMounted) {
+        await requestAllAppPermissionsOnce(uid);
+        if (isMounted && !isConfigured) {
+          openMfsModal();
+        }
+      }
+    }, 700);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [effectiveUserId, isFocused, isHomeTab, isConfigured, openMfsModal]);
 
   // Proactive Financial Insight (Zero-credit waste: loads from SecureStore or fresh if signature changed)
   useEffect(() => {
@@ -212,7 +245,7 @@ export default function HomeScreen() {
       if (AppState.currentState === 'active') {
         syncRecentSms(transactions);
       }
-    }, 15000);
+    }, 30000);
 
     return () => {
       unsub();

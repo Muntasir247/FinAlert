@@ -37,6 +37,7 @@ function summarizeMfsSpending(transactions: Transaction[]): string | null {
     nagad: { expense: 0, income: 0, count: 0 },
     rocket: { expense: 0, income: 0, count: 0 },
     upay: { expense: 0, income: 0, count: 0 },
+    cards: { expense: 0, income: 0, count: 0 },
   };
 
   let matchedAny = false;
@@ -48,6 +49,7 @@ function summarizeMfsSpending(transactions: Transaction[]): string | null {
     if (desc.includes('[nagad]') || desc.includes('nagad')) provider = 'nagad';
     else if (desc.includes('[rocket]') || desc.includes('rocket') || desc.includes('dbbl')) provider = 'rocket';
     else if (desc.includes('[upay]') || desc.includes('upay')) provider = 'upay';
+    else if (desc.includes('[bank card]') || desc.includes('card **') || desc.includes('card ending')) provider = 'cards';
     else if (desc.includes('[bkash]') || desc.includes('bkash')) provider = 'bkash';
 
     if (provider) {

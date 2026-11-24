@@ -8,6 +8,8 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +39,7 @@ export default function BKashSimulatorModal({ visible, onClose }: BKashSimulator
   const [permissionStatus, setPermissionStatus] = useState<string | null>(null);
   const [isGranted, setIsGranted] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
+  const [isScanning, setIsScanning] = useState(false);
 
   // Check actual Android OS permission state on mount and whenever modal becomes visible
   useEffect(() => {
@@ -244,15 +247,39 @@ export default function BKashSimulatorModal({ visible, onClose }: BKashSimulator
                   isDark && { backgroundColor: '#14382A', borderColor: '#1F5A42' },
                 ]}
                 onPress={async () => {
-                  await syncRecentSms(transactions);
-                  onClose();
+                  setIsScanning(true);
+                  try {
+                    const detected = await syncRecentSms(transactions, { isDeepScan: true, limit: 800 });
+                    Alert.alert(
+                      isBangla ? 'এসএমএস স্ক্যান সম্পন্ন' : 'SMS Scan Complete',
+                      detected.length > 0
+                        ? isBangla
+                          ? `${detected.length}টি নতুন লেনদেন পাওয়া গেছে!`
+                          : `Found ${detected.length} new transaction(s)!`
+                        : isBangla
+                        ? 'আপনার ফোনে কোনো নতুন লেনদেন এসএমএস পাওয়া যায়নি।'
+                        : 'No new transaction SMS found on your phone.'
+                    );
+                  } catch (e) {
+                    console.warn(e);
+                  } finally {
+                    setIsScanning(false);
+                    onClose();
+                  }
                 }}
+                disabled={isScanning}
                 accessibilityRole="button"
                 accessibilityLabel="Scan SMS inbox now"
               >
-                <Ionicons name="refresh-outline" size={18} color="#0FB384" />
+                {isScanning ? (
+                  <ActivityIndicator size="small" color="#0FB384" />
+                ) : (
+                  <Ionicons name="refresh-outline" size={18} color="#0FB384" />
+                )}
                 <Text style={[styles.syncBtnText, isDark && { color: '#6EE7B7' }]}>
-                  {isBangla ? 'এখনই এসএমএস ইনবক্স স্ক্যান করুন' : 'Scan SMS Inbox Now'}
+                  {isScanning
+                    ? (isBangla ? 'পূর্ববর্তী এসএমএস স্ক্যান করা হচ্ছে...' : 'Scanning previous SMS...')
+                    : (isBangla ? 'এখনই পূর্ববর্তী সব এসএমএস স্ক্যান করুন' : 'Scan Phone SMS History Now')}
                 </Text>
               </TouchableOpacity>
             )}

@@ -26,7 +26,7 @@ export default function ProfileScreen() {
   const { notificationsEnabled, setNotificationsEnabled } = useNotifications();
   const { isDark, setTheme, colors } = useTheme();
   const { language, setLanguage, t, formatCompactCurrency, isBangla } = useLanguage();
-  const { trackedProviders, openModal: openMfsModal } = useMfsTracking();
+  const { openModal: openMfsModal } = useMfsTracking();
 
   // Bottom sheet modal state ('security' | 'support' | null)
   const [activeModal, setActiveModal] = useState<'security' | 'support' | null>(null);
@@ -165,24 +165,7 @@ export default function ProfileScreen() {
                   {t('profile.tracked_providers', 'Tracked Providers')}
                 </Text>
               </View>
-              <View style={styles.rowRight}>
-                <Text style={[styles.rowRightText, { color: colors.textSecondary }]}>
-                  {trackedProviders.length === 0
-                    ? t('profile.none_selected', 'None Selected')
-                    : trackedProviders.length === 4
-                    ? t('profile.all_providers', 'All Providers')
-                    : trackedProviders
-                        .map((p) => {
-                          if (p === 'bkash') return isBangla ? 'বিকাশ' : 'bKash';
-                          if (p === 'nagad') return isBangla ? 'নগদ' : 'Nagad';
-                          if (p === 'rocket') return isBangla ? 'রকেট' : 'Rocket';
-                          if (p === 'upay') return isBangla ? 'উপায়' : 'Upay';
-                          return p;
-                        })
-                        .join(', ')}
-                </Text>
-                <Feather name="chevron-right" size={16} color={colors.textMuted} />
-              </View>
+              <Feather name="chevron-right" size={16} color={colors.textMuted} />
             </TouchableOpacity>
 
             {/* Notifications Row */}

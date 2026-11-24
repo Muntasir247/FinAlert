@@ -23,6 +23,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { TRANSACTION_CATEGORIES, INCOME_CATEGORIES } from '../lib/transactionCategories';
 import type { Transaction, TransactionType } from '../lib/transactions';
 import { markTrxIdProcessed, removePendingTransaction } from '../services/smsReaderService';
+import { useKeyboard } from '../lib/useKeyboard';
 
 const SHEET_MAX_HEIGHT = 620;
 
@@ -51,6 +52,7 @@ export default function AddTransactionModal({
   const { addTransaction, updateTransaction } = useTransactions();
   const { colors, isDark } = useTheme();
   const { t, isBangla, translateCategory } = useLanguage();
+  const { keyboardPaddingBottom } = useKeyboard();
 
   const [type, setType] = useState<TransactionType>('expense');
   const [amount, setAmount] = useState('');
@@ -213,7 +215,7 @@ export default function AddTransactionModal({
     >
       <KeyboardAvoidingView
         style={styles.root}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
           <TouchableOpacity
@@ -255,7 +257,8 @@ export default function AddTransactionModal({
           <ScrollView
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.scrollContent}
+            automaticallyAdjustKeyboardInsets={true}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 + keyboardPaddingBottom }]}
           >
             {prefill?.source === 'bkash' && (
               <View style={[styles.bkashNoticeBox, isDark && { backgroundColor: '#3B1828', borderColor: '#BE185D' }]}>
@@ -505,7 +508,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scrollContent: {
-    paddingBottom: 8,
+    paddingBottom: 48,
   },
   typeToggle: {
     flexDirection: 'row',

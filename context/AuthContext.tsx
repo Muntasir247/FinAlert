@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
@@ -56,6 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const isPasswordRecoveryRef = useRef(false);
 
   const loadProfile = async (userId: string, email: string, fullName?: string) => {
     try {
@@ -72,6 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Load initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!active) return;
+      if (isPasswordRecoveryRef.current) return;
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -86,6 +88,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       if (!active) return;
+      // During password reset / OTP verification, prevent transient sessions from leaking
+      // into app state and falsely routing the user to tabs / triggering permissions
+      if (isPasswordRecoveryRef.current) {
+        return;
+      }
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
 
@@ -141,6 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const verifyOtpAndResetPassword = async (email: string, token: string, newPassword: string) => {
+    isPasswordRecoveryRef.current = true;
     try {
       const { error: otpError } = await supabase.auth.verifyOtp({
         email,
@@ -148,6 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         type: 'recovery',
       });
       if (otpError) {
+        isPasswordRecoveryRef.current = false;
         return { error: otpError };
       }
 
@@ -155,14 +164,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password: newPassword,
       });
       if (updateError) {
+        isPasswordRecoveryRef.current = false;
         return { error: updateError };
       }
 
-      // Explicitly sign out so the user is not automatically logged in
+      // Explicitly sign out and reset local state so the user is never logged in
       await supabase.auth.signOut();
+      setSession(null);
+      setUser(null);
+      setProfile(null);
       return { error: null };
     } catch (err: any) {
       return { error: err };
+    } finally {
+      // Hold guard briefly to swallow any trailing async onAuthStateChange events
+      setTimeout(() => {
+        isPasswordRecoveryRef.current = false;
+      }, 500);
     }
   };
 

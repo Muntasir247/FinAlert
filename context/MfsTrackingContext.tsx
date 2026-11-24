@@ -40,24 +40,12 @@ export const MfsTrackingProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setTrackedProvidersState(saved);
       setIsConfigured(configured);
       setHasCheckedStorage(true);
-
-      // If user has not configured and is currently logged in, prompt them
-      if (!configured && session) {
-        setIsModalOpen(true);
-      }
     }
     init();
     return () => {
       isMounted = false;
     };
   }, [session]);
-
-  // When auth state settles and user is logged in, check if prompt needed
-  useEffect(() => {
-    if (hasCheckedStorage && !isConfigured && session && !isAuthLoading) {
-      setIsModalOpen(true);
-    }
-  }, [hasCheckedStorage, isConfigured, session, isAuthLoading]);
 
   const openModal = useCallback(() => {
     setIsModalOpen(true);

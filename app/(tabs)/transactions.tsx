@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -91,6 +91,7 @@ export default function TransactionsScreen() {
       }
     });
 
+    // Run background SMS sync (throttled internally so tab switches are instant)
     syncRecentSms(transactions);
 
     const appStateSub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
@@ -103,7 +104,7 @@ export default function TransactionsScreen() {
       unsub();
       appStateSub.remove();
     };
-  }, [transactions, trackedProviders]);
+  }, []);
 
   const handleReviewBkashTx = (tx: BKashTransaction) => {
     markTrxIdProcessed(tx.trxId);
@@ -138,25 +139,30 @@ export default function TransactionsScreen() {
   }, [transactionsTabRequested, clearTransactionsTabRequest]);
 
   const query = searchQuery.trim().toLowerCase();
-  const filtered = transactions.filter((t) => {
-    if (activeFilter === 'Income' && t.type !== 'income') return false;
-    if (activeFilter === 'Expense' && t.type !== 'expense') return false;
-    if (query) {
-      const haystack = `${t.description ?? ''} ${t.category}`.toLowerCase();
-      if (!haystack.includes(query)) return false;
+  const filtered = useMemo(() => {
+    return transactions.filter((t) => {
+      if (activeFilter === 'Income' && t.type !== 'income') return false;
+      if (activeFilter === 'Expense' && t.type !== 'expense') return false;
+      if (query) {
+        const haystack = `${t.description ?? ''} ${t.category}`.toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      return true;
+    });
+  }, [transactions, activeFilter, query]);
+
+  const grouped = useMemo(() => groupByDate(filtered), [filtered]);
+
+  // ── Stats: memoized from all transactions ──
+  const { totalIncome, totalExpense } = useMemo(() => {
+    let inc = 0;
+    let exp = 0;
+    for (const tx of transactions) {
+      if (tx.type === 'income') inc += tx.amount;
+      else exp += tx.amount;
     }
-    return true;
-  });
-
-  const grouped = groupByDate(filtered);
-
-  // ── Stats: derived from all transactions ──
-  let totalIncome = 0;
-  let totalExpense = 0;
-  for (const tx of transactions) {
-    if (tx.type === 'income') totalIncome += tx.amount;
-    else totalExpense += tx.amount;
-  }
+    return { totalIncome: inc, totalExpense: exp };
+  }, [transactions]);
   const formatMoney = (n: number) => formatCurrency(n);
 
   // ── Budget overview (bound to shared budget state) ──

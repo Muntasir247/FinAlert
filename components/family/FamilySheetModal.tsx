@@ -66,7 +66,7 @@ export default function FamilySheetModal({
     >
       <KeyboardAvoidingView
         style={styles.root}
-        behavior={keyboardAvoiding ? (Platform.OS === 'ios' ? 'padding' : 'height') : undefined}
+        behavior={keyboardAvoiding ? (Platform.OS === 'ios' ? 'padding' : undefined) : undefined}
       >
         <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
           <TouchableOpacity

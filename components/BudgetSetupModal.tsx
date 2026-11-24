@@ -25,6 +25,7 @@ import {
   generateSmartBudgetRecommendation,
   type AiBudgetRecommendation,
 } from '../services/aiBudgetService';
+import { useKeyboard } from '../lib/useKeyboard';
 
 const SHEET_MAX_HEIGHT = 660;
 
@@ -63,6 +64,7 @@ export default function BudgetSetupModal() {
   } = useBudgets();
   const { colors, isDark } = useTheme();
   const { t, isBangla, formatCurrency, translateCategory } = useLanguage();
+  const { keyboardPaddingBottom } = useKeyboard();
 
   // Snapshot the latest plan data so the open effect only depends on
   // visibility (avoids re-seeding the form if transactions/plan re-render
@@ -303,7 +305,7 @@ export default function BudgetSetupModal() {
     >
       <KeyboardAvoidingView
         style={styles.root}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
           <TouchableOpacity
@@ -378,7 +380,8 @@ export default function BudgetSetupModal() {
           <ScrollView
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.scrollContent}
+            automaticallyAdjustKeyboardInsets={true}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 + keyboardPaddingBottom }]}
           >
             {step === 1 && (
               <>
@@ -894,7 +897,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scrollContent: {
-    paddingBottom: 8,
+    paddingBottom: 48,
   },
 
   // ── Shared labels/inputs ──
