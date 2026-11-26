@@ -512,7 +512,7 @@ export default function HomeScreen() {
         {/* ── Budgets Section ── */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            {t('transactions.tab_budget', 'Budgets')}
+            {t('transactions.tab_budget', 'BUDGET').toUpperCase()}
           </Text>
           <TouchableOpacity
             onPress={handleSeeAllBudgets}
@@ -1048,7 +1048,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#091E15',
   },
   seeAllText: {

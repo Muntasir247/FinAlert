@@ -30,3 +30,17 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
   },
 });
+
+/**
+ * Reconnects the Supabase Realtime WebSocket if the socket was paused or
+ * closed by Android/iOS while the app was running in the background.
+ */
+export function reconnectRealtime(): void {
+  try {
+    if (supabase && (supabase as any).realtime) {
+      (supabase as any).realtime.connect();
+    }
+  } catch (err) {
+    console.warn('[Supabase Realtime] Reconnect error:', err);
+  }
+}

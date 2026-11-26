@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -31,7 +32,7 @@ const SUB_TABS: { label: string; key: 'overview' | 'members' | 'expenses' | 'tra
 ];
 
 export default function FamilyScreen() {
-  const { family, members, isLoading } = useFamily();
+  const { family, members, isLoading, refreshFamily } = useFamily();
   const { user } = useAuth();
   const { colors, isDark } = useTheme();
   const { t, isBangla, formatCurrency } = useLanguage();
@@ -39,13 +40,24 @@ export default function FamilyScreen() {
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'members' | 'expenses' | 'transactions'>('overview');
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Re-fetch finance data every time the screen gains focus so changes made by
-  // other members (expenses, transactions, roles) show up without an app relaunch.
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([refreshFamily(true), finance.reload(true)]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshFamily, finance.reload]);
+
+  // Re-fetch family and finance data every time the screen gains focus so changes
+  // made by other members show up seamlessly without needing an app restart.
   useFocusEffect(
     useCallback(() => {
-      finance.reload();
-    }, [finance.reload])
+      refreshFamily(true);
+      finance.reload(true);
+    }, [refreshFamily, finance.reload])
   );
 
   if (isLoading) {
@@ -84,6 +96,14 @@ export default function FamilyScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#0FB384']}
+            tintColor="#0FB384"
+          />
+        }
       >
         {/* ── Header ── */}
         <View style={styles.headerRow}>

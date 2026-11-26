@@ -159,3 +159,27 @@ export function registerNotificationResponseListener(
     subscription.remove();
   };
 }
+
+/**
+ * Register for remote push notifications (Expo Push / FCM) and obtain the push token.
+ * This token allows the server to send push notifications that wake up the phone
+ * even when the screen is locked or the user is in another app like Messenger.
+ */
+export async function registerForPushNotificationsAsync(): Promise<string | null> {
+  try {
+    const hasPermission = await checkDeviceNotificationPermissions();
+    if (!hasPermission) {
+      const granted = await requestDeviceNotificationPermissions();
+      if (!granted) return null;
+    }
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: '939b0940-115c-417e-87a3-cd979e1c922a',
+    });
+
+    return tokenData.data;
+  } catch (error) {
+    console.warn('[DeviceNotifications] Push token registration notice:', error);
+    return null;
+  }
+}

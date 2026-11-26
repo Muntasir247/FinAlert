@@ -157,6 +157,22 @@ export async function deleteAllNotifications(userId: string): Promise<void> {
 }
 
 /**
+ * Save or update the device's remote push notification token for the user.
+ * Enables the server to send push notifications when the app is in the background
+ * or the phone screen is locked.
+ */
+export async function saveUserPushToken(userId: string, token: string): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ push_token: token })
+    .eq('id', userId);
+
+  if (error) {
+    console.warn('[Notifications] Failed to save push token:', error.message);
+  }
+}
+
+/**
  * Real-time subscription helper isolated behind the lib layer (per backend portability rules).
  * Listens for new rows inserted into public.notifications for this user.
  */

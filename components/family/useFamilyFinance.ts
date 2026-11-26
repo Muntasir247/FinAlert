@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { useNotifications } from '../../context/NotificationsContext';
 import type { FamilyRole } from './familyConstants';
 import {
@@ -11,6 +12,7 @@ import {
   updateFamilyExpense,
   deleteFamilyExpense,
   deleteFamilyTransaction,
+  subscribeToFamilyFinance,
 } from '../../lib/familyFinance';
 import type {
   MemberFinance,
@@ -39,7 +41,7 @@ export interface FamilyFinanceApi {
   me: MemberFinance | null;
   isAdmin: boolean;
   isLoading: boolean;
-  reload: () => Promise<void>;
+  reload: (silent?: boolean) => Promise<void>;
   memberPaid: (memberId: string) => number;
   expensePaid: (expense: SharedExpense) => number;
   expenseStatus: (expense: SharedExpense) => 'Paid' | 'Partial';
@@ -66,30 +68,70 @@ export function useFamilyFinance(familyId: string | null, currentUserId?: string
   const [transactions, setTransactions] = useState<FamilyTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const reload = useCallback(async () => {
-    if (!familyId) {
-      setFinances([]);
-      setExpenses([]);
-      setTransactions([]);
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const snapshot = await fetchFamilyFinance(familyId);
-      setFinances(snapshot.finances);
-      setExpenses(snapshot.expenses);
-      setTransactions(snapshot.transactions);
-    } catch (error) {
-      console.error('Failed to load family finance:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [familyId]);
+  const reload = useCallback(
+    async (silent = false) => {
+      if (!familyId) {
+        setFinances([]);
+        setExpenses([]);
+        setTransactions([]);
+        setIsLoading(false);
+        return;
+      }
+      if (!silent) setIsLoading(true);
+      try {
+        const snapshot = await fetchFamilyFinance(familyId);
+        setFinances(snapshot.finances);
+        setExpenses(snapshot.expenses);
+        setTransactions(snapshot.transactions);
+      } catch (error) {
+        console.error('Failed to load family finance:', error);
+      } finally {
+        if (!silent) setIsLoading(false);
+      }
+    },
+    [familyId]
+  );
 
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // ── Realtime: Family Finance Subscription ─────────────────────────────────
+  // Instantly syncs when another member adds/edits/deletes expenses, records payments, or updates roles
+  useEffect(() => {
+    if (!familyId) return;
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onFinanceChange = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        reload(true);
+      }, 150);
+    };
+
+    const unsubscribe = subscribeToFamilyFinance(familyId, onFinanceChange);
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [familyId, reload]);
+
+  // ── AppState Listener: Resuming from Background ───────────────────────────
+  // Immediately syncs finance snapshot when app returns to active state
+  useEffect(() => {
+    if (!familyId) return;
+
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        reload(true);
+      }
+    };
+
+    const sub = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      sub.remove();
+    };
+  }, [familyId, reload]);
 
   const me = useMemo(
     () => finances.find((m) => m.userId === currentUserId) ?? finances[0] ?? null,

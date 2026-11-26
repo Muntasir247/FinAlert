@@ -121,7 +121,7 @@ export default function ProfileScreen() {
 
         {/* ── Preferences Group Card ── */}
         <View style={styles.groupContainer}>
-          <Text style={[styles.groupHeader, { color: colors.textMuted }]}>
+          <Text style={[styles.groupHeader, { color: colors.text }]}>
             {t('profile.preferences', 'PREFERENCES')}
           </Text>
           <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
@@ -210,7 +210,7 @@ export default function ProfileScreen() {
 
         {/* ── Account Group Card ── */}
         <View style={styles.groupContainer}>
-          <Text style={[styles.groupHeader, { color: colors.textMuted }]}>
+          <Text style={[styles.groupHeader, { color: colors.text }]}>
             {t('profile.account', 'ACCOUNT')}
           </Text>
           <View style={[styles.groupCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
@@ -271,7 +271,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <Text style={[styles.versionText, { color: colors.textMuted }]}>
-          {t('profile.version', 'Version')} 1.0.0
+          {t('profile.version', 'Version')} 1.7
         </Text>
       </ScrollView>
 
@@ -694,9 +694,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   groupHeader: {
-    fontSize: 13,
-    lineHeight: 15,
-    fontWeight: '400',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#091E15',
     paddingLeft: 4,
   },
   groupCard: {

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationsContext';
 import {
@@ -7,6 +8,8 @@ import {
   joinFamilyByCode as joinFamilyByCodeDb,
   leaveFamily as leaveFamilyDb,
   deleteFamily as deleteFamilyDb,
+  subscribeToFamilyChanges,
+  subscribeToUserMembership,
 } from '../lib/families';
 import type { Family, FamilyMember } from '../lib/families';
 
@@ -19,7 +22,7 @@ interface FamilyContextType {
   joinFamily: (code: string) => Promise<{ error: any; family?: Family }>;
   leaveFamily: () => Promise<{ error: any }>;
   deleteFamily: () => Promise<{ error: any }>;
-  refreshFamily: () => Promise<void>;
+  refreshFamily: (silent?: boolean) => Promise<void>;
 }
 
 const FamilyContext = createContext<FamilyContextType | undefined>(undefined);
@@ -52,8 +55,8 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
 
-  const loadFamily = useCallback(async (userId: string) => {
-    setIsLoading(true);
+  const loadFamily = useCallback(async (userId: string, silent = false) => {
+    if (!silent) setIsLoading(true);
     try {
       const result = await fetchUserFamily(userId);
       setFamily(result?.family ?? null);
@@ -62,21 +65,25 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch (e) {
       console.error('Failed to load family:', e);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, []);
 
-  const refreshFamily = useCallback(async () => {
-    if (!user) {
-      setFamily(null);
-      setMembers([]);
-      setIsLoading(false);
-      setHasLoaded(false);
-      return;
-    }
-    await loadFamily(user.id);
-  }, [user, loadFamily]);
+  const refreshFamily = useCallback(
+    async (silent = false) => {
+      if (!user) {
+        setFamily(null);
+        setMembers([]);
+        setIsLoading(false);
+        setHasLoaded(false);
+        return;
+      }
+      await loadFamily(user.id, silent);
+    },
+    [user, loadFamily]
+  );
 
+  // Initial load when user changes
   useEffect(() => {
     if (user) {
       loadFamily(user.id);
@@ -86,6 +93,51 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsLoading(false);
       setHasLoaded(false);
     }
+  }, [user, loadFamily]);
+
+  // ── Realtime: User Membership Subscription ────────────────────────────────
+  // Listens for when the current user joins, is added to, or is removed from any family
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubscribe = subscribeToUserMembership(user.id, () => {
+      loadFamily(user.id, true);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user, loadFamily]);
+
+  // ── Realtime: Active Family Roster Subscription ───────────────────────────
+  // Listens for other members joining, leaving, updating roles, or the family being deleted
+  useEffect(() => {
+    if (!user || !family?.id) return;
+
+    const unsubscribe = subscribeToFamilyChanges(family.id, () => {
+      loadFamily(user.id, true);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user, family?.id, loadFamily]);
+
+  // ── AppState Listener: Resuming from Background ───────────────────────────
+  // Instantly re-syncs family roster whenever user brings app back to foreground
+  useEffect(() => {
+    if (!user) return;
+
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        loadFamily(user.id, true);
+      }
+    };
+
+    const sub = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      sub.remove();
+    };
   }, [user, loadFamily]);
 
   const createFamily = useCallback(

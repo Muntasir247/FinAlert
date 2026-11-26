@@ -224,3 +224,68 @@ export async function removeFamilyMember(memberId: string): Promise<void> {
     throw error;
   }
 }
+
+/**
+ * Real-time subscription to financial activity within a family.
+ * Listens for new expenses, updated/deleted expenses, new payments/transactions,
+ * and contributor payment updates.
+ */
+export function subscribeToFamilyFinance(
+  familyId: string,
+  onChange: () => void,
+  onError?: (err: any) => void
+): () => void {
+  const channelName = `realtime:family_finance:${familyId}`;
+
+  const channel = supabase
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'family_expenses',
+        filter: `family_id=eq.${familyId}`,
+      },
+      () => onChange()
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'family_transactions',
+        filter: `family_id=eq.${familyId}`,
+      },
+      () => onChange()
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'family_expense_contributors',
+      },
+      () => onChange()
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'family_members',
+        filter: `family_id=eq.${familyId}`,
+      },
+      () => onChange()
+    )
+    .subscribe((status, err) => {
+      if (err) {
+        console.warn(`[Realtime family finance] channel ${channelName} error:`, err);
+        onError?.(err);
+      }
+    });
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}

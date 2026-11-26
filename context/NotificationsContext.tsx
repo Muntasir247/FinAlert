@@ -24,8 +24,10 @@ import {
   deleteNotification,
   deleteAllNotifications,
   subscribeToNotifications,
+  saveUserPushToken,
 } from '../lib/notifications';
 import type { AppNotification, NewNotification } from '../lib/notifications';
+import { reconnectRealtime } from '../lib/supabase';
 import {
   setupDeviceNotificationsAsync,
   presentDeviceNotification,
@@ -35,6 +37,7 @@ import {
   registerNotificationResponseListener,
   requestDeviceNotificationPermissions,
   checkDeviceNotificationPermissions,
+  registerForPushNotificationsAsync,
 } from '../lib/deviceNotifications';
 
 const PREF_NOTIFICATIONS_ENABLED = 'finalert_pref_notifications_enabled';
@@ -49,7 +52,7 @@ interface NotificationsContextType {
   markAllRead: () => Promise<{ error: any }>;
   dismissNotification: (notifId: string) => Promise<{ error: any }>;
   clearAllNotifications: () => Promise<{ error: any }>;
-  refreshNotifications: (silent?: boolean) => Promise<void>;
+  refreshNotifications: (silent?: boolean, presentNewAlerts?: boolean) => Promise<void>;
   notify: (
     notif: NewNotification,
     options?: { skipDuplicateCheck?: boolean; dedupeHours?: number }
@@ -70,6 +73,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Keep a ref of current notifications to prevent duplicate insertions from realtime events
   const notifMapRef = useRef<Map<string, AppNotification>>(new Map());
+  const notificationsRef = useRef<AppNotification[]>([]);
   // Ref of recently presented device notification keys/IDs to prevent double-firing alerts
   const presentedDeviceKeysRef = useRef<Map<string, number>>(new Map());
 
@@ -209,12 +213,29 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // ── 3. Load Notifications From Database ───────────────────────────────────
   const loadNotifications = useCallback(
-    async (userId: string, silent = false) => {
+    async (userId: string, silent = false, presentNewAlerts = false) => {
       if (!silent) setIsLoading(true);
       try {
         const data = await fetchNotifications(userId);
         const deduped = deduplicateNotificationList(data);
+
+        // When returning to the foreground, present any new alerts that arrived while backgrounded
+        if (presentNewAlerts) {
+          const existingMap = notifMapRef.current;
+          const now = Date.now();
+          deduped.forEach((item) => {
+            if (!item.is_read && !existingMap.has(item.id)) {
+              const itemTime = new Date(item.created_at).getTime();
+              // Only alert for events from the past 60 minutes
+              if (now - itemTime < 60 * 60 * 1000) {
+                safePresentDevice(item);
+              }
+            }
+          });
+        }
+
         setNotifications(deduped);
+        notificationsRef.current = deduped;
 
         // Update lookup map
         const newMap = new Map<string, AppNotification>();
@@ -228,19 +249,20 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         if (!silent) setIsLoading(false);
       }
     },
-    []
+    [safePresentDevice]
   );
 
   const refreshNotifications = useCallback(
-    async (silent = false) => {
+    async (silent = false, presentNewAlerts = false) => {
       if (!user) {
         setNotifications([]);
+        notificationsRef.current = [];
         notifMapRef.current.clear();
         setIsLoading(false);
         setHasLoaded(false);
         return;
       }
-      await loadNotifications(user.id, silent);
+      await loadNotifications(user.id, silent, presentNewAlerts);
     },
     [user, loadNotifications]
   );
@@ -251,13 +273,30 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       loadNotifications(user.id);
     } else {
       setNotifications([]);
+      notificationsRef.current = [];
       notifMapRef.current.clear();
       setIsLoading(false);
       setHasLoaded(false);
     }
   }, [user, loadNotifications]);
 
+  // Keep notificationsRef synced whenever notifications state changes
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
+
+  // Register push token for remote notifications (FCM / background & lock-screen delivery)
+  useEffect(() => {
+    if (!user || !notificationsEnabled) return;
+    registerForPushNotificationsAsync().then((token) => {
+      if (token && user?.id) {
+        saveUserPushToken(user.id, token);
+      }
+    });
+  }, [user, notificationsEnabled]);
+
   // ── 4. Real-time Subscription to Database Notifications ───────────────────
+  // Isolated listener that stays stably connected without tearing down on every state change
   useEffect(() => {
     if (!user) return;
 
@@ -270,7 +309,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         const dedupeKey = getNotificationDedupeKey(newNotif);
-        const isDupe = notifications.some((n) => {
+        const currentList = notificationsRef.current;
+        const isDupe = currentList.some((n) => {
           if (n.id === newNotif.id) return true;
           const k = getNotificationDedupeKey(n);
           const diffMs = Math.abs(
@@ -284,9 +324,13 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         notifMapRef.current.set(newNotif.id, newNotif);
-        setNotifications((prev) => deduplicateNotificationList([newNotif, ...prev]));
+        setNotifications((prev) => {
+          const updated = deduplicateNotificationList([newNotif, ...prev]);
+          notificationsRef.current = updated;
+          return updated;
+        });
 
-        // Present native phone notification on dashboard/panel
+        // Present native phone notification on dashboard/panel immediately
         safePresentDevice(newNotif);
       },
       (err) => {
@@ -297,16 +341,17 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => {
       unsubscribe();
     };
-  }, [user, notifications, safePresentDevice]);
+  }, [user, safePresentDevice]);
 
   // ── 5. AppState Listener & Foreground Polling Fallback ────────────────────
-  // When user returns to the app, sync notifications silently so any background events appear
+  // When user returns to the app, reconnect socket and sync notifications instantly
   useEffect(() => {
     if (!user) return;
 
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
-        refreshNotifications(true);
+        reconnectRealtime();
+        refreshNotifications(true, true);
       }
     };
 

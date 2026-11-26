@@ -140,3 +140,84 @@ export async function deleteFamily(familyId: string): Promise<void> {
     if (directError) throw error;
   }
 }
+
+/**
+ * Real-time subscription to changes within a specific family group.
+ * Listens for roster changes (members joined, left, roles/limits updated)
+ * and family group details updates or deletions.
+ */
+export function subscribeToFamilyChanges(
+  familyId: string,
+  onChange: () => void,
+  onError?: (err: any) => void
+): () => void {
+  const channelName = `realtime:family_roster:${familyId}`;
+
+  const channel = supabase
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'family_members',
+        filter: `family_id=eq.${familyId}`,
+      },
+      () => onChange()
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'families',
+        filter: `id=eq.${familyId}`,
+      },
+      () => onChange()
+    )
+    .subscribe((status, err) => {
+      if (err) {
+        console.warn(`[Realtime family] channel ${channelName} error:`, err);
+        onError?.(err);
+      }
+    });
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+/**
+ * Real-time subscription listening for when a specific user is added,
+ * removed, or modified in any family group.
+ */
+export function subscribeToUserMembership(
+  userId: string,
+  onChange: () => void,
+  onError?: (err: any) => void
+): () => void {
+  const channelName = `realtime:user_membership:${userId}`;
+
+  const channel = supabase
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'family_members',
+        filter: `user_id=eq.${userId}`,
+      },
+      () => onChange()
+    )
+    .subscribe((status, err) => {
+      if (err) {
+        console.warn(`[Realtime user membership] channel ${channelName} error:`, err);
+        onError?.(err);
+      }
+    });
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
